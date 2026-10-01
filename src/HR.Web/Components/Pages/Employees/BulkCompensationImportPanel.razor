@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @using HR.Web.Services
 @inject CompensationService CompensationService
@@ -9,7 +10,7 @@
     <div class="card-body">
         <p class="text-muted">Upload a spreadsheet (use the template above) to update many employees' compensation in one step.</p>
         <InputFile class="form-control mb-2" OnChange="OnImportFileSelected" accept=".xlsx" disabled="@_importing" />
-        <SfButton IsPrimary="true" Disabled="@(_importFile is null || _importing)" OnClick="ImportAsync">
+        <SfButton IsPrimary="true" Disabled="@(Session.IsReadOnly || _importFile is null || _importing)" OnClick="ImportAsync">
             @if (_importing)
             {
                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>

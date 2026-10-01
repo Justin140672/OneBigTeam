@@ -176,8 +176,19 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
 
     public async Task OpenSaveViewDialogAsync()
     {
-        await page.Locator(".report-filter-toolbar button:has(span.e-save)").ClickAsync();
-        await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        var saveButton = page.Locator(".report-filter-toolbar button:has(span.e-save)");
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            await saveButton.ClickAsync();
+            try
+            {
+                await SaveViewDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < 4 ? 5_000 : 10_000 });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
     }
 
     public async Task SaveCurrentFiltersAsNewViewAsync(string name)

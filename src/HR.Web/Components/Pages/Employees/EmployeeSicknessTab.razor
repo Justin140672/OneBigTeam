@@ -1,3 +1,4 @@
+@inject AppSession Session
 @inject SicknessService SicknessService
 
 <RecordSicknessDialog CompanyId="CompanyId"
@@ -27,7 +28,7 @@ else
         <div class="card-header d-flex align-items-center">
             <h5 class="mb-0">Sickness</h5>
             <div class="ms-auto d-flex gap-2">
-                <SfButton CssClass="e-primary e-small" OnClick="@(() => _recordOpen = true)">
+                <SfButton CssClass="e-primary e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => _recordOpen = true)">
                     <i class="fa-solid fa-plus me-1"></i> Record Sickness
                 </SfButton>
             </div>
@@ -89,7 +90,7 @@ else
                             @if (r.Status == "Active")
                             {
                                 <SfButton CssClass="e-outline e-small"
-                                          OnClick="() => StartClose(r.Id)"
+                                          Disabled="@Session.IsReadOnly" OnClick="() => StartClose(r.Id)"
                                           title="Close record">
                                     Close
                                 </SfButton>

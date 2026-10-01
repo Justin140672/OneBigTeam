@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @inject AssetService AssetService
 @inject TaskService TaskService
@@ -51,7 +52,7 @@
                 <div class="alert alert-danger">@_error</div>
             }
 
-            <SfButton IsPrimary="true" data-testid="acknowledge-btn" OnClick="AcknowledgeAsync" Disabled="@_submitting">
+            <SfButton IsPrimary="true" data-testid="acknowledge-btn" OnClick="AcknowledgeAsync" Disabled="@(_submitting || Session.IsReadOnly)">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

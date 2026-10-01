@@ -1,3 +1,4 @@
+@inject AppSession Session
 @* SPEC-OFF-01: this is no longer a standalone employee-profile tab (see EmployeeProfileNavigation
    and EmployeeEdit.razor) — it renders the offboarding checklist section embedded inside the
    unified EmployeeLeavingTab.razor "Leaving & Offboarding" workspace. *@
@@ -125,7 +126,7 @@ else
                                         }
                                         @if (CanWaive && LeavingInProgress && t.Status is "Pending" or "InProgress")
                                         {
-                                            <SfButton CssClass="e-outline e-small e-warning" OnClick="@(() => OpenWaive(t))">Waive</SfButton>
+                                            <SfButton CssClass="e-outline e-small e-warning" Disabled="@Session.IsReadOnly" OnClick="@(() => OpenWaive(t))">Waive</SfButton>
                                         }
                                     </div>
                                 </td>

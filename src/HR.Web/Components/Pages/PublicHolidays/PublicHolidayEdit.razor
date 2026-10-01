@@ -62,7 +62,7 @@
                     <div class="d-flex gap-2 mt-3 justify-content-end">
                         @if (!IsViewMode)
                         {
-                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                            <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
                                 @if (Saving)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

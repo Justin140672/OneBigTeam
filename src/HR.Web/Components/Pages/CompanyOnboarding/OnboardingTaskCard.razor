@@ -1,3 +1,5 @@
+@inject AppSession Session
+
 <div class="card h-100">
     <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">@Task.Name</h6>
@@ -21,14 +23,14 @@
                 {
                     if (action.IsDownload)
                     {
-                        <a href="@action.Href" download data-enhance-nav="false"
-                           class="btn btn-outline-primary btn-sm" aria-label="@action.AccessibleName">
+                        <a href="@(Session.IsReadOnly ? null : action.Href)" download data-enhance-nav="false" aria-disabled="@(Session.IsReadOnly ? "true" : null)" tabindex="@(Session.IsReadOnly ? -1 : null)"
+                           class="btn btn-outline-primary btn-sm @(Session.IsReadOnly ? "disabled" : "")" aria-label="@action.AccessibleName">
                             <i class="@action.IconCss me-1" aria-hidden="true"></i>@action.Label
                         </a>
                     }
                     else
                     {
-                        <a href="@action.Href" class="btn btn-primary btn-sm">@action.Label</a>
+                        <a href="@(Session.IsReadOnly ? null : action.Href)" aria-disabled="@(Session.IsReadOnly ? "true" : null)" tabindex="@(Session.IsReadOnly ? -1 : null)" class="btn btn-primary btn-sm @(Session.IsReadOnly ? "disabled" : "")">@action.Label</a>
                     }
                 }
             </div>

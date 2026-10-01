@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel
 @inject DocumentService DocumentService
 @inject ICompanyTimeProvider CompanyTimeProvider
@@ -42,7 +43,7 @@
                                 @if (r.Status == "Requested" && EmployeeSelfUpload)
                                 {
                                     <SfButton CssClass="e-primary e-small"
-                                              OnClick="() => OpenUploadRequested(r)">
+                                              Disabled="@Session.IsReadOnly" OnClick="() => OpenUploadRequested(r)">
                                         <i class="fa-solid fa-upload me-1"></i> Upload
                                     </SfButton>
                                 }
@@ -52,7 +53,7 @@
                                     {
                                         <span class="me-2 text-muted small">Cancel?</span>
                                         <SfButton CssClass="e-danger e-small me-1"
-                                                  OnClick="() => ConfirmCancelRequestAsync(r.Id)">
+                                                  Disabled="@Session.IsReadOnly" OnClick="() => ConfirmCancelRequestAsync(r.Id)">
                                             Yes
                                         </SfButton>
                                         <SfButton CssClass="e-small" OnClick="ClearCancelTarget">No</SfButton>
@@ -60,7 +61,7 @@
                                     else
                                     {
                                         <SfButton CssClass="e-outline e-small"
-                                                  OnClick="() => _cancelTargetId = r.Id"
+                                                  Disabled="@Session.IsReadOnly" OnClick="() => _cancelTargetId = r.Id"
                                                   title="Cancel request">
                                             Cancel
                                         </SfButton>
@@ -131,10 +132,10 @@ else
             @if (!EmployeeSelfUpload)
             {
                 <div class="ms-auto d-flex gap-2">
-                    <SfButton CssClass="e-outline e-small" OnClick="@(() => _requestOpen = true)">
+                    <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => _requestOpen = true)">
                         <i class="fa-solid fa-file-circle-plus me-1"></i> Request Document
                     </SfButton>
-                    <SfButton CssClass="e-primary e-small" OnClick="@(() => _uploadOpen = true)">
+                    <SfButton CssClass="e-primary e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => _uploadOpen = true)">
                         <i class="fa-solid fa-upload me-1"></i> Upload
                     </SfButton>
                 </div>
@@ -183,7 +184,7 @@ else
                             {
                                 <span class="me-2 text-muted small">Delete?</span>
                                 <SfButton CssClass="e-danger e-small me-1"
-                                          OnClick="() => ConfirmDeleteAsync(r.EmployeeDocumentId)">
+                                          Disabled="@Session.IsReadOnly" OnClick="() => ConfirmDeleteAsync(r.EmployeeDocumentId)">
                                     Yes
                                 </SfButton>
                                 <SfButton CssClass="e-small" OnClick="CancelDelete">No</SfButton>
@@ -198,7 +199,7 @@ else
                                 @if (!EmployeeSelfUpload)
                                 {
                                     <SfButton CssClass="e-outline e-small me-1"
-                                              OnClick="() => OpenUploadVersion(r.EmployeeDocumentId)"
+                                              Disabled="@Session.IsReadOnly" OnClick="() => OpenUploadVersion(r.EmployeeDocumentId)"
                                               title="Upload a replacement as a new version">
                                         New Version
                                     </SfButton>
@@ -208,7 +209,7 @@ else
                                         History
                                     </SfButton>
                                     <SfButton CssClass="e-danger e-outline e-small"
-                                              OnClick="() => StartDelete(r.EmployeeDocumentId)">
+                                              Disabled="@Session.IsReadOnly" OnClick="() => StartDelete(r.EmployeeDocumentId)">
                                         Delete
                                     </SfButton>
                                 }

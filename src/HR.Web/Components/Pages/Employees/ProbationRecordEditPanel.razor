@@ -73,7 +73,7 @@ else
         </EditForm>
 
         <div class="mt-3 d-flex gap-2">
-            <SfButton IsPrimary="true" OnClick="SaveAsync" data-testid="save-probation-record">Save</SfButton>
+            <SfButton IsPrimary="true" Disabled="@IsSubscriptionReadOnly" OnClick="SaveAsync" data-testid="save-probation-record">Save</SfButton>
             <SfButton CssClass="e-outline" OnClick="@(() => OnCancel.InvokeAsync())">Cancel</SfButton>
         </div>
     </div>

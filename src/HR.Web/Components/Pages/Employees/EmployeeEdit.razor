@@ -29,7 +29,7 @@
         </BreadcrumbItems>
     </SfBreadcrumb>
 
-    @if (IsLoading)
+    @if (IsLoading || _accessDenied)
     {
         <HrLoadingIndicator />
     }
@@ -269,7 +269,7 @@
                     </div>
 
                     <div class="d-flex gap-2 align-items-center mt-3 justify-content-end">
-                        <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                        <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
                             @if (Saving)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -297,7 +297,7 @@
             <div class="ms-auto d-flex align-items-center gap-2">
                 @if (IsViewMode && Session.CanManageEmployees)
                 {
-                    <SfButton CssClass="e-small e-primary" data-testid="edit-details-button" OnClick="EnterEditMode">
+                    <SfButton CssClass="e-small e-primary" data-testid="edit-details-button" Disabled="@Session.IsReadOnly" OnClick="EnterEditMode">
                         <i class="fa-solid fa-pen me-1"></i>Edit details
                     </SfButton>
                 }
@@ -746,7 +746,7 @@
                  below; only rendered in edit mode, per AC3. -->
             <div class="employee-edit-sticky-bar">
                 <div class="d-flex gap-2 align-items-center justify-content-end">
-                    <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                    <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
                         @if (Saving)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -963,11 +963,14 @@
 
     private EmployeeNumberMode _companyEmployeeNumberMode = EmployeeNumberMode.Manual;
 
+    private bool _accessDenied;
+
     protected override async Task LoadAsync()
     {
         await Session.InitialiseAsync();
         if (!Session.CanManageEmployees)
         {
+            _accessDenied = true;
             Navigation.NavigateTo(Session.MyProfileUrl, replace: true);
             return;
         }

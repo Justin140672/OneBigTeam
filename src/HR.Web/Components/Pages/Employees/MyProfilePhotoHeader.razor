@@ -1,10 +1,11 @@
+@inject AppSession Session
 @using HR.SharedKernel.Http
 @inject ProfilePhotoService ProfilePhotoService
 
 <div class="photo-header-row">
     <ProfilePhotoAvatar PhotoUrl="@_photo?.CurrentPhoto?.DownloadUrl" Initials="@Initials" SizePx="72" />
     <div>
-        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@_loading">Change Photo</SfButton>
+        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@(_loading || Session.IsReadOnly)">Change Photo</SfButton>
 
         @if (_photo?.PendingPhoto is not null)
         {
@@ -14,7 +15,7 @@
                     <div class="fw-semibold small">Pending approval</div>
                     <div class="small text-muted">Awaiting HR review</div>
                 </div>
-                <SfButton CssClass="e-small e-flat" Disabled="@_cancelling" OnClick="CancelPendingAsync">
+                <SfButton CssClass="e-small e-flat" Disabled="@(_cancelling || Session.IsReadOnly)" OnClick="CancelPendingAsync">
                     @if (_cancelling)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

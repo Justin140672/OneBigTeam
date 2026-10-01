@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using System.ComponentModel.DataAnnotations
 @using HR.SharedKernel
 @using HR.Web.Models
@@ -33,7 +34,7 @@
     <FooterContent>
             @* Secondary action first, destructive primary action rightmost. *@
             <SfButton Disabled="@_submitting" OnClick="DismissAsync">Close</SfButton>
-            <SfButton CssClass="e-danger" IsPrimary="true" Disabled="@_submitting" OnClick="ConfirmAsync">
+            <SfButton CssClass="e-danger" IsPrimary="true" Disabled="@(_submitting || Session.IsReadOnly)" OnClick="ConfirmAsync">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject DocumentService DocumentService
@@ -52,7 +53,7 @@
             </EditForm>
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="_uploading">
+            <SfButton IsPrimary="true" OnClick="SubmitAsync" Disabled="@(_uploading || Session.IsReadOnly)">
                 @if (_uploading)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

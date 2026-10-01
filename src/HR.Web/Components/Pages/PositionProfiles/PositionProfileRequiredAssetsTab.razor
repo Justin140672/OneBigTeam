@@ -1,3 +1,4 @@
+@inject AppSession Session
 @inject PositionProfileService PositionProfileService
 
 <AddRequiredAssetDialog CompanyId="CompanyId"
@@ -19,7 +20,7 @@ else
             @if (CanEdit)
             {
                 <div class="ms-auto">
-                    <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)">
+                    <SfButton CssClass="e-primary e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => _addOpen = true)">
                         <i class="fa-solid fa-plus me-1"></i> Add
                     </SfButton>
                 </div>
@@ -60,7 +61,7 @@ else
                                     {
                                         <span class="me-2 text-muted small">Remove?</span>
                                         <SfButton CssClass="e-danger e-small me-1"
-                                                  OnClick="() => ConfirmRemoveAsync(r.Id)">
+                                                  Disabled="@Session.IsReadOnly" OnClick="() => ConfirmRemoveAsync(r.Id)">
                                             Yes
                                         </SfButton>
                                         <SfButton CssClass="e-small" OnClick="CancelRemove">No</SfButton>
@@ -68,7 +69,7 @@ else
                                     else
                                     {
                                         <SfButton CssClass="e-danger e-outline e-small"
-                                                  OnClick="() => StartRemove(r.Id)"
+                                                  Disabled="@Session.IsReadOnly" OnClick="() => StartRemove(r.Id)"
                                                   title="Remove">
                                             <i class="fa-solid fa-trash"></i>
                                         </SfButton>

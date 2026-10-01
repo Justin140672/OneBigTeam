@@ -24,11 +24,11 @@
             </div>
             <div class="recruitment-dashboard-actions">
                 <SfButton IsPrimary="true" CssClass="recruitment-dashboard-action-btn"
-                          OnClick="NavigateToNewVacancy" data-testid="recruitment-dashboard-create-vacancy-btn">
+                          Disabled="@Session.IsReadOnly" OnClick="NavigateToNewVacancy" data-testid="recruitment-dashboard-create-vacancy-btn">
                     <i class="fa-solid fa-plus me-1"></i>Create vacancy
                 </SfButton>
                 <SfButton CssClass="recruitment-dashboard-action-btn"
-                          OnClick="NavigateToNewCandidate" data-testid="recruitment-dashboard-add-candidate-btn">
+                          Disabled="@Session.IsReadOnly" OnClick="NavigateToNewCandidate" data-testid="recruitment-dashboard-add-candidate-btn">
                     <i class="fa-solid fa-user-plus me-1"></i>Add candidate
                 </SfButton>
             </div>

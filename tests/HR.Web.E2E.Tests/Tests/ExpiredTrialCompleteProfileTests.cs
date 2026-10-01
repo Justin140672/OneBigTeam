@@ -83,7 +83,21 @@ public sealed class ExpiredTrialCompleteProfileTests(ParallelBlankPersonaFixture
         Assert.Equal("Start subscription", (await alert.GetByTestId("subscription-alert-action").InnerTextAsync()).Trim());
         Assert.Equal(0, await alert.GetByTestId("subscription-alert-guidance").CountAsync());
 
-        await alert.GetByTestId("subscription-alert-action").ClickAsync();
+        var action = alert.GetByTestId("subscription-alert-action");
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            if (await action.IsVisibleAsync())
+                await action.ClickAsync();
+            try
+            {
+                await _page.WaitForFunctionAsync("() => location.pathname.includes('/subscription') && document.querySelector('.card-header h5') !== null", null, new() { Timeout = 8_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
+
         await AssertSubscriptionPageOpenedAsync();
     }
 

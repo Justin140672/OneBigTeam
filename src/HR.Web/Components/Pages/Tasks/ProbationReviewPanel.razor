@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
 @inject ProbationService ProbationService
@@ -82,7 +83,7 @@
             }
             <SfButton CssClass="e-success"
                     OnClick="CompleteReviewAsync"
-                    Disabled="@_submitting">
+                    Disabled="@(_submitting || Session.IsReadOnly)">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

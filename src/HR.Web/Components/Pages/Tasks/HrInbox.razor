@@ -69,7 +69,7 @@
                             View
                         </SfButton>
                         <SfButton CssClass="e-small" IsPrimary="true"
-                                Disabled="@(_claiming is not null)"
+                                Disabled="@(_claiming is not null || Session.IsReadOnly)"
                                 OnClick="() => ClaimAsync(t)">
                             @if (_claiming == t.Id)
                             {

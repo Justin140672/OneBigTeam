@@ -29,7 +29,7 @@
         </div>
         <div class="card-body">
             <div class="mb-3">
-                <InputFile class="form-control" OnChange="OnFileSelected" accept=".xlsx" disabled="@(_session is not null)" />
+                <InputFile class="form-control" OnChange="OnFileSelected" accept=".xlsx" disabled="@(_session is not null || Session.IsReadOnly)" />
             </div>
             @if (_session is not null)
             {
@@ -45,7 +45,7 @@
             <div class="d-flex gap-2 mt-2">
                 @if (_session is null)
                 {
-                    <SfButton IsPrimary="true" Disabled="@(_selectedFile is null || _uploading)" OnClick="UploadAsync">
+                    <SfButton IsPrimary="true" Disabled="@(_selectedFile is null || _uploading || Session.IsReadOnly)" OnClick="UploadAsync">
                         @if (_uploading)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -137,7 +137,7 @@
                     </div>
 
                     <div class="d-flex gap-2 mt-2">
-                        <SfButton IsPrimary="true" Disabled="@_validating" OnClick="ContinueToValidateAsync">
+                        <SfButton IsPrimary="true" Disabled="@(_validating || Session.IsReadOnly)" OnClick="ContinueToValidateAsync">
                             @if (_validating)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -260,7 +260,7 @@
                 }
 
                 <div class="d-flex gap-2 mt-2">
-                    <SfButton IsPrimary="true" Disabled="@(_preview.ValidRowCount == 0 || _confirming)" OnClick="ConfirmAsync">
+                    <SfButton IsPrimary="true" Disabled="@(_preview.ValidRowCount == 0 || _confirming || Session.IsReadOnly)" OnClick="ConfirmAsync">
                         @if (_confirming)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>

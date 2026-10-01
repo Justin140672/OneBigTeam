@@ -46,6 +46,11 @@ public sealed class CandidateEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
+    public async Task ClickSaveAsync()
+    {
+        await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Save|Add)$") }).ClickAsync();
+    }
+
     public async Task SaveNewCandidateAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { NameRegex = new System.Text.RegularExpressions.Regex("^(Save|Add)$") }).ClickAsync();

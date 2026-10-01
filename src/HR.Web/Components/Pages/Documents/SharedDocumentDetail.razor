@@ -39,12 +39,12 @@
                 <div class="doc-detail-actions-group">
                     @if (_detail.Status == "Draft")
                     {
-                        <SfButton CssClass="e-primary" OnClick="@(() => _publishConfirmOpen = true)"
+                        <SfButton CssClass="e-primary" Disabled="@Session.IsReadOnly" OnClick="@(() => _publishConfirmOpen = true)"
                                   aria-label="@($"Publish {_detail.Title}")">
                             <i class="fa-solid fa-paper-plane me-1"></i> Publish
                         </SfButton>
                     }
-                    <SfButton CssClass="e-outline" OnClick="@(() => _editOpen = true)"
+                    <SfButton CssClass="e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => _editOpen = true)"
                               aria-label="@($"Edit details for {_detail.Title}")">
                         <i class="fa-solid fa-pen me-1"></i> Edit details
                     </SfButton>
@@ -74,7 +74,7 @@
                         </span>
                         @if (_detail.Status != "Archived")
                         {
-                            <SfButton CssClass="e-small e-outline" OnClick="@(() => _uploadVersionOpen = true)">
+                            <SfButton CssClass="e-small e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => _uploadVersionOpen = true)">
                                 <i class="fa-solid fa-upload me-1"></i> Upload New Version
                             </SfButton>
                         }
@@ -161,7 +161,7 @@
                             <i class="fa-solid fa-users overview-card-icon"></i>
                             <span class="overview-card-title">Audience</span>
                         </span>
-                        <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAudienceOpen = true)">
+                        <SfButton CssClass="e-small e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => _editAudienceOpen = true)">
                             <i class="fa-solid fa-pen me-1"></i> Edit audience
                         </SfButton>
                     </div>
@@ -190,12 +190,12 @@
                                 </a>
                                 @if (_detail.Status == "Published")
                                 {
-                                    <SfButton CssClass="e-small e-outline me-1" OnClick="@(() => _reissueConfirmOpen = true)">
+                                    <SfButton CssClass="e-small e-outline me-1" Disabled="@Session.IsReadOnly" OnClick="@(() => _reissueConfirmOpen = true)">
                                         <i class="fa-solid fa-paper-plane me-1"></i> Reissue
                                     </SfButton>
                                 }
                             }
-                            <SfButton CssClass="e-small e-outline" OnClick="@(() => _editAcknowledgementOpen = true)">
+                            <SfButton CssClass="e-small e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => _editAcknowledgementOpen = true)">
                                 <i class="fa-solid fa-pen me-1"></i> Edit acknowledgement settings
                             </SfButton>
                         </div>
@@ -405,7 +405,7 @@
             This cannot be undone from here. Continue?
         </Content>
         <FooterTemplate>
-            <SfButton CssClass="e-primary" Disabled="_publishing" OnClick="ConfirmPublishAsync">
+            <SfButton CssClass="e-primary" Disabled="@(_publishing || Session.IsReadOnly)" OnClick="ConfirmPublishAsync">
                 @(_publishing ? "Publishing…" : "Publish")
             </SfButton>
             <SfButton Disabled="_publishing" OnClick="@(() => _publishConfirmOpen = false)">Cancel</SfButton>
@@ -437,7 +437,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton CssClass="e-danger" Disabled="_archiving" OnClick="ConfirmArchiveAsync">
+            <SfButton CssClass="e-danger" Disabled="@(_archiving || Session.IsReadOnly)" OnClick="ConfirmArchiveAsync">
                 @(_archiving ? "Archiving…" : "Archive")
             </SfButton>
             <SfButton Disabled="_archiving" OnClick="CancelArchive">Cancel</SfButton>
@@ -460,7 +460,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton CssClass="e-primary" Disabled="_reissuing" OnClick="ConfirmReissueAsync">
+            <SfButton CssClass="e-primary" Disabled="@(_reissuing || Session.IsReadOnly)" OnClick="ConfirmReissueAsync">
                 @(_reissuing ? "Sending…" : "Reissue")
             </SfButton>
             <SfButton Disabled="_reissuing" OnClick="@(() => _reissueConfirmOpen = false)">Cancel</SfButton>

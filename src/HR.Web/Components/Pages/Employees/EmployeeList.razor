@@ -555,6 +555,7 @@
             EventCallback.Factory.Create<string>(this, HandleBulkUpdateMenuItemSelected));
         builder.AddAttribute(2, nameof(HR.Web.Components.Controls.BulkUpdateMenu.HasSelection), _hasSelection);
         builder.AddAttribute(3, nameof(HR.Web.Components.Controls.BulkUpdateMenu.SelectedCount), SelectedCount);
+        builder.AddAttribute(4, nameof(HR.Web.Components.Controls.BulkUpdateMenu.Disabled), Session.IsReadOnly);
         builder.CloseComponent();
     };
 
@@ -753,16 +754,16 @@
         switch (AccountStateCategory(row.UserAccountStatus))
         {
             case "none":
-                items.Add(new() { Id = "invite", Text = "Invite", IconCss = "fa-solid fa-paper-plane" });
+                items.Add(new() { Id = "invite", Text = "Invite", Disabled = Session.IsReadOnly, IconCss = "fa-solid fa-paper-plane" });
                 break;
             case "invited":
             case "expired":
-                items.Add(new() { Id = "resend", Text = "Resend invite", IconCss = "fa-solid fa-paper-plane" });
+                items.Add(new() { Id = "resend", Text = "Resend invite", Disabled = Session.IsReadOnly, IconCss = "fa-solid fa-paper-plane" });
                 items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });
                 break;
             case "active":
                 items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });
-                items.Add(new() { Id = "disable", Text = "Disable access", IconCss = "fa-solid fa-ban" });
+                items.Add(new() { Id = "disable", Text = "Disable access", Disabled = Session.IsReadOnly, IconCss = "fa-solid fa-ban" });
                 break;
             case "disabled":
                 items.Add(new() { Id = "view", Text = "View account", IconCss = "fa-solid fa-up-right-from-square" });

@@ -22,7 +22,7 @@
                 <h1 class="mb-1">Getting Started</h1>
                 <p class="text-muted mb-3">Complete these steps to finish setting up your company.</p>
             </div>
-            <SfButton CssClass="e-outline" OnClick="SkipForNowAsync" Disabled="_dismissing">Skip for now</SfButton>
+            <SfButton CssClass="e-outline" OnClick="SkipForNowAsync" Disabled="@(_dismissing || Session.IsReadOnly)">Skip for now</SfButton>
         </div>
 
         <div class="onboarding-progress mb-4">
@@ -49,7 +49,7 @@
                         </div>
                         <div class="card-body d-flex flex-column">
                             <p class="text-muted small mb-3">Review and update your personal, contact, and employment details.</p>
-                            <a href="/companies/@Session.CompanyId/employees/@myEmployeeId" class="btn btn-primary btn-sm align-self-start mt-auto">
+                            <a href="@(Session.IsReadOnly ? null : $"/companies/{Session.CompanyId}/employees/{myEmployeeId}")" aria-disabled="@(Session.IsReadOnly ? "true" : null)" tabindex="@(Session.IsReadOnly ? -1 : null)" class="btn btn-primary btn-sm align-self-start mt-auto @(Session.IsReadOnly ? "disabled" : "")">
                                 Go to task
                             </a>
                         </div>

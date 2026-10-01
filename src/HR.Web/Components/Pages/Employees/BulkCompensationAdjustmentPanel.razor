@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @using HR.Web.Models
@@ -61,7 +62,7 @@
             </div>
         </EditForm>
         <div class="d-flex gap-2 mt-3">
-            <SfButton IsPrimary="true" Disabled="@(Employees.Count == 0 || _loadingPreview)" OnClick="BuildPreviewAsync">
+            <SfButton IsPrimary="true" Disabled="@(Session.IsReadOnly || Employees.Count == 0 || _loadingPreview)" OnClick="BuildPreviewAsync">
                 @if (_loadingPreview)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -116,7 +117,7 @@
             <p class="text-muted">@_previewRows.Count employee(s) will be updated. This is a single atomic operation — if any employee fails validation, no changes are applied to anyone.</p>
 
             <div class="d-flex gap-2">
-                <SfButton IsPrimary="true" Disabled="@_applying" OnClick="ConfirmApplyAsync">
+                <SfButton IsPrimary="true" Disabled="@(_applying || Session.IsReadOnly)" OnClick="ConfirmApplyAsync">
                     @if (_applying)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

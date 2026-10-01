@@ -23,7 +23,7 @@
     <SelectedApplicationMarker @ref="_selectionMarker" />
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="mb-0">Applications</h5>
-        <SfButton IsPrimary="true" OnClick="OpenAddDialog" data-testid="add-application-btn">
+        <SfButton IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="OpenAddDialog" data-testid="add-application-btn">
             <i class="fa-solid fa-plus me-1"></i>Add Candidate
         </SfButton>
     </div>
@@ -374,7 +374,7 @@
         <FooterTemplate>
             @* Disabled while a request is in flight so a double click can't submit twice (a second
                new-candidate submit would otherwise trip the duplicate-email protection). *@
-            <SfButton IsPrimary="true" Disabled="_adding" OnClick="ConfirmAddAsync" data-testid="add-application-submit">
+            <SfButton IsPrimary="true" Disabled="@(_adding || Session.IsReadOnly)" OnClick="ConfirmAddAsync" data-testid="add-application-submit">
                 @if (_adding)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -698,7 +698,7 @@
         </Content>
         <FooterTemplate>
             @* Disabled while in flight so a double click can't submit twice. *@
-            <SfButton IsPrimary="true" Disabled="_appointing" OnClick="ConfirmAppointAsync" data-testid="appoint-confirm">
+            <SfButton IsPrimary="true" Disabled="@(_appointing || Session.IsReadOnly)" OnClick="ConfirmAppointAsync" data-testid="appoint-confirm">
                 @if (_appointing)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

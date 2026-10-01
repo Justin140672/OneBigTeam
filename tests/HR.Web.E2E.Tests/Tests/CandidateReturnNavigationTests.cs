@@ -168,7 +168,7 @@ public sealed class CandidateReturnNavigationTests(RecruiterPersonaFixture fixtu
         // email) empty so Save fails validation — the editor must stay open (not redirect anywhere,
         // dashboard or otherwise) and the already-entered value must survive the failed attempt.
         await candidateEdit.FillFirstNameAsync(firstName);
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await candidateEdit.ClickSaveAsync();
 
         await _page.WaitForFunctionAsync(
             "document.querySelector('.alert-danger, .validation-message') !== null " +

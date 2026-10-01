@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @using Syncfusion.Blazor.Grids
 
@@ -55,7 +56,7 @@
                 @{ var item = (context as EmployeeNoteItemModel)!; }
                 @if (!item.IsSuperseded)
                 {
-                    <SfButton CssClass="e-outline e-small" OnClick="() => OnEdit.InvokeAsync(item)" data-testid="edit-note-btn">Edit</SfButton>
+                    <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="() => OnEdit.InvokeAsync(item)" data-testid="edit-note-btn">Edit</SfButton>
                 }
             </Template>
         </GridColumn>

@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel
 @inject UserAdministrationService UserAdministrationService
 
@@ -50,7 +51,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" Disabled="@(_submitting || string.IsNullOrWhiteSpace(_email))" OnClick="ConfirmAsync">
+            <SfButton IsPrimary="true" Disabled="@(_submitting || string.IsNullOrWhiteSpace(_email) || Session.IsReadOnly)" OnClick="ConfirmAsync">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

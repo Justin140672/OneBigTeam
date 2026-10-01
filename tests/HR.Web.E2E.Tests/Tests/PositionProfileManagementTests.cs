@@ -113,8 +113,8 @@ public sealed class PositionProfileManagementTests(HrAdminPersonaFixture fixture
         await ppList.OpenPositionProfileAsync(profileTitle);
 
         Assert.Equal("3", await _page.GetByPlaceholder("Use company default").InputValueAsync());
-        Assert.Equal("40000", await _page.GetByPlaceholder("Min").InputValueAsync());
-        Assert.Equal("60000", await _page.GetByPlaceholder("Max").InputValueAsync());
+        Assert.Equal("40,000", await _page.GetByPlaceholder("Min").InputValueAsync());
+        Assert.Equal("60,000", await _page.GetByPlaceholder("Max").InputValueAsync());
 
         var useCompanyWorkingPattern = await _page.GetByLabel("Use company working pattern").IsCheckedAsync();
         Assert.False(useCompanyWorkingPattern, "Expected the working pattern override to persist across reload");

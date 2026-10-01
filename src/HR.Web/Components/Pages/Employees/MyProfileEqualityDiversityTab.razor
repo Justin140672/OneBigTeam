@@ -59,7 +59,7 @@ else
             <div class="ed-form-body">
                 <div class="ed-field-group" data-testid="my-profile-equality-gender">
                     <label class="ed-label">Gender identity</label>
-                    <SfDropDownList TValue="GenderIdentityChoice" TItem="EqualityFieldOption<GenderIdentityChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="GenderIdentityChoice" TItem="EqualityFieldOption<GenderIdentityChoice>"
                                     DataSource="_genderOptions" @bind-Value="_model.GenderIdentity">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -68,13 +68,13 @@ else
                 {
                     <div class="ed-field-group">
                         <label class="ed-label">Describe your gender identity</label>
-                        <HrTextBox @bind-Value="_model.GenderIdentitySelfDescribed" Maxlength="200" />
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="_model.GenderIdentitySelfDescribed" Maxlength="200" />
                     </div>
                 }
 
                 <div class="ed-field-group" data-testid="my-profile-equality-marital">
                     <label class="ed-label">Are you married or in a civil partnership?</label>
-                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
                                     DataSource="_yesNoOptions" @bind-Value="_model.MarriedOrCivilPartnershipStatus">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -82,7 +82,7 @@ else
 
                 <div class="ed-field-group" data-testid="my-profile-equality-ethnicgroup">
                     <label class="ed-label">Ethnic group</label>
-                    <SfDropDownList TValue="EthnicGroupChoice" TItem="EqualityFieldOption<EthnicGroupChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="EthnicGroupChoice" TItem="EqualityFieldOption<EthnicGroupChoice>"
                                     DataSource="_ethnicOptions" @bind-Value="_model.EthnicGroup">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -91,13 +91,13 @@ else
                 {
                     <div class="ed-field-group">
                         <label class="ed-label">Describe your ethnic group</label>
-                        <HrTextBox @bind-Value="_model.EthnicGroupSelfDescribed" Maxlength="200" />
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="_model.EthnicGroupSelfDescribed" Maxlength="200" />
                     </div>
                 }
 
                 <div class="ed-field-group" data-testid="my-profile-equality-disability">
                     <label class="ed-label">Do you consider yourself to have a disability?</label>
-                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
                                     DataSource="_yesNoOptions" @bind-Value="_model.DisabilityStatus">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -106,13 +106,13 @@ else
                 {
                     <div class="ed-field-group">
                         <label class="ed-label">If you wish, describe the impact of your disability</label>
-                        <HrTextBox @bind-Value="_model.DisabilityImpact" Multiline="true" Rows="3" Maxlength="1000" />
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="_model.DisabilityImpact" Multiline="true" Rows="3" Maxlength="1000" />
                     </div>
                 }
 
                 <div class="ed-field-group" data-testid="my-profile-equality-orientation">
                     <label class="ed-label">Sexual orientation</label>
-                    <SfDropDownList TValue="SexualOrientationChoice" TItem="EqualityFieldOption<SexualOrientationChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="SexualOrientationChoice" TItem="EqualityFieldOption<SexualOrientationChoice>"
                                     DataSource="_orientationOptions" @bind-Value="_model.SexualOrientation">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -121,13 +121,13 @@ else
                 {
                     <div class="ed-field-group">
                         <label class="ed-label">Describe your sexual orientation</label>
-                        <HrTextBox @bind-Value="_model.SexualOrientationSelfDescribed" Maxlength="200" />
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="_model.SexualOrientationSelfDescribed" Maxlength="200" />
                     </div>
                 }
 
                 <div class="ed-field-group" data-testid="my-profile-equality-religion">
                     <label class="ed-label">Religion or belief</label>
-                    <SfDropDownList TValue="ReligionOrBeliefChoice" TItem="EqualityFieldOption<ReligionOrBeliefChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="ReligionOrBeliefChoice" TItem="EqualityFieldOption<ReligionOrBeliefChoice>"
                                     DataSource="_religionOptions" @bind-Value="_model.ReligionOrBelief">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
@@ -136,23 +136,23 @@ else
                 {
                     <div class="ed-field-group">
                         <label class="ed-label">Describe your religion or belief</label>
-                        <HrTextBox @bind-Value="_model.ReligionOrBeliefSelfDescribed" Maxlength="200" />
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="_model.ReligionOrBeliefSelfDescribed" Maxlength="200" />
                     </div>
                 }
 
                 <div class="ed-field-group" data-testid="my-profile-equality-caring">
                     <label class="ed-label">Do you have caring responsibilities?</label>
-                    <SfDropDownList TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
+                    <SfDropDownList Enabled="@(!Session.IsReadOnly)" TValue="YesNoChoice" TItem="EqualityFieldOption<YesNoChoice>"
                                     DataSource="_yesNoOptions" @bind-Value="_model.CaringResponsibilities">
                         <DropDownListFieldSettings Value="Value" Text="Label" />
                     </SfDropDownList>
                 </div>
 
                 <div class="ed-form-footer">
-                    <SfButton Disabled="@_saving" OnClick="ClearAnswersAsync">
+                    <SfButton Disabled="@(_saving || Session.IsReadOnly)" OnClick="ClearAnswersAsync">
                         Clear my answers
                     </SfButton>
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync"
+                    <SfButton IsPrimary="true" Disabled="@(_saving || Session.IsReadOnly)" OnClick="SaveAsync"
                               HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "my-profile-equality-save" })">
                         @if (_saving)
                         {

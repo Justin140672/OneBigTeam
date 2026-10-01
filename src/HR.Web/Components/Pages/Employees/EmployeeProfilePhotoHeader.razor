@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel.Http
 @inject ProfilePhotoService ProfilePhotoService
 @implements IDisposable
@@ -5,7 +6,7 @@
 <div class="d-flex align-items-start gap-3 mb-3">
     <ProfilePhotoAvatar PhotoUrl="@_currentPhotoUrl" Initials="@Initials" SizePx="72" />
     <div>
-        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@_loading">Upload / Replace Photo</SfButton>
+        <SfButton CssClass="e-small" OnClick="OpenUploadDialog" Disabled="@(_loading || Session.IsReadOnly)">Upload / Replace Photo</SfButton>
 
         @if (!string.IsNullOrEmpty(_uploadSuccessMsg))
         {
@@ -27,21 +28,21 @@
                 {
                     <HrTextBox @bind-Value="_rejectReason" Placeholder="Reason for rejection (optional)" CssClass="mb-2 w-100" />
                     <div class="d-flex gap-2">
-                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@_reviewing" OnClick="ConfirmRejectAsync">Confirm Reject</SfButton>
+                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@(_reviewing || Session.IsReadOnly)" OnClick="ConfirmRejectAsync">Confirm Reject</SfButton>
                         <SfButton CssClass="e-small e-flat" Disabled="@_reviewing" OnClick="@(() => _showRejectReason = false)">Back</SfButton>
                     </div>
                 }
                 else
                 {
                     <div class="d-flex gap-2">
-                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@_reviewing" OnClick="ApproveAsync">
+                        <SfButton CssClass="e-small" IsPrimary="true" Disabled="@(_reviewing || Session.IsReadOnly)" OnClick="ApproveAsync">
                             @if (_reviewing)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>
                             }
                             Approve
                         </SfButton>
-                        <SfButton CssClass="e-small" Disabled="@_reviewing" OnClick="@(() => _showRejectReason = true)">Reject</SfButton>
+                        <SfButton CssClass="e-small" Disabled="@(_reviewing || Session.IsReadOnly)" OnClick="@(() => _showRejectReason = true)">Reject</SfButton>
                     </div>
                 }
             </div>

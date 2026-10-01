@@ -60,7 +60,7 @@ else
     </div>
 
     <div class="mb-4">
-        <SfButton IsPrimary="true" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
+        <SfButton IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="@(() => _showRequestForm = true)">Request Leave</SfButton>
     </div>
 
     <div class="card">
@@ -117,7 +117,7 @@ else
                                 @{ var r = (context as LeaveRequestListItem)!; }
                                 @if (r.Status == "Pending")
                                 {
-                                    <SfButton CssClass="e-outline e-danger e-small"
+                                    <SfButton CssClass="e-outline e-danger e-small" Disabled="@Session.IsReadOnly"
                                               OnClick="@(() => _cancelTargetId = r.Id)">
                                         Cancel
                                     </SfButton>

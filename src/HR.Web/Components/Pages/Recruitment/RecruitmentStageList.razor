@@ -86,12 +86,12 @@
                             var row = (context as RecruitmentStageListItem)!;
                         }
                         <SfButton CssClass="e-outline e-small me-1"
-                                Disabled="@(row.DisplayOrder <= 1)"
+                                Disabled="@(row.DisplayOrder <= 1 || Session.IsReadOnly)"
                                 OnClick="() => MoveUpAsync(row)" title="Move up">
                             <i class="fa-solid fa-arrow-up"></i>
                         </SfButton>
                         <SfButton CssClass="e-outline e-small"
-                                Disabled="@(row.DisplayOrder >= Items.Count)"
+                                Disabled="@(row.DisplayOrder >= Items.Count || Session.IsReadOnly)"
                                 OnClick="() => MoveDownAsync(row)" title="Move down">
                             <i class="fa-solid fa-arrow-down"></i>
                         </SfButton>
@@ -130,7 +130,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
+            <SfButton CssClass="e-danger" Disabled="@(_deactivating || Session.IsReadOnly)" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
             <SfButton Disabled="_deactivating" OnClick="CancelDeactivate">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>

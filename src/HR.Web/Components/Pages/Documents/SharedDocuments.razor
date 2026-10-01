@@ -10,7 +10,7 @@
     <HubBreadcrumb CompanyId="@CompanyId" CurrentPage="Shared Documents" />
     <div class="d-flex justify-content-between align-items-start mb-1">
         <h1 class="mb-1">Shared Documents</h1>
-        <SfButton CssClass="e-primary" OnClick="@(() => _uploadOpen = true)">Upload Document</SfButton>
+        <SfButton CssClass="e-primary" Disabled="@Session.IsReadOnly" OnClick="@(() => _uploadOpen = true)">Upload Document</SfButton>
     </div>
     <p class="text-muted mb-4">Company-wide documents such as policies and handbooks.</p>
 

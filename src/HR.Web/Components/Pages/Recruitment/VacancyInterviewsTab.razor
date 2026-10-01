@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using System.ComponentModel.DataAnnotations
 @inject InterviewService InterviewService
 
@@ -57,7 +58,7 @@
                         }
                         @if (row.Outcome == "Pending")
                         {
-                            <SfButton CssClass="e-small" IsPrimary="true" OnClick="() => OpenOutcomeDialog(row)">Record Outcome</SfButton>
+                            <SfButton CssClass="e-small" IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="() => OpenOutcomeDialog(row)">Record Outcome</SfButton>
                         }
                     </Template>
                 </GridColumn>

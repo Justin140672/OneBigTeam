@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @inject TaskService TaskService
 
@@ -20,7 +21,7 @@
         <div class="d-flex gap-2">
             <SfButton CssClass="e-success"
                     OnClick='() => SubmitAsync("Approve")'
-                    Disabled="@_submitting">
+                    Disabled="@(_submitting || Session.IsReadOnly)">
                 @if (_submitting && _pending == "Approve")
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -29,7 +30,7 @@
             </SfButton>
             <SfButton CssClass="e-outline e-danger"
                     OnClick='() => SubmitAsync("Reject")'
-                    Disabled="@_submitting">
+                    Disabled="@(_submitting || Session.IsReadOnly)">
                 @if (_submitting && _pending == "Reject")
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

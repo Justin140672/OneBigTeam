@@ -1,6 +1,6 @@
 @using Syncfusion.Blazor.SplitButtons
 
-<SfDropDownButton Content="@ButtonText" IconCss="fa-solid fa-money-bill-wave" CssClass="e-flat hr-toolbar-bulk-update-btn" Items="_items">
+<SfDropDownButton Content="@ButtonText" IconCss="fa-solid fa-money-bill-wave" CssClass="e-flat hr-toolbar-bulk-update-btn" Items="_items" Disabled="Disabled">
     <DropDownButtonEvents ItemSelected="HandleItemSelected" />
 </SfDropDownButton>
 
@@ -8,6 +8,8 @@
     [Parameter] public EventCallback<string> OnItemSelected { get; set; }
 
     [Parameter] public bool HasSelection { get; set; }
+
+    [Parameter] public bool Disabled { get; set; }
 
     [Parameter] public int SelectedCount { get; set; }
 

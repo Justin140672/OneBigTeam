@@ -13,6 +13,9 @@ namespace HR.Web.Components.Pages;
 public abstract class EditPageBase : ComponentBase, IDisposable
 {
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
+    [Inject] protected AppSession ReadOnlyAppSession { get; set; } = default!;
+
+    protected bool IsSubscriptionReadOnly => ReadOnlyAppSession.IsReadOnly;
 
     protected bool IsLoading { get; set; } = true;
     protected bool IsViewMode { get; private set; }

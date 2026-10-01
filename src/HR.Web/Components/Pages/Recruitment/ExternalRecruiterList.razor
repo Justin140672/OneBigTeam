@@ -112,7 +112,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton CssClass="e-danger" Disabled="_deactivating" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
+            <SfButton CssClass="e-danger" Disabled="@(_deactivating || Session.IsReadOnly)" OnClick="ConfirmDeactivateAsync">Deactivate</SfButton>
             <SfButton Disabled="_deactivating" OnClick="CancelDeactivate">Cancel</SfButton>
         </FooterTemplate>
     </DialogTemplates>

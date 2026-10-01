@@ -188,20 +188,20 @@
                         {
                             @if (_candidate.IsActive)
                             {
-                                <SfButton CssClass="e-danger" Disabled="@(Saving || _actionBusy)" OnClick="@(() => _showDeactivateDialog = true)">
+                                <SfButton CssClass="e-danger" Disabled="@(Session.IsReadOnly || Saving || _actionBusy)" OnClick="@(() => _showDeactivateDialog = true)">
                                     Deactivate
                                 </SfButton>
                             }
                             else
                             {
-                                <SfButton Disabled="@(Saving || _actionBusy)" OnClick="@(() => _showReactivateDialog = true)">
+                                <SfButton Disabled="@(Session.IsReadOnly || Saving || _actionBusy)" OnClick="@(() => _showReactivateDialog = true)">
                                     Reactivate
                                 </SfButton>
                             }
                         }
                         @if (!IsViewMode)
                         {
-                            <SfButton IsPrimary="true" Disabled="@Saving" OnClick="SaveAsync">
+                            <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
                                 @if (Saving)
                                 {
                                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -295,7 +295,7 @@
                                         <div class="text-danger small mt-1" data-testid="candidate-cv-input-error">@_cvSelectionError</div>
                                     }
                                     <div class="mt-2">
-                                        <SfButton IsPrimary="true" Disabled="@(_cvBusy || _selectedCvFile is null)"
+                                        <SfButton IsPrimary="true" Disabled="@(_cvBusy || _selectedCvFile is null || Session.IsReadOnly)"
                                                   OnClick="UploadCvAsync" data-testid="candidate-cv-upload">
                                             @if (_cvBusy)
                                             {
@@ -381,7 +381,7 @@
                     </EditForm>
                 </Content>
                 <FooterTemplate>
-                    <SfButton IsPrimary="true" CssClass="e-danger" Disabled="@(_actionBusy)" OnClick="ConfirmDeactivateAsync">
+                    <SfButton IsPrimary="true" CssClass="e-danger" Disabled="@(_actionBusy || Session.IsReadOnly)" OnClick="ConfirmDeactivateAsync">
                         @if (_actionBusy)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>

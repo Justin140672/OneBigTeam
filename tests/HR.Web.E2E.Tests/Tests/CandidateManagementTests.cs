@@ -68,7 +68,7 @@ public sealed class CandidateManagementTests(RecruiterPersonaFixture fixture) : 
 
         await candidateEdit.GoToNewAsync(AcmeId);
 
-        await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+        await candidateEdit.ClickSaveAsync();
 
         await _page.WaitForFunctionAsync(
             "document.querySelector('.alert-danger, .validation-message') !== null " +

@@ -99,18 +99,18 @@
                     <div class="d-flex gap-2 mb-4">
                         @if (_user.InvitationStatus is "Pending" or "Expired")
                         {
-                            <SfButton Disabled="@_actionInProgress" OnClick="ResendInviteAsync">Resend Invitation</SfButton>
-                            <SfButton Disabled="@_actionInProgress" OnClick="CancelInviteAsync">Cancel Invitation</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="ResendInviteAsync">Resend Invitation</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="CancelInviteAsync">Cancel Invitation</SfButton>
                         }
                         else if (_user.AccountStatus == "Active")
                         {
-                            <SfButton Disabled="@_actionInProgress" OnClick="DisableAccountAsync">Disable Account</SfButton>
-                            <SfButton Disabled="@_actionInProgress" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="DisableAccountAsync">Disable Account</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
                         }
                         else if (_user.AccountStatus == "Disabled")
                         {
-                            <SfButton Disabled="@_actionInProgress" OnClick="EnableAccountAsync">Enable Account</SfButton>
-                            <SfButton Disabled="@_actionInProgress" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="EnableAccountAsync">Enable Account</SfButton>
+                            <SfButton Disabled="@(_actionInProgress || Session.IsReadOnly)" OnClick="OpenManageRolesDialog">Manage Roles</SfButton>
                         }
                     </div>
                 }

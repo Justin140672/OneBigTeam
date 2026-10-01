@@ -1,3 +1,4 @@
+using HR.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Forms;
 
@@ -8,6 +9,10 @@ public abstract class EditDialogBase<TModel> : ComponentBase where TModel : clas
     [Parameter] public bool IsOpen { get; set; }
     [Parameter] public EventCallback OnSaved { get; set; }
     [Parameter] public EventCallback OnCancelled { get; set; }
+
+    [Inject] protected AppSession ReadOnlyAppSession { get; set; } = default!;
+
+    protected bool IsSubscriptionReadOnly => ReadOnlyAppSession.IsReadOnly;
 
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;

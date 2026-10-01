@@ -46,6 +46,7 @@
                                     <button type="button"
                                             class="btn btn-link p-0 report-catalog-favourite @(IsFavourite(item.Id) ? "report-catalog-favourite--active" : "")"
                                             title="@(IsFavourite(item.Id) ? "Remove from favourites" : "Add to favourites")"
+                                            disabled="@Session.IsReadOnly"
                                             @onclick="@(() => ToggleFavouriteAsync(item.Id))"
                                             @onclick:stopPropagation="true">
                                         <i class="@(IsFavourite(item.Id) ? "fa-solid" : "fa-regular") fa-star"></i>

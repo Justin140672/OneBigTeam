@@ -21,9 +21,9 @@ public static class DropDownSelector
         // race. A click in that gap is silently swallowed with no popup and no error. Only ONE
         // ".e-popup.e-ddl" is visible at a time (Syncfusion mounts one per instance and toggles it
         // via a CSS class rather than DOM add/remove, closing any other when one opens), so a
-        // visible popup is a reliable "my click landed" signal. On a retry, press Escape first to
-        // return to a known-closed state — otherwise a click that opened a popup a moment too late
-        // to be seen would just get toggled back closed by the next click.
+        // visible popup is a reliable "my click landed" signal. Escape is never pressed on retry: it
+        // closes a modal SfDialog (CloseOnEscape) and destroys the combobox being driven. Instead a
+        // late-opening popup is re-checked before the next click could toggle it closed.
         //
         // This deliberately does NOT poll for the combobox's aria-owns attribute *before* opening:
         // Syncfusion only sets aria-owns once the popup has opened at least once, so a pre-open poll
@@ -51,8 +51,8 @@ public static class DropDownSelector
             }
             catch (PlaywrightException) when (attempt < openAttempts)
             {
-                await page.Keyboard.PressAsync("Escape");
-                await page.WaitForTimeoutAsync(300);
+                await page.WaitForTimeoutAsync(500);
+                if (await openPopup.First.IsVisibleAsync()) break;
             }
         }
 
@@ -68,8 +68,6 @@ public static class DropDownSelector
         {
             if (await popup.First.IsVisibleAsync()) break;
 
-            await page.Keyboard.PressAsync("Escape");
-            await page.WaitForTimeoutAsync(300);
             await combobox.ClickAsync(new() { Timeout = finalOpenTimeout });
             try
             {

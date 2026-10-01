@@ -40,7 +40,7 @@ else
         <div class="pd-card-header">
             <i class="fa-solid fa-id-card pd-card-icon"></i>
             <span class="pd-card-title">Personal Details</span>
-            <button class="pd-change-btn ms-auto" @onclick="OpenDialog">
+            <button class="pd-change-btn ms-auto" disabled="@Session.IsReadOnly" @onclick="OpenDialog">
                 <i class="fa-solid fa-pen-to-square"></i>
                 Request Change
             </button>
@@ -135,7 +135,7 @@ else
                 </EditForm>
             </Content>
             <FooterTemplate>
-                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SubmitRequestAsync">
+                <SfButton IsPrimary="true" Disabled="@(_submitting || Session.IsReadOnly)" OnClick="SubmitRequestAsync">
                     @if (_submitting)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

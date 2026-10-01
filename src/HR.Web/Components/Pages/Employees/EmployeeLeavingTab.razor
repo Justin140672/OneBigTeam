@@ -48,8 +48,8 @@ else
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     @if (isInProgress)
                     {
-                        <SfButton CssClass="e-outline e-small" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
-                        <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
+                        <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
+                        <SfButton CssClass="e-outline e-danger e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
                     }
                     <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(EmploymentStatus)">@EmploymentStatusLabel(EmploymentStatus)</span>
                     <span class="badge fs-6 px-3 py-2 @LeavingStatusBadgeClass(process.Status)">@LeavingStatusLabel(process.Status)</span>

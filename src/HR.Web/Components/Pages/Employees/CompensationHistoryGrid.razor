@@ -84,13 +84,13 @@
                     @if (_deleteTargetId == item.Id)
                     {
                         <span class="me-2 text-muted small">Delete?</span>
-                        <SfButton CssClass="e-danger e-small me-1" OnClick="() => ConfirmDeleteAsync(item.Id)">Yes</SfButton>
+                        <SfButton CssClass="e-danger e-small me-1" Disabled="@Session.IsReadOnly" OnClick="() => ConfirmDeleteAsync(item.Id)">Yes</SfButton>
                         <SfButton CssClass="e-small" OnClick="CancelDelete">No</SfButton>
                     }
                     else
                     {
-                        <SfButton CssClass="e-outline e-small me-1" title="Edit" OnClick="() => OnEdit.InvokeAsync(item)">Edit</SfButton>
-                        <SfButton CssClass="e-danger e-outline e-small" title="Delete" OnClick="() => StartDelete(item.Id)">Delete</SfButton>
+                        <SfButton CssClass="e-outline e-small me-1" title="Edit" Disabled="@Session.IsReadOnly" OnClick="() => OnEdit.InvokeAsync(item)">Edit</SfButton>
+                        <SfButton CssClass="e-danger e-outline e-small" title="Delete" Disabled="@Session.IsReadOnly" OnClick="() => StartDelete(item.Id)">Delete</SfButton>
                     }
                 }
             </Template>

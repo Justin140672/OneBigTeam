@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.SharedKernel
 @using System.ComponentModel.DataAnnotations
 @inject UserAdministrationService UserAdministrationService
@@ -105,7 +106,7 @@
             }
             else
             {
-                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="SendAsync">
+                <SfButton IsPrimary="true" Disabled="@(_submitting || Session.IsReadOnly)" OnClick="SendAsync">
                     @if (_submitting)
                     {
                         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

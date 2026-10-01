@@ -1130,6 +1130,13 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
+    public Task ExpectSicknessStatusForStartDateAsync(string startDateddMMMyyyy, string status) =>
+        Assertions.Expect(
+            page.Locator(".e-grid .e-row")
+                .Filter(new() { HasText = startDateddMMMyyyy })
+                .First.Locator(".badge").First)
+            .ToHaveTextAsync(status, new() { Timeout = 15_000 });
+
     public async Task StartCloseSicknessRecordAsync(string startDateddMMMyyyy)
     {
         await page.WaitForSelectorAsync(".e-grid .e-row", new() { Timeout = 10_000 });

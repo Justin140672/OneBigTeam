@@ -1,3 +1,4 @@
+@inject AppSession Session
 @inject SicknessService SicknessService
 
 @if (_loading)
@@ -8,7 +9,7 @@ else
 {
     <ApiFailureAlert Failure="_failure" OnRetry="ReloadAsync" />
     <div class="mb-4">
-        <SfButton IsPrimary="true" OnClick="@(() => _showRecordDialog = true)">Notify Sickness</SfButton>
+        <SfButton IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="@(() => _showRecordDialog = true)">Notify Sickness</SfButton>
     </div>
 
     <div class="card">

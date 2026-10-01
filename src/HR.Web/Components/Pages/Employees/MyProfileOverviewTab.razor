@@ -251,12 +251,12 @@ else
                     <span class="overview-card-title">Quick Actions</span>
                 </div>
                 <div class="overview-actions">
-                    <button class="action-btn action-btn--leave" @onclick="@(() => _showRequestLeaveForm = true)">
+                    <button class="action-btn action-btn--leave" disabled="@Session.IsReadOnly" @onclick="@(() => _showRequestLeaveForm = true)">
                         <span class="action-btn-icon"><i class="fa-solid fa-calendar-plus"></i></span>
                         <span class="action-btn-label">Request Leave</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>
                     </button>
-                    <button class="action-btn action-btn--sickness" @onclick="@(() => _showRecordSicknessDialog = true)">
+                    <button class="action-btn action-btn--sickness" disabled="@Session.IsReadOnly" @onclick="@(() => _showRecordSicknessDialog = true)">
                         <span class="action-btn-icon"><i class="fa-solid fa-house-medical"></i></span>
                         <span class="action-btn-label">Notify Sickness</span>
                         <i class="fa-solid fa-chevron-right action-btn-chevron"></i>

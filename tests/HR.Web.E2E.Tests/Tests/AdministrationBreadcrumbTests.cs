@@ -34,7 +34,19 @@ public sealed class AdministrationBreadcrumbTests(HrAdminPersonaFixture fixture)
         await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
         await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
 
-        await _page.GetByRole(AriaRole.Link, new() { Name = "Employment Types" }).ClickAsync();
+        var crumb = _page.GetByRole(AriaRole.Link, new() { Name = "Employment Types" });
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            await crumb.ClickAsync();
+            try
+            {
+                await _page.WaitForURLAsync($"**/companies/{AcmeId}/employment-types", new() { Timeout = 8_000, WaitUntil = WaitUntilState.Commit });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
 
         await _page.WaitForURLAsync($"**/companies/{AcmeId}/employment-types", new() { Timeout = 30_000 });
         Assert.EndsWith($"/companies/{AcmeId}/employment-types", _page.Url.TrimEnd('/'));

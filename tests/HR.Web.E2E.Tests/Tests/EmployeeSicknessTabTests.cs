@@ -67,7 +67,8 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         await catEdit.FillDisplayOrderAsync(1);
         await catEdit.SaveAsync();
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "Sick", activate: true);
+        await empEdit.GoToAsync(AcmeId, employee.Id);
         await empEdit.OpenSicknessTabAsync();
 
         await empEdit.OpenRecordSicknessDialogAsync();
@@ -107,7 +108,8 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         await catEdit.FillDisplayOrderAsync(1);
         await catEdit.SaveAsync();
 
-        await empEdit.GoToAsync(AcmeId, TomWilliams);
+        var employee = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "Sick", activate: true);
+        await empEdit.GoToAsync(AcmeId, employee.Id);
         await empEdit.OpenSicknessTabAsync();
 
         await empEdit.OpenRecordSicknessDialogAsync();
@@ -122,7 +124,6 @@ public sealed class EmployeeSicknessTabTests(HrAdminPersonaFixture fixture) : Ro
         await empEdit.FillCloseSicknessEndDateAsync(endDate.ToString("dd/MM/yyyy"));
         await empEdit.SubmitCloseSicknessRecordAsync();
 
-        var closedStatus = await empEdit.GetSicknessStatusBadgeForStartDateAsync(startDateGridText);
-        Assert.Equal("Closed", closedStatus);
+        await empEdit.ExpectSicknessStatusForStartDateAsync(startDateGridText, "Closed");
     }
 }

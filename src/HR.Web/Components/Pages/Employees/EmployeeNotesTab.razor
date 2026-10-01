@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @inject EmployeeNoteService EmployeeNoteService
 
@@ -21,7 +22,7 @@
 else
 {
     <div class="d-flex justify-content-end mb-3">
-        <SfButton CssClass="e-primary e-small" OnClick="@(() => _addOpen = true)" data-testid="add-note-btn">
+        <SfButton CssClass="e-primary e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => _addOpen = true)" data-testid="add-note-btn">
             <i class="fa-solid fa-plus me-1"></i> Add Note
         </SfButton>
     </div>

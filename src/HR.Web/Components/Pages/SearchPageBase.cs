@@ -1,4 +1,5 @@
 using HR.Web.Components.Controls;
+using HR.Web.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.AspNetCore.WebUtilities;
@@ -12,6 +13,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     [Parameter] public Guid CompanyId { get; set; }
 
     [Inject] protected NavigationManager Navigation { get; set; } = default!;
+    [Inject] protected AppSession ReadOnlyAppSession { get; set; } = default!;
+
+    protected bool IsSubscriptionReadOnly => ReadOnlyAppSession.IsReadOnly;
 
     protected bool IsLoading { get; private set; } = true;
     protected string? Error { get; private set; }
@@ -52,7 +56,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
             var items = new List<object>
             {
                 new ItemModel { Id = "hr-add",  Text = AddButtonText,  PrefixIcon = "fa-solid fa-plus", TooltipText = AddButtonText, Disabled = IsAddDisabled },
-                new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "fa-solid fa-pen",  TooltipText = "Edit selected", Disabled = !_hasSelection },
+                new ItemModel { Id = "hr-edit", Text = "Edit", PrefixIcon = "fa-solid fa-pen",  TooltipText = "Edit selected", Disabled = !_hasSelection || IsEditDisabled },
                 new ItemModel { Id = "hr-view", Text = "View", PrefixIcon = "fa-solid fa-eye",  TooltipText = "View selected", Disabled = !_hasSelection },
             };
 
@@ -63,7 +67,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                     Text        = action.TextWithSelectionCount?.Invoke(SelectedCount) ?? action.Text,
                     PrefixIcon  = action.Icon,
                     TooltipText = action.Tooltip ?? action.Text,
-                    Disabled    = action.SelectionDependent && !_hasSelection,
+                    Disabled    = IsSubscriptionReadOnly || (action.SelectionDependent && !_hasSelection),
                 });
 
             if (SupportsActiveFilter)
@@ -112,7 +116,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
         }
     }
 
-    protected virtual bool IsAddDisabled => false;
+    protected virtual bool IsAddDisabled => IsSubscriptionReadOnly;
+
+    protected virtual bool IsEditDisabled => IsSubscriptionReadOnly;
 
     protected virtual string? GetAddUrl() => null;
     protected virtual string? GetEditUrl(TItem item) => null;
@@ -127,8 +133,9 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
     }
 
     private List<string> SelectionDependentToolbarIds =>
-        new List<string> { "hr-edit", "hr-view" }
-            .Concat(_customActions.Where(a => a.SelectionDependent).Select(a => a.Id))
+        new List<string> { "hr-view" }
+            .Concat(IsEditDisabled ? Array.Empty<string>() : new[] { "hr-edit" })
+            .Concat(IsSubscriptionReadOnly ? Array.Empty<string>() : _customActions.Where(a => a.SelectionDependent).Select(a => a.Id))
             .ToList();
 
     protected async Task OnRowSelected(RowSelectEventArgs<TItem> args)
@@ -169,6 +176,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
             case "hr-edit":
             case "hr-view":
                 if (Grid is null || !_hasSelection) break;
+                if (args.Item.Id == "hr-edit" && IsEditDisabled) break;
                 var records = await Grid.GetSelectedRecordsAsync();
                 if (records.Count == 0) break;
                 if (args.Item.Id == "hr-edit")
@@ -202,7 +210,7 @@ public abstract class SearchPageBase<TItem> : ComponentBase, IDisposable
                     break;
 
                 var customAction = _customActions.FirstOrDefault(a => a.Id == args.Item.Id);
-                if (customAction is not null && _hasSelection && Grid is not null)
+                if (customAction is not null && !IsSubscriptionReadOnly && _hasSelection && Grid is not null)
                 {
                     var selected = await Grid.GetSelectedRecordsAsync();
                     if (selected.Count > 0)

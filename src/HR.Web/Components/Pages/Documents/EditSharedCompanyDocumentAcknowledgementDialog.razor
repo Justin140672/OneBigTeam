@@ -1,3 +1,4 @@
+@inject AppSession Session
 @inject DocumentService DocumentService
 @inject CompanyService CompanyService
 @inherits EditDialogBase<EditSharedCompanyDocumentAcknowledgementDialog.EditSharedCompanyDocumentAcknowledgementFormModel>
@@ -38,7 +39,7 @@
                         <div class="col-12 @(_isLocked ? "view-mode" : "")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label class="form-label mb-0">Acknowledgement Statement</label>
-                                <SfButton CssClass="e-small e-outline" Disabled="_isLocked" OnClick="ResetToDefault">
+                                <SfButton CssClass="e-small e-outline" Disabled="@(_isLocked || Session.IsReadOnly)" OnClick="ResetToDefault">
                                     Reset to Default
                                 </SfButton>
                             </div>

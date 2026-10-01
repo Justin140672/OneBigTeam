@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using Syncfusion.Blazor.Inputs
 @inject RecruitmentKanbanService KanbanService
 @inject RecruitmentStageService RecruitmentStageService
@@ -69,7 +70,7 @@
                             @foreach (var candidate in cards)
                             {
                                 var app = candidate;
-                                <div class="vacancy-kanban-board__draggable" draggable="true"
+                                <div class="vacancy-kanban-board__draggable" draggable="@(Session.IsReadOnly ? "false" : "true")"
                                      @ondragstart="() => OnDragStart(app)"
                                      @ondragend="OnDragEnd">
                                     <KanbanCandidateCard Candidate="app"

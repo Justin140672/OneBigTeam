@@ -43,7 +43,7 @@ else
             <span class="ec-card-title">Emergency Contacts</span>
             @if (!_showAddForm && _editingId is null)
             {
-                <SfButton CssClass="e-outline e-small ms-auto" OnClick="StartAdd">
+                <SfButton CssClass="e-outline e-small ms-auto" Disabled="@Session.IsReadOnly" OnClick="StartAdd">
                     <i class="fa-solid fa-plus me-1"></i>Add Contact
                 </SfButton>
             }
@@ -55,7 +55,7 @@ else
                 <div class="ec-empty">
                     <i class="fa-solid fa-address-book ec-empty-icon"></i>
                     <p class="ec-empty-text">No emergency contacts added yet.</p>
-                    <SfButton CssClass="e-outline e-small" OnClick="StartAdd">Add your first contact</SfButton>
+                    <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="StartAdd">Add your first contact</SfButton>
                 </div>
             }
 
@@ -93,7 +93,7 @@ else
                                 </div>
                             </div>
                             <div class="ec-form-actions">
-                                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="@(() => SaveEditAsync(c.Id))">
+                                <SfButton IsPrimary="true" Disabled="@(_saving || Session.IsReadOnly)" OnClick="@(() => SaveEditAsync(c.Id))">
                                     @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
                                     Save
                                 </SfButton>
@@ -117,10 +117,10 @@ else
                             </div>
                         </div>
                         <div class="ec-contact-actions">
-                            <SfButton CssClass="e-outline e-small" OnClick="@(() => StartEdit(c))" title="Edit">
+                            <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => StartEdit(c))" title="Edit">
                                 <i class="fa-solid fa-pen"></i>
                             </SfButton>
-                            <SfButton CssClass="e-outline e-danger e-small" OnClick="@(() => RemoveAsync(c.Id))" title="Remove">
+                            <SfButton CssClass="e-outline e-danger e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => RemoveAsync(c.Id))" title="Remove">
                                 <i class="fa-solid fa-trash"></i>
                             </SfButton>
                         </div>
@@ -165,7 +165,7 @@ else
                 </EditForm>
             </Content>
             <FooterTemplate>
-                <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAddAsync">
+                <SfButton IsPrimary="true" Disabled="@(_saving || Session.IsReadOnly)" OnClick="SaveAddAsync">
                     @if (_saving) { <span class="spinner-border spinner-border-sm me-1" role="status"></span> }
                     Add Contact
                 </SfButton>

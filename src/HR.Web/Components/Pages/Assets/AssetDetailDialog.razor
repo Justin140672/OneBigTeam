@@ -80,13 +80,13 @@
                         <div class="d-flex gap-2">
                             @if (_asset.Status == "Available")
                             {
-                                <SfButton CssClass="e-outline e-small" OnClick="OpenAssignDialog" data-testid="assign-to-employee-btn">
+                                <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="OpenAssignDialog" data-testid="assign-to-employee-btn">
                                     Assign to Employee
                                 </SfButton>
                             }
                             @if (_asset.Status == "Assigned" && ActiveAssignment is not null)
                             {
-                                <SfButton CssClass="e-outline e-small" OnClick="OpenReturnDialog" data-testid="request-return-btn">
+                                <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="OpenReturnDialog" data-testid="request-return-btn">
                                     Request Return
                                 </SfButton>
                             }

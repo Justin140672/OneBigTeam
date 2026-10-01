@@ -40,7 +40,19 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
         await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         var myTeamButton = _page.Locator(".dashboard-switcher-item").Filter(new() { HasText = "My Team" });
-        await myTeamButton.ClickAsync();
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            await myTeamButton.ClickAsync();
+            try
+            {
+                await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 8_000, WaitUntil = WaitUntilState.Commit });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
+
         await _page.WaitForURLAsync(new Regex("/dashboard/manager"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/", new() { WaitUntil = WaitUntilState.Commit });

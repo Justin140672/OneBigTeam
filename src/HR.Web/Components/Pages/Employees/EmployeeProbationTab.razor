@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @inject ProbationService ProbationService
 @inject UserService UserService
@@ -23,7 +24,7 @@ else
                         <span class="badge @StatusBadgeClass(_record.Status)">@StatusLabel(_record.Status)</span>
                         @if (!_editing && _canEdit && IsEditable(_record.Status))
                         {
-                            <SfButton CssClass="e-small e-outline" OnClick="@(() => { _editing = true; _terminalWhileEditingMessage = null; })" data-testid="edit-probation-record">Edit</SfButton>
+                            <SfButton CssClass="e-small e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => { _editing = true; _terminalWhileEditingMessage = null; })" data-testid="edit-probation-record">Edit</SfButton>
                         }
                     </div>
                 </div>

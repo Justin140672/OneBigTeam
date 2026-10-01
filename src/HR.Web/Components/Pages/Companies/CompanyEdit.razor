@@ -45,7 +45,7 @@
         @* Branding: hidden per product decision, not removed — CompanyBrandingTab itself is
            untouched, just not shown as its own tab for now. *@
         <div style="display:none" aria-hidden="true">
-            <CompanyBrandingTab CompanyId="Id" Company="_company" CanEdit="!IsViewMode" />
+            <CompanyBrandingTab CompanyId="Id" Company="_company" CanEdit="@(!IsViewMode && !IsSubscriptionReadOnly)" />
         </div>
 
         <div class="mt-4 d-flex gap-2 align-items-center">
@@ -56,7 +56,7 @@
             <div class="ms-auto d-flex gap-2">
                 @if (!IsViewMode)
                 {
-                    <SfButton IsPrimary="true" Disabled="@(Saving || Session.IsReadOnly)" OnClick="SaveAsync">
+                    <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
                         @(Saving ? "Saving…" : "Save")
                     </SfButton>
                 }

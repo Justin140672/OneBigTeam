@@ -7,6 +7,10 @@ namespace HR.Web.Components.Pages;
 
 public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where TModel : class, new()
 {
+    [Inject] protected AppSession ReadOnlyAppSession { get; set; } = default!;
+
+    protected bool IsSubscriptionReadOnly => ReadOnlyAppSession.IsReadOnly;
+
     protected TModel Model { get; } = new();
     protected EditContext EditContext { get; private set; } = default!;
 

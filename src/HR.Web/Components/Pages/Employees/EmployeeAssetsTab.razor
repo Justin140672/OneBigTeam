@@ -10,8 +10,8 @@
 else
 {
     <div class="mb-3 d-flex gap-2">
-        <SfButton IsPrimary="true" OnClick="OpenAssignDialog">Assign Asset</SfButton>
-        <SfButton OnClick="OpenReturnDialog" Disabled="@(!_assets.Any(a => a.IsAcknowledged))">Return Asset</SfButton>
+        <SfButton IsPrimary="true" Disabled="@Session.IsReadOnly" OnClick="OpenAssignDialog">Assign Asset</SfButton>
+        <SfButton OnClick="OpenReturnDialog" Disabled="@(Session.IsReadOnly || !_assets.Any(a => a.IsAcknowledged))">Return Asset</SfButton>
     </div>
 
     @if (!string.IsNullOrEmpty(_success))

@@ -1,4 +1,7 @@
-<SfButton IsPrimary="true" OnClick="OnSave" Disabled="Saving">
+@using HR.Web.Services
+@inject AppSession Session
+
+<SfButton IsPrimary="true" OnClick="OnSave" Disabled="@(Saving || Session.IsReadOnly)">
     @if (Saving)
     {
         <span class="spinner-border spinner-border-sm me-1" role="status"></span>

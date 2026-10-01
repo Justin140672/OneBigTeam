@@ -154,7 +154,9 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
             })
             .First
             .Locator("span[role='combobox'] input").First;
-        await Assertions.Expect(positionInput).ToHaveValueAsync(positionProfileTitle, new() { Timeout = 20_000 });
+        await Assertions.Expect(positionInput).ToHaveValueAsync(
+            new System.Text.RegularExpressions.Regex("^" + System.Text.RegularExpressions.Regex.Escape(positionProfileTitle) + " — "),
+            new() { Timeout = 20_000 });
     }
 
 

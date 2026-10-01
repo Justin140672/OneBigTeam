@@ -1,3 +1,4 @@
+@inject AppSession Session
 @inject UserAdministrationService UserAdministrationService
 
 <SfDialog Visible="IsOpen" IsModal="true" Width="480px" ShowCloseIcon="false">
@@ -42,7 +43,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveAsync">
+            <SfButton IsPrimary="true" Disabled="@(_saving || Session.IsReadOnly)" OnClick="SaveAsync">
                 @if (_saving)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

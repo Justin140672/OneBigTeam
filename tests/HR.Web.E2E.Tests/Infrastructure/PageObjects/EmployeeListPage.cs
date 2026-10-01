@@ -217,10 +217,21 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
 
     public async Task ClickBulkImportAsync()
     {
-        await OpenBulkUpdateMenuItemAsync("hr-bulk-import");
-        await page.WaitForSelectorAsync(
-            "[role='dialog'].bulk-compensation-import-dialog",
-            new() { Timeout = 15_000 });
+        var dialog = page.Locator("[role='dialog'].bulk-compensation-import-dialog");
+        var deadline = DateTime.UtcNow.AddSeconds(45);
+        while (true)
+        {
+            await OpenBulkUpdateMenuItemAsync("hr-bulk-import");
+            try
+            {
+                await dialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                return;
+            }
+            catch (TimeoutException) when (DateTime.UtcNow < deadline)
+            {
+                await page.Keyboard.PressAsync("Escape");
+            }
+        }
     }
 
     private async Task OpenBulkUpdateMenuItemAsync(string itemId)

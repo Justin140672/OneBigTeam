@@ -1,3 +1,4 @@
+@inject AppSession Session
 @using HR.Web.Models
 @inject InvitationBatchService InvitationBatchService
 
@@ -55,7 +56,7 @@
             }
         </Content>
         <FooterTemplate>
-            <SfButton IsPrimary="true" Disabled="@(_submitting || Recipients.Count == 0)" OnClick="ConfirmAsync">
+            <SfButton IsPrimary="true" Disabled="@(_submitting || Recipients.Count == 0 || Session.IsReadOnly)" OnClick="ConfirmAsync">
                 @if (_submitting)
                 {
                     <span class="spinner-border spinner-border-sm me-1" role="status"></span>

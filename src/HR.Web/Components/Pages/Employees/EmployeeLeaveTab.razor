@@ -37,7 +37,7 @@ else
                                             @if (item.HasBalance && Session.CanManageEmployees)
                                             {
                                                 <SfButton CssClass="e-outline e-small"
-                                                          OnClick="@(() => OpenAdjustDialog(item))">
+                                                          Disabled="@Session.IsReadOnly" OnClick="@(() => OpenAdjustDialog(item))">
                                                     Adjust
                                                 </SfButton>
                                             }
@@ -159,7 +159,7 @@ else
                         {
                             <div class="d-flex gap-1">
                                 <SfButton CssClass="e-outline e-small"
-                                          OnClick="@(() => OpenAdjustDialog(_toilBalance))">
+                                          Disabled="@Session.IsReadOnly" OnClick="@(() => OpenAdjustDialog(_toilBalance))">
                                     Adjust
                                 </SfButton>
                             </div>

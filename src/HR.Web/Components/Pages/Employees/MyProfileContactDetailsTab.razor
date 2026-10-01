@@ -65,7 +65,7 @@ else
 
                 <div class="cd-field-group">
                     <label class="cd-label" for="cd-personal-email">Personal Email</label>
-                    <HrTextBox @bind-Value="Model.PersonalEmail" Type="InputType.Email" Placeholder="e.g. name@personal.com" Maxlength="320"
+                    <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.PersonalEmail" Type="InputType.Email" Placeholder="e.g. name@personal.com" Maxlength="320"
                                HtmlAttributes="@Attrs("cd-personal-email", "Personal Email")" />
                     <div id="cd-personal-email-hint" class="cd-hint visually-hidden">Optional. Used for personal correspondence only.</div>
                     <div id="cd-personal-email-error" class="cd-error"><ValidationMessage For="@(() => Model.PersonalEmail)" /></div>
@@ -76,7 +76,7 @@ else
 
                 <div class="cd-field-group">
                     <label class="cd-label" for="cd-address-line-1">Address Line 1 <span class="cd-required" aria-hidden="true">*</span></label>
-                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" Maxlength="200"
+                    <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.AddressLine1" Placeholder="Street address" Maxlength="200"
                                HtmlAttributes="@Attrs("cd-address-line-1", "Address Line 1", required: true)" />
                     <div id="cd-address-line-1-hint" class="cd-hint visually-hidden">Required.</div>
                     <div id="cd-address-line-1-error" class="cd-error"><ValidationMessage For="@(() => Model.AddressLine1)" /></div>
@@ -84,7 +84,7 @@ else
 
                 <div class="cd-field-group">
                     <label class="cd-label" for="cd-address-line-2">Address Line 2</label>
-                    <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." Maxlength="200"
+                    <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." Maxlength="200"
                                HtmlAttributes="@Attrs("cd-address-line-2", "Address Line 2")" />
                     <div id="cd-address-line-2-hint" class="cd-hint visually-hidden">Optional.</div>
                     <div id="cd-address-line-2-error" class="cd-error"></div>
@@ -93,14 +93,14 @@ else
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label" for="cd-city">City <span class="cd-required" aria-hidden="true">*</span></label>
-                        <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" Maxlength="100"
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.City" Placeholder="e.g. London" Maxlength="100"
                                    HtmlAttributes="@Attrs("cd-city", "City", required: true)" />
                         <div id="cd-city-hint" class="cd-hint visually-hidden">Required.</div>
                         <div id="cd-city-error" class="cd-error"><ValidationMessage For="@(() => Model.City)" /></div>
                     </div>
                     <div class="cd-field-group">
                         <label class="cd-label" for="cd-county">County / State</label>
-                        <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" Maxlength="100"
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.County" Placeholder="e.g. Greater London" Maxlength="100"
                                    HtmlAttributes="@Attrs("cd-county", "County / State")" />
                         <div id="cd-county-hint" class="cd-hint visually-hidden">Optional.</div>
                         <div id="cd-county-error" class="cd-error"></div>
@@ -110,7 +110,7 @@ else
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label" for="cd-post-code">Post Code <span class="cd-required" aria-hidden="true">*</span></label>
-                        <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" Maxlength="20"
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" Maxlength="20"
                                    HtmlAttributes="@Attrs("cd-post-code", "Post Code", required: true)" />
                         <div id="cd-post-code-hint" class="cd-hint visually-hidden">Required.</div>
                         <div id="cd-post-code-error" class="cd-error"><ValidationMessage For="@(() => Model.PostCode)" /></div>
@@ -125,14 +125,14 @@ else
                 <div class="cd-field-row">
                     <div class="cd-field-group">
                         <label class="cd-label" for="cd-phone-number">Mobile / Work Phone</label>
-                        <HrTextBox @bind-Value="Model.PhoneNumber" Type="InputType.Tel" Placeholder="e.g. 07700 900000" Maxlength="30"
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.PhoneNumber" Type="InputType.Tel" Placeholder="e.g. 07700 900000" Maxlength="30"
                                    HtmlAttributes="@Attrs("cd-phone-number", "Mobile / Work Phone")" />
                         <div id="cd-phone-number-hint" class="cd-hint visually-hidden">Optional.</div>
                         <div id="cd-phone-number-error" class="cd-error"><ValidationMessage For="@(() => Model.PhoneNumber)" /></div>
                     </div>
                     <div class="cd-field-group">
                         <label class="cd-label" for="cd-home-phone">Home Phone</label>
-                        <HrTextBox @bind-Value="Model.HomePhone" Type="InputType.Tel" Placeholder="e.g. 01234 567890" Maxlength="30"
+                        <HrTextBox Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.HomePhone" Type="InputType.Tel" Placeholder="e.g. 01234 567890" Maxlength="30"
                                    HtmlAttributes="@Attrs("cd-home-phone", "Home Phone")" />
                         <div id="cd-home-phone-hint" class="cd-hint visually-hidden">Optional.</div>
                         <div id="cd-home-phone-error" class="cd-error"><ValidationMessage For="@(() => Model.HomePhone)" /></div>
@@ -145,7 +145,7 @@ else
                 <div id="cd-saving-status" class="cd-saving-status visually-hidden" role="status" aria-live="polite" aria-atomic="true">@_savingStatus</div>
 
                 <div class="cd-form-footer">
-                    <SfButton IsPrimary="true" Disabled="@_saving" OnClick="SaveClickedAsync"
+                    <SfButton IsPrimary="true" Disabled="@(_saving || Session.IsReadOnly)" OnClick="SaveClickedAsync"
                               HtmlAttributes="@(new Dictionary<string, object> { ["id"] = "cd-save-button" })">
                         @if (_saving)
                         {
