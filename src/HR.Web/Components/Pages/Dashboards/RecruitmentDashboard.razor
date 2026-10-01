@@ -56,8 +56,8 @@
                     }
                     <div class="widget-kpi-row recruitment-dashboard-summary-row" role="list">
                         <RecruitmentSummaryTile Label="Open vacancies" Value="_openVacancies" Failed="_vacanciesRes.IsFailed"
-                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" />
-                        <RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_newApplicationsRes.IsFailed"
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies?view=open")" />
+<RecruitmentSummaryTile Label="New applications" Value="_newApplications" Failed="_newApplicationsRes.IsFailed"
                                                  Href="#" OnClick="@(() => OpenDrillDown(SrcPipeline))" />
                         <RecruitmentSummaryTile Label="Candidates in progress" Value="_candidatesInProgress" Failed="_candidatesRes.IsFailed"
                                                  Href="#" OnClick="@(() => OpenDrillDown(SrcCandidates))" />
@@ -68,7 +68,7 @@
                                                  Muted="@(_offersRes.IsLoaded && !_offerStageConfigured)"
                                                  Title="@(_offersRes.IsLoaded && !_offerStageConfigured ? "No offer stage configured" : null)" />
                         <RecruitmentSummaryTile Label="Stale vacancies" Value="_staleVacancies" Failed="_staleRes.IsFailed"
-                                                 Href="@($"/companies/{Session.CompanyId}/vacancies")" Muted="@(_staleRes.IsLoaded && _staleVacancies == 0)" />
+                                                 Href="@($"/companies/{Session.CompanyId}/vacancies?view=stale")" Muted="@(_staleRes.IsLoaded && _staleVacancies == 0)" />
                     </div>
                 </div>
             }
@@ -177,7 +177,7 @@
                 else
                 {
                     <div class="dashboard-scroll-x">
-                        <VacancyList CompanyId="Session.CompanyId" />
+                        <VacancyList CompanyId="Session.CompanyId" Embedded="true" />
                     </div>
                 }
             </section>

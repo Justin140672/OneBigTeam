@@ -1,4 +1,5 @@
 using HR.Web.E2E.Tests.Infrastructure;
+using Microsoft.Playwright;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
 namespace HR.Web.E2E.Tests.Tests;
@@ -32,6 +33,67 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
         Assert.True(await dashboard.GetSummaryTileValueAsync("Interviews requiring action") >= 0);
         Assert.True(await dashboard.GetSummaryTileValueAsync("Offers awaiting response") >= 0);
         Assert.True(await dashboard.GetSummaryTileValueAsync("Stale vacancies") >= 0);
+    }
+
+    [Fact]
+    public async Task OpenVacanciesTile_OpensVacancyList_FilteredToOpenStatus()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+        await dashboard.GoToAsync();
+        var openCount = await dashboard.GetSummaryTileValueAsync("Open vacancies");
+
+        await _page.Locator(".widget-kpi-row[role='list'] .widget-kpi")
+            .Filter(new() { HasText = "Open vacancies" }).First.ClickAsync();
+        await _page.WaitForURLAsync("**/vacancies?view=open", new() { Timeout = 30_000 });
+        await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 30_000 });
+
+        await Assertions.Expect(_page.Locator(".e-grid .e-row")).ToHaveCountAsync(openCount, new() { Timeout = 15_000 });
+
+        var statusCells = _page.Locator(".e-grid .e-row .e-rowcell:nth-child(5)");
+        var count = await statusCells.CountAsync();
+        for (var i = 0; i < count; i++)
+            Assert.Contains("Open", (await statusCells.Nth(i).InnerTextAsync()).Trim());
+    }
+
+    [Fact]
+    public async Task StaleVacanciesTile_OpensVacancyList_WithStaleBanner()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+        await dashboard.GoToAsync();
+        var staleCount = await dashboard.GetSummaryTileValueAsync("Stale vacancies");
+
+        await _page.Locator(".widget-kpi-row[role='list'] .widget-kpi")
+            .Filter(new() { HasText = "Stale vacancies" }).First.ClickAsync();
+        await _page.WaitForURLAsync("**/vacancies?view=stale", new() { Timeout = 30_000 });
+        await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 30_000 });
+
+        await Assertions.Expect(_page.Locator("[data-testid='vacancy-list-stale-banner']"))
+            .ToBeVisibleAsync(new() { Timeout = 10_000 });
+        Assert.Equal(staleCount, await _page.Locator(".e-grid .e-row").CountAsync());
+    }
+
+    [Fact]
+    public async Task ListViewToggle_ShowsVacancyList_WithoutPageHeader()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new RecruitmentDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+        await dashboard.GoToAsync();
+        await dashboard.SwitchToListViewAsync();
+
+        await Assertions.Expect(_page.Locator(".dashboard-scroll-x .e-grid")).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await Assertions.Expect(_page.Locator(".dashboard-scroll-x h1")).ToHaveCountAsync(0);
+        await Assertions.Expect(_page.Locator(".dashboard-scroll-x", new() { HasText = "Track open roles" })).ToHaveCountAsync(0);
     }
 
     [Fact]
