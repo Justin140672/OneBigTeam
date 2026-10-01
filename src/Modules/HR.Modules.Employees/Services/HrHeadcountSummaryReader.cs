@@ -16,7 +16,8 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
 
         var query = dbContext.Employees
             .AsNoTracking()
-            .Where(e => e.CompanyId == companyId);
+            .Where(e => e.CompanyId == companyId)
+            .Where(HeadcountRules.CountedExpression());
 
         if (filter.DepartmentId is not null)
             query = query.Where(e => e.DepartmentId == filter.DepartmentId);
@@ -123,12 +124,16 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
                 currentFteByEmployee.TryGetValue(e.Id, out var fte) ? fte : null))
             .ToList();
 
+        var categories = employees
+            .Select(e => HeadcountRules.Classify(e.Status, e.StartDate, e.LeavingDate, today))
+            .ToList();
         var totalHeadcount = employees.Count;
-        var activeEmployees = employees.Count(e => e.Status == EmploymentStatus.Active);
-        var futureStarters = employees.Count(e => e.StartDate > today);
-        var leavers = employees.Count(e => e.LeavingDate != null);
+        var activeEmployees = categories.Count(c => c == HeadcountCategory.Active);
+        var futureStarters = categories.Count(c => c == HeadcountCategory.FutureStarter);
+        var leavers = categories.Count(c => c == HeadcountCategory.Leaver);
+        var otherEmployees = categories.Count(c => c == HeadcountCategory.Other);
         var totalFte = items.Sum(i => i.Fte ?? 0m);
 
-        return new HrHeadcountSummaryResult(items, totalHeadcount, activeEmployees, futureStarters, leavers, totalFte);
+        return new HrHeadcountSummaryResult(items, totalHeadcount, activeEmployees, futureStarters, leavers, totalFte, otherEmployees);
     }
 }

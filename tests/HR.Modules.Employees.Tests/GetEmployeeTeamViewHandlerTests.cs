@@ -18,7 +18,8 @@ public class GetEmployeeTeamViewHandlerTests
             new FakeOnboardingStatusReader(null),
             new FakeProbationStatusReader(null),
             new FakeOffboardingStatusReader(null),
-            resourceAuthorizer);
+            resourceAuthorizer,
+            new FakeProfilePhotoReader());
 
     private static EmployeesDbContext BuildContext()
     {

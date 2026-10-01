@@ -14,7 +14,8 @@ public sealed record HrHeadcountSummaryResult(
     int ActiveEmployees,
     int FutureStarters,
     int Leavers,
-    decimal TotalFte);
+    decimal TotalFte,
+    int OtherEmployees = 0);
 
 public sealed record HrHeadcountSummaryItem(
     Guid EmployeeId,

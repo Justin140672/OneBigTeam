@@ -25,13 +25,17 @@ public class HrHeadcountSummaryReaderTests
         Guid? positionProfileId = null,
         Guid? employmentTypeId = null,
         string firstName = "Alice",
-        string lastName = "Smith")
+        string lastName = "Smith",
+        bool activate = true)
     {
         var employee = Employee.Create(
             Guid.NewGuid(), companyId, firstName, lastName, $"{firstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com",
             startDate, hasSystemAccess: false, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001",
             employmentTypeId ?? Guid.NewGuid(), departmentId ?? Guid.NewGuid(), locationId ?? Guid.NewGuid(),
             positionProfileId ?? Guid.NewGuid(), Now);
+
+        if (activate)
+            employee.Activate(Now);
 
         db.Employees.Add(employee);
         return employee;
@@ -51,6 +55,89 @@ public class HrHeadcountSummaryReaderTests
     }
 
     [Fact]
+    public async Task GetHeadcountSummaryAsync_Excludes_Draft_And_Categories_Reconcile_To_Total()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+
+        var active = SeedEmployee(db, companyId, Today.AddDays(-30));
+        active.Activate(Now);
+
+        var futureStarter = SeedEmployee(db, companyId, Today.AddDays(10));
+        futureStarter.Activate(Now);
+
+        var leaver = SeedEmployee(db, companyId, Today.AddDays(-100));
+        leaver.Activate(Now);
+        leaver.UpdateEmploymentDetails(
+            "EMP-LEAVER", Guid.NewGuid(), Today.AddDays(-100), null, null, Today.AddDays(-1), null, Now);
+
+        var suspended = SeedEmployee(db, companyId, Today.AddDays(-60));
+        suspended.Activate(Now);
+        suspended.Suspend(Now);
+
+        SeedEmployee(db, companyId, Today.AddDays(-5), activate: false);
+
+        await db.SaveChangesAsync();
+
+        var reader = new HrHeadcountSummaryReader(db);
+        var result = await reader.GetHeadcountSummaryAsync(companyId, new ReportFilterCriteria(), CancellationToken.None);
+
+        Assert.Equal(4, result.TotalHeadcount);
+        Assert.Equal(1, result.ActiveEmployees);
+        Assert.Equal(1, result.FutureStarters);
+        Assert.Equal(1, result.Leavers);
+        Assert.Equal(1, result.OtherEmployees);
+        Assert.Equal(
+            result.TotalHeadcount,
+            result.ActiveEmployees + result.FutureStarters + result.Leavers + result.OtherEmployees);
+        Assert.Equal(result.TotalHeadcount, result.Items.Count);
+        Assert.DoesNotContain(result.Items, i => i.Status == nameof(EmploymentStatus.Draft));
+    }
+
+    [Fact]
+    public async Task GetHeadcountSummaryAsync_Draft_Status_Filter_Returns_Nothing()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        SeedEmployee(db, companyId, Today.AddDays(-5), activate: false);
+        await db.SaveChangesAsync();
+
+        var reader = new HrHeadcountSummaryReader(db);
+        var result = await reader.GetHeadcountSummaryAsync(
+            companyId, new ReportFilterCriteria(EmployeeStatus: "Draft"), CancellationToken.None);
+
+        Assert.Equal(0, result.TotalHeadcount);
+        Assert.Empty(result.Items);
+    }
+
+    [Fact]
+    public async Task Dashboard_Charts_And_Report_Active_Count_Use_The_Same_Definition()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var departmentId = Guid.NewGuid();
+        var employmentTypeId = Guid.NewGuid();
+
+        var active = SeedEmployee(db, companyId, Today.AddDays(-30), departmentId, employmentTypeId: employmentTypeId);
+        active.Activate(Now);
+        var futureStarter = SeedEmployee(db, companyId, Today.AddDays(10), departmentId, employmentTypeId: employmentTypeId);
+        futureStarter.Activate(Now);
+        SeedEmployee(db, companyId, Today.AddDays(-5), departmentId, employmentTypeId: employmentTypeId, activate: false);
+        await db.SaveChangesAsync();
+
+        var report = await new HrHeadcountSummaryReader(db)
+            .GetHeadcountSummaryAsync(companyId, new ReportFilterCriteria(), CancellationToken.None);
+        var byDepartment = await new HR.Modules.Employees.Features.GetHeadcountSummary.GetHeadcountSummaryHandler(db)
+            .HandleAsync(new HR.Modules.Employees.Features.GetHeadcountSummary.GetHeadcountSummaryRequest(companyId), CancellationToken.None);
+        var byEmploymentType = await new HR.Modules.Employees.Features.GetEmploymentTypeSplit.GetEmploymentTypeSplitHandler(db)
+            .HandleAsync(new HR.Modules.Employees.Features.GetEmploymentTypeSplit.GetEmploymentTypeSplitRequest(companyId), CancellationToken.None);
+
+        Assert.Equal(1, report.ActiveEmployees);
+        Assert.Equal(report.ActiveEmployees, byDepartment.Items.Sum(i => i.EmployeeCount));
+        Assert.Equal(report.ActiveEmployees, byEmploymentType.Items.Sum(i => i.EmployeeCount));
+    }
+
+    [Fact]
     public async Task GetHeadcountSummaryAsync_Counts_Total_Active_FutureStarters_And_Leavers()
     {
         await using var db = BuildContext();
@@ -60,6 +147,7 @@ public class HrHeadcountSummaryReaderTests
         active.Activate(Now);
 
         var futureStarter = SeedEmployee(db, companyId, Today.AddDays(10));
+        futureStarter.Activate(Now);
 
         var leaver = SeedEmployee(db, companyId, Today.AddDays(-100));
         leaver.Activate(Now);
@@ -72,7 +160,7 @@ public class HrHeadcountSummaryReaderTests
         var result = await reader.GetHeadcountSummaryAsync(companyId, new ReportFilterCriteria(), CancellationToken.None);
 
         Assert.Equal(3, result.TotalHeadcount);
-        Assert.Equal(2, result.ActiveEmployees);
+        Assert.Equal(1, result.ActiveEmployees);
         Assert.Equal(1, result.FutureStarters);
         Assert.Equal(1, result.Leavers);
     }
@@ -244,7 +332,7 @@ public class HrHeadcountSummaryReaderTests
         var active = SeedEmployee(db, companyId, Today);
         active.Activate(Now);
 
-        var draft = SeedEmployee(db, companyId, Today);
+        var draft = SeedEmployee(db, companyId, Today, activate: false);
 
         await db.SaveChangesAsync();
 

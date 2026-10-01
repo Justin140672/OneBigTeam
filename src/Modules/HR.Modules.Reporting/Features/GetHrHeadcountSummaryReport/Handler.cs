@@ -23,6 +23,7 @@ internal sealed class GetHrHeadcountSummaryReportHandler(IHrHeadcountSummaryRead
             result.ActiveEmployees,
             result.FutureStarters,
             result.Leavers,
-            result.TotalFte));
+            result.TotalFte,
+            result.OtherEmployees));
     }
 }

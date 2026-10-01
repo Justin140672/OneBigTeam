@@ -7,10 +7,12 @@ public record ReportCatalogItemModel(
     string Id,
     string DisplayName,
     string Category,
-    string Description);
+    string Description,
+    bool ManagerReport = false);
 
 public static class ReportRoutes
 {
+
     public static readonly IReadOnlyDictionary<string, string> Map = new Dictionary<string, string>
     {
         ["employee-directory"] = "employee-directory",
@@ -468,7 +470,8 @@ public record GetHrHeadcountSummaryReportResponse(
     int ActiveEmployees,
     int FutureStarters,
     int Leavers,
-    decimal TotalFte);
+    decimal TotalFte,
+    int OtherEmployees = 0);
 
 public record HrHeadcountSummaryReportItemModel(
     Guid EmployeeId,

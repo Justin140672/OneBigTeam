@@ -43,6 +43,10 @@ public sealed class HrHeadcountSummaryReportPage(IPage page, string baseUrl)
     public Task<int> GetActiveEmployeesAsync() => GetStatIntAsync("Active Employees");
     public Task<int> GetFutureStartersAsync() => GetStatIntAsync("Future Starters");
     public Task<int> GetLeaversAsync() => GetStatIntAsync("Leavers");
+    public Task<int> GetSuspendedOrServingNoticeAsync() => GetStatIntAsync("Suspended or Serving Notice");
+
+    public async Task<string?> GetHeadcountDefinitionAsync() =>
+        (await page.Locator("#headcount-definition").TextContentAsync())?.Trim();
 
     public async Task<decimal> GetTotalFteAsync()
     {

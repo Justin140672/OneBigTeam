@@ -8,4 +8,5 @@ internal sealed record GetHrHeadcountSummaryReportResponse(
     int ActiveEmployees,
     int FutureStarters,
     int Leavers,
-    decimal TotalFte);
+    decimal TotalFte,
+    int OtherEmployees = 0);

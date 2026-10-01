@@ -37,6 +37,28 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
     }
 
     [Fact]
+    public async Task SummaryStatCards_ReconcileToTotalHeadcount_AndDefinitionIsShown()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var report = new HrHeadcountSummaryReportPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await report.GoToAsync(AcmeId);
+
+        var total = await report.GetTotalHeadcountAsync();
+        var parts = await report.GetActiveEmployeesAsync()
+            + await report.GetFutureStartersAsync()
+            + await report.GetLeaversAsync()
+            + await report.GetSuspendedOrServingNoticeAsync();
+
+        Assert.Equal(total, parts);
+        Assert.True(await report.GetRowCountAsync() <= total);
+        Assert.Contains("except Drafts", await report.GetHeadcountDefinitionAsync());
+    }
+
+    [Fact]
     public async Task SummaryStatCards_AreConsistentWithGridRowCount()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

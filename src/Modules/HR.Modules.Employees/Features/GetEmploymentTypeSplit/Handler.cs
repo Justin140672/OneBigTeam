@@ -1,5 +1,6 @@
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Employees.Features.GetEmploymentTypeSplit;
@@ -14,8 +15,8 @@ internal sealed class GetEmploymentTypeSplitHandler(EmployeesDbContext dbContext
     {
         var counts = await dbContext.Employees
             .AsNoTracking()
-            .Where(e => e.CompanyId == request.CompanyId
-                     && e.Status == EmploymentStatus.Active)
+            .Where(e => e.CompanyId == request.CompanyId)
+            .Where(HeadcountRules.ActiveExpression(DateOnly.FromDateTime(DateTime.UtcNow.Date)))
             .GroupBy(e => e.EmploymentTypeId)
             .Select(g => new { EmploymentTypeId = g.Key, EmployeeCount = g.Count() })
             .ToListAsync(cancellationToken);
