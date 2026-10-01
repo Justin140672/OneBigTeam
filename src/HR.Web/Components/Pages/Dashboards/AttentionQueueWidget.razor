@@ -1,4 +1,4 @@
-@* Unified "Needs your attention" queue for the HR dashboard.
+@* "Needs your action" queue and "Waiting on others" monitoring list for the HR dashboard.
 
    DSH-06: the widget issues ONE server-side bounded summary fetch
    (DashboardService.GetHrSummaryOrThrowAsync) instead of fanning out to 6 category endpoints plus
@@ -17,18 +17,23 @@
 
 @if (Session.CanManageEmployees)
 {
-    <AttentionQueuePanel Title="Needs your attention"
-                          AllClearMessage="No overdue tasks, pending approvals or compliance exceptions right now."
+    <AttentionQueuePanel Title="Needs your action"
+                          AllClearMessage="Nothing needs your action right now."
                           CompanyId="Session.CompanyId"
                           Loading="_loading"
                           RetryingAll="_retryingAll"
                           Summary="_summary"
                           Items="_items"
                           OnReload="ReloadAllAsync" />
+
+    <WaitingOnOthersPanel Loading="_loading"
+                          WaitingCount="_waitingCount"
+                          Items="_waiting"
+                          Exceptions="_exceptions" />
 }
 
 @code {
-    private const string WidgetName = "Needs your attention";
+    private const string WidgetName = "Needs your action";
 
     private bool _loading = true;
     private bool _retryingAll;
@@ -37,6 +42,9 @@
     private WidgetResult<DashboardSummaryModel> _res = WidgetResult<DashboardSummaryModel>.Loading(WidgetName);
     private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
     private IReadOnlyList<AttentionQueueItem> _items = [];
+    private IReadOnlyList<AttentionQueueItem> _waiting = [];
+    private IReadOnlyList<DashboardExceptionModel> _exceptions = [];
+    private int _waitingCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -68,6 +76,9 @@
         {
             _summary = WidgetPanelState.Summarise([new WidgetSourceOutcome("Dashboard summary", true, true, 0)]);
             _items = [];
+            _waiting = [];
+            _exceptions = [];
+            _waitingCount = 0;
             return;
         }
 
@@ -75,5 +86,9 @@
 
         _summary = WidgetPanelState.Summarise(outcomes);
         _items = ManagerAttentionQueueOrdering.Order(items, i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate);
+        _waiting = ManagerAttentionQueueOrdering.Order(
+            AttentionQueueSupport.ConvertWaiting(_res.Value!, _today), i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate);
+        _waitingCount = _res.Value!.TotalWaitingOnOthersCount;
+        _exceptions = _res.Value!.Exceptions;
     }
 }

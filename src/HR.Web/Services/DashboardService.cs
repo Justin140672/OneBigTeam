@@ -32,10 +32,20 @@ public sealed record DashboardSummaryModel(
     int TotalActionableCount,
     bool AllRequiredLoaded,
     bool HasPartialFailure,
-    DateOnly AsOfDate)
+    DateOnly AsOfDate,
+    int TotalWaitingOnOthersCount = 0,
+    IReadOnlyList<DashboardExceptionModel>? Exceptions = null,
+    int TotalUnavailableCount = 0)
 {
     public IReadOnlyList<DashboardCategoryModel> Categories { get; init; } = Categories ?? [];
+    public IReadOnlyList<DashboardExceptionModel> Exceptions { get; init; } = Exceptions ?? [];
 }
+
+public sealed record DashboardExceptionModel(
+    string Category,
+    string Message,
+    string? EmployeeName,
+    string? InvestigationUrl);
 
 public sealed record DashboardCategoryModel(
     string Category,
@@ -43,10 +53,15 @@ public sealed record DashboardCategoryModel(
     bool Required,
     int ActionableCount,
     bool IsTruncated,
-    IReadOnlyList<DashboardActionItemModel> Items)
+    IReadOnlyList<DashboardActionItemModel> Items,
+    IReadOnlyList<DashboardActionItemModel>? WaitingItems = null,
+    int WaitingOnOthersCount = 0,
+    bool WaitingIsTruncated = false,
+    int UnavailableCount = 0)
 {
     public bool IsFailed => Status == "Failed";
     public IReadOnlyList<DashboardActionItemModel> Items { get; init; } = Items ?? [];
+    public IReadOnlyList<DashboardActionItemModel> WaitingItems { get; init; } = WaitingItems ?? [];
 }
 
 public sealed record DashboardActionItemModel(
@@ -62,7 +77,10 @@ public sealed record DashboardActionItemModel(
     string DeepLinkUrl,
     Guid? TaskId,
     bool IsOwnerActionable = true,
-    string? OwnerLabel = null)
+    string? OwnerLabel = null,
+    string Actionability = "CanAct",
+    string? VisibilityReason = null,
+    string? MonitoringUrl = null)
 {
     public int UrgencyRank => Urgency switch
     {

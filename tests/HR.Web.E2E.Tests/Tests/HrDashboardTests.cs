@@ -43,7 +43,7 @@ public sealed class HrDashboardTests(HrAdminPersonaFixture fixture) : RoleE2ETes
         Assert.True(await dashboard.HasWidgetAsync("Headcount by Department"));
         Assert.True(await dashboard.HasWidgetAsync("Gender Split"));
         Assert.True(await dashboard.HasWidgetAsync("Employment Type"));
-        Assert.True(await dashboard.HasWidgetAsync("Needs your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Needs your action"));
         Assert.True(await dashboard.HasWidgetAsync(CurrentSicknessAbsenceTitle));
         Assert.True(await dashboard.HasWidgetAsync(MissingFitNotesTitle));
         Assert.True(await dashboard.HasWidgetAsync("Recent Employee Changes"));

@@ -66,12 +66,31 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
         var taskIdsByRequest = await taskReader.GetOpenTaskIdsAsync(
             companyId, pending.Select(p => p.Id), cancellationToken, TaskActionType.Approve);
 
-        var isHrOversightOnly = requestedScope == WorkloadScope.Hr;
+        var hrScope = requestedScope == WorkloadScope.Hr;
+        IReadOnlyDictionary<Guid, Guid?> assigneesByTask = new Dictionary<Guid, Guid?>();
+        IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> assigneeNames = new Dictionary<Guid, EmployeeDepartmentInfo>();
+        if (hrScope && taskIdsByRequest.Count > 0)
+        {
+            assigneesByTask = await taskReader.GetTaskAssigneesAsync(
+                companyId, taskIdsByRequest.Values, cancellationToken);
+            var assigneeIds = assigneesByTask.Values.Where(v => v is not null).Select(v => v!.Value).Distinct().ToList();
+            if (assigneeIds.Count > 0)
+                assigneeNames = await employeeDepartmentReader.GetDepartmentsAsync(companyId, assigneeIds, cancellationToken);
+        }
 
         return pending.Select(p =>
         {
             departments.TryGetValue(p.EmployeeId, out var dept);
             var taskId = taskIdsByRequest.TryGetValue(p.Id, out var tid) ? tid : (Guid?)null;
+
+            var decision = new WorkloadOwnerDecision(WorkloadActionability.CanAct, null, null);
+            if (hrScope)
+            {
+                Guid? assignee = taskId is { } linked && assigneesByTask.TryGetValue(linked, out var a) ? a : null;
+                string? assigneeName = assignee is { } assigneeId && assigneeNames.TryGetValue(assigneeId, out var info) ? info.EmployeeName : null;
+                decision = WorkloadOwnership.ForHrViewer(
+                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager");
+            }
 
             return new WorkloadAction(
                 EmployeeId: p.EmployeeId,
@@ -84,8 +103,9 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 Status: "Pending",
                 DeepLinkUrl: "",
                 TaskId: taskId,
-                IsOwnerActionable: !isHrOversightOnly,
-                OwnerLabel: isHrOversightOnly ? "Owned by the employee's manager" : null);
+                IsOwnerActionable: decision.IsOwnerActionable,
+                OwnerLabel: decision.OwnerLabel,
+                VisibilityReason: decision.VisibilityReason);
         }).ToList();
     }
 }

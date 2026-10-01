@@ -135,11 +135,31 @@ internal static class ProbationReviewWorkloadActions
         var taskIdsByReview = await taskReader.GetOpenTaskIdsAsync(
             companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
 
+        var hrScope = requestedScope == WorkloadScope.Hr;
+        IReadOnlyDictionary<Guid, Guid?> assigneesByTask = new Dictionary<Guid, Guid?>();
+        IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> assigneeNames = new Dictionary<Guid, EmployeeDepartmentInfo>();
+        if (hrScope && taskIdsByReview.Count > 0)
+        {
+            assigneesByTask = await taskReader.GetTaskAssigneesAsync(companyId, taskIdsByReview.Values, cancellationToken);
+            var assigneeIds = assigneesByTask.Values.Where(v => v is not null).Select(v => v!.Value).Distinct().ToList();
+            if (assigneeIds.Count > 0)
+                assigneeNames = await employeeDepartmentReader.GetDepartmentsAsync(companyId, assigneeIds, cancellationToken);
+        }
+
         return reviews.Select(r =>
         {
             var employeeId = recordMap[r.ProbationRecordId];
             departments.TryGetValue(employeeId, out var dept);
             var taskId = taskIdsByReview.TryGetValue(r.Id, out var tid) ? tid : (Guid?)null;
+
+            var decision = new WorkloadOwnerDecision(WorkloadActionability.CanAct, null, null);
+            if (hrScope && taskId is { } linked)
+            {
+                Guid? assignee = assigneesByTask.TryGetValue(linked, out var a) ? a : null;
+                string? assigneeName = assignee is { } assigneeId && assigneeNames.TryGetValue(assigneeId, out var info) ? info.EmployeeName : null;
+                decision = WorkloadOwnership.ForHrViewer(
+                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager");
+            }
 
             return new WorkloadAction(
                 EmployeeId: employeeId,
@@ -151,7 +171,10 @@ internal static class ProbationReviewWorkloadActions
                 AssignedTo: null,
                 Status: overdueOnly ? "Overdue" : "Due",
                 DeepLinkUrl: "",
-                TaskId: taskId);
+                TaskId: taskId,
+                IsOwnerActionable: decision.IsOwnerActionable,
+                OwnerLabel: decision.OwnerLabel,
+                VisibilityReason: decision.VisibilityReason);
         }).ToList();
     }
 }

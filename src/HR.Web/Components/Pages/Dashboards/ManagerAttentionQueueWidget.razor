@@ -17,14 +17,19 @@
 
 @if (Session.IsManager)
 {
-    <AttentionQueuePanel Title="Requires your attention"
-                          AllClearMessage="No overdue tasks, pending approvals or team wellbeing exceptions right now."
+    <AttentionQueuePanel Title="Needs your action"
+                          AllClearMessage="Nothing needs your action right now."
                           CompanyId="Session.CompanyId"
                           Loading="_loading"
                           RetryingAll="_retryingAll"
                           Summary="_summary"
                           Items="_items"
                           OnReload="ReloadAllAsync" />
+
+    <WaitingOnOthersPanel Loading="_loading"
+                          WaitingCount="_waitingCount"
+                          Items="_waiting"
+                          Exceptions="_exceptions" />
 }
 
 @code {
@@ -32,7 +37,7 @@
 
     [Parameter] public EventCallback<int> OnItemCountChanged { get; set; }
 
-    private const string WidgetName = "Requires your attention";
+    private const string WidgetName = "Needs your action";
 
     private bool _loading = true;
     private bool _retryingAll;
@@ -41,6 +46,9 @@
     private WidgetResult<DashboardSummaryModel> _res = WidgetResult<DashboardSummaryModel>.Loading(WidgetName);
     private WidgetPanelSummary _summary = WidgetPanelState.Summarise([]);
     private IReadOnlyList<AttentionQueueItem> _items = [];
+    private IReadOnlyList<AttentionQueueItem> _waiting = [];
+    private IReadOnlyList<DashboardExceptionModel> _exceptions = [];
+    private int _waitingCount;
 
     protected override async Task OnInitializedAsync()
     {
@@ -72,6 +80,9 @@
         {
             _summary = WidgetPanelState.Summarise([new WidgetSourceOutcome("Dashboard summary", true, true, 0)]);
             _items = [];
+            _waiting = [];
+            _exceptions = [];
+            _waitingCount = 0;
 
             if (OnAlertCountsChanged.HasDelegate)
                 await OnAlertCountsChanged.InvokeAsync(new Dictionary<Guid, int>());
@@ -91,11 +102,15 @@
 
         _summary = WidgetPanelState.Summarise(outcomes);
         _items = ManagerAttentionQueueOrdering.Order(rawItems, i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate);
+        _waiting = ManagerAttentionQueueOrdering.Order(
+            AttentionQueueSupport.ConvertWaiting(_res.Value!, _today), i => i.IsOverdue, i => i.UrgencyRank, i => i.DueDate);
+        _waitingCount = _res.Value!.TotalWaitingOnOthersCount;
+        _exceptions = _res.Value!.Exceptions;
 
         if (OnAlertCountsChanged.HasDelegate)
             await OnAlertCountsChanged.InvokeAsync(alertCounts);
 
         if (OnItemCountChanged.HasDelegate)
-            await OnItemCountChanged.InvokeAsync(_items.Count);
+            await OnItemCountChanged.InvokeAsync(_summary.TotalActionableCount);
     }
 }

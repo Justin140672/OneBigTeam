@@ -31,3 +31,28 @@
   automatically by a data import and not yet reviewed (`requires_review`) are labelled "(unreviewed import)", and ids that
   no longer resolve are labelled "Unknown (legacy value)". Opening and saving an imported type in Employment Types
   confirms it and clears the flag.
+
+## Dashboard workload: actionable and visibility-only items
+
+The HR and manager dashboards separate two kinds of outstanding work. Classification is computed on the server by
+`DashboardSummaryComposer` from the signed-in user, the item's responsible party and its source record. It is never
+inferred from task type or priority, and nothing a client sends can change it.
+
+| Classification | Meaning | Where it appears |
+|---|---|---|
+| `CanAct` | The user is authorised and expected to complete it: the underlying task is assigned to them, or belongs to an HR-owned queue (unassigned onboarding, offboarding), and a working destination exists | "Needs your action" |
+| `VisibilityOnly` | Outstanding, but someone else is responsible (a manager's leave approval, an employee's evidence upload). HR can monitor it but not complete it | "Waiting on others" |
+| `Unavailable` | The source record is missing or inconsistent, or an actionable item has no destination | Neither queue. Reported as an explicit exception (HR dashboard) with an investigation link where one exists, and recorded as a warning log and the `dashboard.workload.unavailable` counter |
+
+- Items whose source is completed, cancelled or deleted are not returned by providers, so they never reach either queue.
+- A waiting item never carries a task id or deep link. It shows the responsible person or role, status, due or overdue
+  state, why HR sees it and, where one exists, a read-only monitoring link (the employee profile).
+- Counts: `TotalActionableCount` is the number of `CanAct` items and drives the "Needs your action" badge and the manager
+  dashboard activity summary. `TotalWaitingOnOthersCount` is the number of `VisibilityOnly` items and drives the
+  "Waiting on others" badge. They are never summed into one headline figure.
+- The notification bell counts unread notifications (events). It is a separate feed, not a second count of this workload.
+  Task-backed notifications deep-link to the same task that appears in "Needs your action".
+- Ownership rules for HR scope are in `WorkloadOwnership.ForHrViewer`: assigned to the viewer is `CanAct`; unassigned is
+  `CanAct` only for HR-owned processes; assigned to anyone else is `VisibilityOnly`. A user who holds both the HR and
+  manager roles acts on items assigned to them and monitors the rest.
+- Priority and overdue styling are independent of ownership.

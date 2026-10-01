@@ -2231,3 +2231,50 @@ html[data-theme="dark"] .chart-tile .e-accumulationchart text {
     width: auto;
     max-width: 28rem;
 }
+
+/* ── Waiting on others (visibility-only items, never actionable) ── */
+
+.waiting-on-others-card {
+    margin-bottom: 2rem;
+}
+
+.waiting-item {
+    gap: 12px;
+    cursor: default;
+    flex-wrap: wrap;
+}
+
+.waiting-item--overdue {
+    background: rgba(220, 38, 38, 0.04);
+}
+
+.waiting-owner {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.waiting-reason {
+    display: block;
+}
+
+.waiting-monitor-link {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.waiting-monitor-link:focus-visible {
+    outline: 3px solid #0b5ed7;
+    outline-offset: 2px;
+}
+
+.waiting-exceptions {
+    border-top: 1px solid var(--hr-gray-200);
+    padding-top: 0.75rem;
+}
+
+.waiting-exception {
+    font-size: 0.85rem;
+    margin-bottom: 0.25rem;
+}

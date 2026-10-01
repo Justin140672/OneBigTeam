@@ -71,7 +71,8 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
         CancellationToken cancellationToken)
     {
         IReadOnlyCollection<Guid>? employeeIds = null;
-        if (requestedScope == WorkloadScope.Hr)
+        var hrScope = requestedScope == WorkloadScope.Hr;
+        if (hrScope)
         {
             var callerIsHr = (await authorizationService.AuthorizeAsync(caller, "reporting:view-hr")).Succeeded;
             if (!callerIsHr)
@@ -103,6 +104,10 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
         if (employeeIds is not null)
             query = query.Where(t => employeeIds.Contains(t.AssignedEmployeeId!.Value));
 
+        var viewerId = currentUser.UserId;
+        if (hrScope && viewerId is { } viewer)
+            query = query.Where(t => t.AssignedEmployeeId != viewer);
+
         var overdue = await query
             .Select(t => new { t.Id, t.Title, t.DueDate, AssignedEmployeeId = t.AssignedEmployeeId!.Value })
             .ToListAsync(cancellationToken);
@@ -126,7 +131,13 @@ internal sealed class ManagerTasksOverdueWorkloadActionProvider(
                 AssignedTo: dept?.EmployeeName,
                 Status: "Overdue",
                 DeepLinkUrl: $"/companies/{companyId}/tasks/{t.Id}",
-                TaskId: t.Id);
+                TaskId: t.Id,
+                IsOwnerActionable: !hrScope,
+                OwnerLabel: hrScope ? OwnerLabelFor(dept?.EmployeeName) : null,
+                VisibilityReason: hrScope ? $"Shown so you can monitor it. {OwnerLabelFor(dept?.EmployeeName)}." : null);
         }).ToList();
     }
+
+    private static string OwnerLabelFor(string? assigneeName) =>
+        string.IsNullOrWhiteSpace(assigneeName) ? "Assigned to another employee" : $"Assigned to {assigneeName}";
 }

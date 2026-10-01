@@ -2,8 +2,13 @@ using HR.Modules.Tasks.Contracts;
 
 namespace HR.Modules.Offboarding.Tests.Infrastructure;
 
-internal sealed class FakeOpenTaskBySourceEntityReader(Dictionary<Guid, Guid>? openTaskIds = null) : IOpenTaskBySourceEntityReader
+internal sealed class FakeOpenTaskBySourceEntityReader(
+    Dictionary<Guid, Guid>? openTaskIds = null,
+    Dictionary<Guid, Guid?>? taskAssignees = null) : IOpenTaskBySourceEntityReader
 {
+    private readonly IReadOnlyDictionary<Guid, Guid?> _taskAssignees =
+        taskAssignees ?? new Dictionary<Guid, Guid?>();
+
     private readonly IReadOnlyDictionary<Guid, Guid> _openTaskIds =
         openTaskIds ?? new Dictionary<Guid, Guid>();
 
@@ -26,5 +31,6 @@ internal sealed class FakeOpenTaskBySourceEntityReader(Dictionary<Guid, Guid>? o
         Guid companyId,
         IEnumerable<Guid> taskIds,
         CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(new Dictionary<Guid, Guid?>());
+        Task.FromResult<IReadOnlyDictionary<Guid, Guid?>>(
+            taskIds.Where(_taskAssignees.ContainsKey).ToDictionary(id => id, id => _taskAssignees[id]));
 }

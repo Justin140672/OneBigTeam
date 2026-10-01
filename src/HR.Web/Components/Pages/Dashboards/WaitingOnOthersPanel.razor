@@ -1,0 +1,96 @@
+@* "Waiting on others": outstanding items other people are responsible for. HR can monitor them
+   but cannot complete them, so no row is ever a button or an actionable link. Every row names the
+   responsible person or role, the current status, the due or overdue state and why it is shown, and
+   offers a read-only monitoring link where one exists. Orphaned or inconsistent records are listed
+   separately as explicit exceptions so they are never a silent dead end. *@
+
+<div class="widget-card waiting-on-others-card" data-testid="waiting-on-others">
+    <div class="widget-header">
+        <i class="fa-solid fa-hourglass-half widget-icon" aria-hidden="true"></i>
+        <h2 class="widget-title mb-0 fs-6">Waiting on others</h2>
+        @if (!Loading && WaitingCount > 0)
+        {
+            <span class="widget-count-badge" aria-label="@(WaitingCount + " items waiting on others")">@WaitingCount</span>
+        }
+    </div>
+
+    <div class="widget-body">
+        <p class="text-muted small mb-2">
+            Outstanding items that someone else is responsible for. You can monitor them here but cannot complete them.
+        </p>
+
+        @if (Loading)
+        {
+            <HrLoadingIndicator Label="Loading items waiting on others…" />
+        }
+        else if (Items.Count == 0)
+        {
+            <p class="waiting-empty text-muted mb-0">Nothing is waiting on anyone else right now.</p>
+        }
+        else
+        {
+            <ul class="list-unstyled mb-0 waiting-list">
+                @foreach (var item in Items)
+                {
+                    var i = item;
+                    <li class="task-widget-item waiting-item @(i.IsOverdue ? "waiting-item--overdue" : "")">
+                        <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
+                            <i class="@i.PriorityIcon" aria-hidden="true"></i>
+                            <span class="visually-hidden">@i.PriorityLabel</span>
+                        </span>
+                        <div class="task-widget-content">
+                            <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
+                            <span class="task-widget-meta">@i.MetaText</span>
+                            <span class="waiting-owner">Responsible: @(i.OwnerLabel ?? "Someone else")</span>
+                            @if (!string.IsNullOrWhiteSpace(i.VisibilityReason))
+                            {
+                                <span class="waiting-reason text-muted small">@i.VisibilityReason</span>
+                            }
+                        </div>
+                        @if (i.DueLabel is not null)
+                        {
+                            <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(i.MonitoringUrl))
+                        {
+                            <a class="waiting-monitor-link" href="@i.MonitoringUrl">View employee<span class="visually-hidden"> @i.EmployeeName</span></a>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+
+        @if (!Loading && Exceptions.Count > 0)
+        {
+            <section class="waiting-exceptions mt-3" aria-label="Items that need investigation" data-testid="dashboard-exceptions">
+                <h3 class="fs-6"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Needs investigation</h3>
+                <ul class="list-unstyled mb-0">
+                    @foreach (var exception in Exceptions)
+                    {
+                        <li class="waiting-exception">
+                            <span>@exception.Message</span>
+                            @if (!string.IsNullOrWhiteSpace(exception.EmployeeName))
+                            {
+                                <span class="text-muted"> (@exception.EmployeeName)</span>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(exception.InvestigationUrl))
+                            {
+                                <a class="ms-2" href="@exception.InvestigationUrl">Investigate</a>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public bool Loading { get; set; }
+
+    [Parameter] public int WaitingCount { get; set; }
+
+    [Parameter] public IReadOnlyList<AttentionQueueItem> Items { get; set; } = [];
+
+    [Parameter] public IReadOnlyList<HR.Web.Services.DashboardExceptionModel> Exceptions { get; set; } = [];
+}

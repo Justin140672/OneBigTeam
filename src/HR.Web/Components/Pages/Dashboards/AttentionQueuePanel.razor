@@ -10,9 +10,9 @@
     <div class="widget-header">
         <i class="fa-solid fa-bell widget-icon"></i>
         <span class="widget-title">@Title</span>
-        @if (!Loading && Items.Count > 0)
+        @if (!Loading && Summary.TotalActionableCount > 0)
         {
-            <span class="widget-count-badge">@Items.Count</span>
+            <span class="widget-count-badge" aria-label="@(Summary.TotalActionableCount + " items need your action")">@Summary.TotalActionableCount</span>
         }
     </div>
 
@@ -69,43 +69,6 @@
                             }
                             <span class="attention-queue-action">@i.ActionLabel</span>
                         </button>
-                    }
-                    else if (i.IsReadOnlyByDesign)
-                    {
-                        @* Genuinely exists but is owned by someone else in this list's context (e.g.
-                           a manager-owned leave approval shown to HR for oversight). Rendered as a
-                           plain, non-interactive div — no tabindex, no click handler, no cursor/hover
-                           styling — so it is never focusable or actionable via mouse or keyboard,
-                           and the owner label makes the reason explicit rather than implying the
-                           item is stale/removed. *@
-                        <div class="task-widget-item attention-queue-item attention-queue-item--readonly"
-                             aria-label="@i.AccessibleLabel">
-                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
-                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
-                            </span>
-                            <div class="task-widget-content">
-                                <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
-                                <span class="task-widget-meta">@i.MetaText</span>
-                            </div>
-                            @if (i.DueLabel is not null)
-                            {
-                                <span class="due-badge due-badge--@i.DueCss">@i.DueLabel</span>
-                            }
-                            <span class="attention-queue-owner-label text-muted">@i.OwnerLabel</span>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="task-widget-item attention-queue-item attention-queue-item--stale"
-                             aria-label="@i.AccessibleLabel">
-                            <span class="priority-pip priority-pip--@i.PriorityCss" title="@i.PriorityLabel">
-                                <i class="@i.PriorityIcon" aria-hidden="true"></i>
-                            </span>
-                            <div class="task-widget-content">
-                                <span class="task-widget-title" title="@i.ActionTitle">@i.ActionTitle</span>
-                                <span class="task-widget-meta text-muted">This item can no longer be opened — it may have been completed or removed.</span>
-                            </div>
-                        </div>
                     }
                 }
             }

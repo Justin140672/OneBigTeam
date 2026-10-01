@@ -16,7 +16,9 @@ public sealed record AttentionQueueItem(
     Guid? TaskId,
     string? DeepLinkUrl,
     bool IsOwnerActionable = true,
-    string? OwnerLabel = null)
+    string? OwnerLabel = null,
+    string? VisibilityReason = null,
+    string? MonitoringUrl = null)
 {
     public bool HasTarget => IsOwnerActionable && (TaskId is not null || !string.IsNullOrWhiteSpace(DeepLinkUrl));
 
@@ -162,7 +164,9 @@ public static class AttentionQueueSupport
             TaskId: it.TaskId,
             DeepLinkUrl: it.DeepLinkUrl,
             IsOwnerActionable: it.IsOwnerActionable,
-            OwnerLabel: it.OwnerLabel);
+            OwnerLabel: it.OwnerLabel,
+            VisibilityReason: it.VisibilityReason,
+            MonitoringUrl: it.MonitoringUrl);
     }
 
     public static (IReadOnlyList<WidgetSourceOutcome> Outcomes, IReadOnlyList<AttentionQueueItem> Items) Convert(
@@ -184,4 +188,11 @@ public static class AttentionQueueSupport
 
         return (outcomes, items);
     }
+
+    public static IReadOnlyList<AttentionQueueItem> ConvertWaiting(DashboardSummaryModel response, DateOnly today) =>
+        response.Categories
+            .Where(c => !c.IsFailed)
+            .SelectMany(c => c.WaitingItems)
+            .Select(it => ToAttentionItem(it, today))
+            .ToList();
 }

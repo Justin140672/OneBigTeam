@@ -147,7 +147,7 @@ internal sealed class GetWorkloadActionsHandler(
         a.Urgency.ToString(),
         a.DeepLinkUrl,
         a.TaskId,
-        a.IsOwnerActionable,
+        a.Actionability == WorkloadActionability.CanAct,
         a.OwnerLabel);
 
     private static List<WorkloadActionGroup> GroupRows(

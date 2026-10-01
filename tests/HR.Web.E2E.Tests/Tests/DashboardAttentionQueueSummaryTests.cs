@@ -83,7 +83,7 @@ public sealed class HrDashboardAttentionQueueSummaryTests(HrAdminPersonaFixture 
         await DashboardAttentionQueueSummaryTests.TryWaitForSummaryRequestAsync(
             _page, "**/dashboards/hr/summary", () => dashboard.GoToAsync());
 
-        Assert.True(await dashboard.HasWidgetAsync("Needs your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Needs your action"));
 
         await dashboard.WaitForAttentionQueueLoadedAsync();
     }
@@ -269,7 +269,7 @@ public sealed class ManagerDashboardAttentionQueueSummaryTests(ManagerPersonaFix
         await DashboardAttentionQueueSummaryTests.TryWaitForSummaryRequestAsync(
             _page, "**/dashboards/manager/summary", () => dashboard.GoToAsync());
 
-        Assert.True(await dashboard.HasWidgetAsync("Requires your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Needs your action"));
         await dashboard.WaitForAttentionQueueLoadedAsync();
     }
 

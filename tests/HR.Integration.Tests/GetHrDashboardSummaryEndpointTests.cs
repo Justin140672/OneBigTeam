@@ -109,13 +109,14 @@ public class GetHrDashboardSummaryEndpointTests
         var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyA));
 
         Assert.NotNull(payload);
-        var allItems = payload!.Categories.SelectMany(c => c.Items).ToList();
+        var allItems = payload!.Categories.SelectMany(c => c.Items.Concat(c.WaitingItems)).ToList();
         Assert.Contains(allItems, i => i.EmployeeId == empA);
         Assert.DoesNotContain(allItems, i => i.EmployeeId == empB);
 
         var leave = payload.Categories.SingleOrDefault(c => c.Category == "Pending Leave Approvals");
         Assert.NotNull(leave);
-        Assert.Equal(1, leave!.ActionableCount);
+        Assert.Equal(0, leave!.ActionableCount);
+        Assert.Equal(1, leave.WaitingOnOthersCount);
     }
 
     [Fact]
@@ -129,10 +130,11 @@ public class GetHrDashboardSummaryEndpointTests
 
         Assert.NotNull(payload);
         var leave = payload!.Categories.Single(c => c.Category == "Pending Leave Approvals");
-        Assert.Equal(30, leave.ActionableCount);
-        Assert.Equal(25, leave.Items.Count);
-        Assert.True(leave.IsTruncated);
-        Assert.True(payload.TotalActionableCount >= 30);
+        Assert.Equal(0, leave.ActionableCount);
+        Assert.Equal(30, leave.WaitingOnOthersCount);
+        Assert.Equal(25, leave.WaitingItems.Count);
+        Assert.True(leave.WaitingIsTruncated);
+        Assert.True(payload.TotalWaitingOnOthersCount >= 30);
     }
 
     [Fact]
@@ -147,9 +149,15 @@ public class GetHrDashboardSummaryEndpointTests
 
         Assert.NotNull(payload);
         var leave = payload!.Categories.Single(c => c.Category == "Pending Leave Approvals");
-        var item = Assert.Single(leave.Items);
+        Assert.Empty(leave.Items);
+        var item = Assert.Single(leave.WaitingItems);
         Assert.False(item.IsOwnerActionable);
+        Assert.Equal("VisibilityOnly", item.Actionability);
         Assert.NotNull(item.OwnerLabel);
+        Assert.False(string.IsNullOrWhiteSpace(item.VisibilityReason));
+        Assert.Null(item.TaskId);
+        Assert.Equal("", item.DeepLinkUrl);
+        Assert.Equal($"/companies/{companyId}/employees/{employeeId}", item.MonitoringUrl);
     }
 
     [Fact]
@@ -171,7 +179,7 @@ public class GetHrDashboardSummaryEndpointTests
         var employeeId = await SeedEmployeeAsync(companyId, "Nadia", "Newstarter");
         var onboardingTaskId = await SeedOutstandingOnboardingTaskAsync(companyId, employeeId);
         var linkedTaskId = await SeedOpenTaskLinkedToSourceAsync(
-            companyId, onboardingTaskId, TaskSource.Onboarding, TaskActionType.Complete, employeeId);
+            companyId, onboardingTaskId, TaskSource.Onboarding, TaskActionType.Complete, null);
 
         using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
         var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
@@ -195,9 +203,12 @@ public class GetHrDashboardSummaryEndpointTests
 
         Assert.NotNull(payload);
         var category = payload!.Categories.Single(c => c.Category == "Outstanding Onboarding Tasks");
-        var item = Assert.Single(category.Items);
-        Assert.Null(item.TaskId);
-        Assert.Equal("", item.DeepLinkUrl);
+        Assert.Empty(category.Items);
+        Assert.Empty(category.WaitingItems);
+        Assert.Equal(1, category.UnavailableCount);
+        var exception = Assert.Single(payload.Exceptions);
+        Assert.Equal("Outstanding Onboarding Tasks", exception.Category);
+        Assert.Contains("administrator investigation", exception.Message);
     }
 
     [Fact]
@@ -211,9 +222,9 @@ public class GetHrDashboardSummaryEndpointTests
         var onboardingTaskIdB = await SeedOutstandingOnboardingTaskAsync(companyId, employeeB, "Set up laptop");
 
         var linkedTaskIdA = await SeedOpenTaskLinkedToSourceAsync(
-            companyId, onboardingTaskIdA, TaskSource.Onboarding, TaskActionType.Complete, employeeA);
+            companyId, onboardingTaskIdA, TaskSource.Onboarding, TaskActionType.Complete, null);
         var linkedTaskIdB = await SeedOpenTaskLinkedToSourceAsync(
-            companyId, onboardingTaskIdB, TaskSource.Onboarding, TaskActionType.Complete, employeeB);
+            companyId, onboardingTaskIdB, TaskSource.Onboarding, TaskActionType.Complete, null);
 
         using var client = await ClientFor(companyId, Guid.NewGuid(), SystemRoles.HrAdministrator);
         var payload = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
@@ -294,7 +305,7 @@ public class GetHrDashboardSummaryEndpointTests
     }
 
     private async Task<Guid> SeedOpenTaskLinkedToSourceAsync(
-        Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid assignedEmployeeId)
+        Guid companyId, Guid sourceEntityId, TaskSource source, TaskActionType actionType, Guid? assignedEmployeeId)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
@@ -312,7 +323,15 @@ public class GetHrDashboardSummaryEndpointTests
         int TotalActionableCount,
         bool AllRequiredLoaded,
         bool HasPartialFailure,
-        DateOnly AsOfDate);
+        DateOnly AsOfDate,
+        int TotalWaitingOnOthersCount = 0,
+        List<ExceptionPayload>? Exceptions = null,
+        int TotalUnavailableCount = 0)
+    {
+        public List<ExceptionPayload> Exceptions { get; init; } = Exceptions ?? [];
+    }
+
+    private sealed record ExceptionPayload(string Category, string Message, string? EmployeeName, string? InvestigationUrl);
 
     private sealed record CategoryPayload(
         string Category,
@@ -320,7 +339,14 @@ public class GetHrDashboardSummaryEndpointTests
         bool Required,
         int ActionableCount,
         bool IsTruncated,
-        List<ActionItemPayload> Items);
+        List<ActionItemPayload> Items,
+        List<ActionItemPayload>? WaitingItems = null,
+        int WaitingOnOthersCount = 0,
+        bool WaitingIsTruncated = false,
+        int UnavailableCount = 0)
+    {
+        public List<ActionItemPayload> WaitingItems { get; init; } = WaitingItems ?? [];
+    }
 
     private sealed record ActionItemPayload(
         Guid? EmployeeId,
@@ -335,5 +361,8 @@ public class GetHrDashboardSummaryEndpointTests
         string DeepLinkUrl,
         Guid? TaskId,
         bool IsOwnerActionable = true,
-        string? OwnerLabel = null);
+        string? OwnerLabel = null,
+        string Actionability = "CanAct",
+        string? VisibilityReason = null,
+        string? MonitoringUrl = null);
 }

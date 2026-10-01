@@ -78,6 +78,11 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
             assigneesByTaskId = await taskReader.GetTaskAssigneesAsync(
                 companyId, openTaskIds.Values, cancellationToken);
         }
+        else if (requestedScope == WorkloadScope.Hr && openTaskIds.Count > 0)
+        {
+            assigneesByTaskId = await taskReader.GetTaskAssigneesAsync(
+                companyId, openTaskIds.Values, cancellationToken);
+        }
 
         var actions = new List<WorkloadAction>();
         foreach (var item in items)
@@ -90,12 +95,23 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
 
                 var isOwnerActionable = true;
                 string? ownerLabel = null;
+                string? visibilityReason = null;
                 if (managerAccessibleAssignees is not null && linkedTaskId is { } linked)
                 {
                     var assignee = assigneesByTaskId.TryGetValue(linked, out var a) ? a : null;
                     isOwnerActionable = assignee is { } assigneeId && managerAccessibleAssignees.Contains(assigneeId);
                     if (!isOwnerActionable)
                         ownerLabel = assignee is null ? "Unassigned — owned by HR" : "Assigned outside your team";
+                }
+                else if (requestedScope == WorkloadScope.Hr && linkedTaskId is { } hrLinked)
+                {
+                    var assignee = assigneesByTaskId.TryGetValue(hrLinked, out var hrAssignee) ? hrAssignee : null;
+                    var decision = WorkloadOwnership.ForHrViewer(
+                        assignee, currentUser.UserId, unassignedBelongsToHr: true,
+                        string.IsNullOrWhiteSpace(task.Owner) ? null : task.Owner, "Assigned to another user");
+                    isOwnerActionable = decision.IsOwnerActionable;
+                    ownerLabel = decision.OwnerLabel;
+                    visibilityReason = decision.VisibilityReason;
                 }
 
                 actions.Add(new WorkloadAction(
@@ -110,7 +126,8 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
                     DeepLinkUrl: "",
                     TaskId: linkedTaskId,
                     IsOwnerActionable: isOwnerActionable,
-                    OwnerLabel: ownerLabel));
+                    OwnerLabel: ownerLabel,
+                    VisibilityReason: visibilityReason));
             }
         }
 

@@ -43,7 +43,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         await login.LoginAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        Assert.True(await dashboard.HasWidgetAsync("Requires your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Needs your action"));
         Assert.True(await dashboard.HasWidgetAsync("Team Status"));
         Assert.True(await dashboard.HasWidgetAsync("My Team"));
     }
@@ -58,7 +58,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         await login.LoginAsync(JamesEmail);
         await dashboard.GoToAsync();
 
-        Assert.True(await dashboard.HasWidgetAsync("Requires your attention"));
+        Assert.True(await dashboard.HasWidgetAsync("Needs your action"));
         await dashboard.WaitForAttentionQueueLoadedAsync();
         await dashboard.GetAttentionQueueSubjectsAsync();
     }
@@ -195,5 +195,25 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
 
         var planStatus = await empEdit.GetOnboardingStatusBadgeTextAsync();
         Assert.Equal("In Progress", planStatus);
+    }
+
+    [Fact]
+    public async Task ManagerWhoIsAlsoHrAdmin_TeamReportsWidget_ShowsOnlyTheFourManagerReports()
+    {
+        var login     = new LoginPage(_page, _fixture.WebBaseUrl);
+        var dashboard = new ManagerDashboardPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(DavidEmail);
+        await dashboard.GoToAsync();
+
+        var widget = _page.Locator(".widget-card").Filter(new() { HasText = "Team Reports" });
+        var items = widget.Locator(".task-widget-title");
+        await Assertions.Expect(items).ToHaveCountAsync(4, new() { Timeout = 15_000 });
+
+        var titles = (await items.AllInnerTextsAsync()).Select(t => t.Trim()).OrderBy(t => t).ToList();
+        Assert.Equal(
+            ["Leave Summary Report", "Onboarding Progress Report", "Probation Report", "Workload & HR Actions Report"],
+            titles);
     }
 }

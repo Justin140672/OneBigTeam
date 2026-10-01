@@ -183,10 +183,12 @@ public class GetManagerDashboardSummaryEndpointTests
 
         Assert.NotNull(hrPayload);
         var hrManagerTasks = hrPayload!.Categories.Single(c => c.Category == "Manager Tasks Overdue");
-        var hrManagerTaskEmployeeIds = hrManagerTasks.Items.Select(i => i.EmployeeId).ToList();
+        var hrManagerTaskEmployeeIds = hrManagerTasks.WaitingItems.Select(i => i.EmployeeId).ToList();
         Assert.Contains(directReportId, hrManagerTaskEmployeeIds);
         Assert.Contains(outOfHierarchyEmployeeId, hrManagerTaskEmployeeIds);
-        Assert.Equal(2, hrManagerTasks.ActionableCount);
+        Assert.Equal(2, hrManagerTasks.WaitingOnOthersCount);
+        Assert.Equal(0, hrManagerTasks.ActionableCount);
+        Assert.Empty(hrManagerTasks.Items);
 
         var hrInvitations = hrPayload.Categories.Single(c => c.Category == "Employee Accounts Awaiting Invitation");
         Assert.Contains(hrInvitations.Items, i => i.EmployeeId == awaitingInvitationEmployeeId);
@@ -273,10 +275,23 @@ public class GetManagerDashboardSummaryEndpointTests
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<LeaveDbContext>();
-        db.LeaveRequests.Add(LeaveRequest.Create(
+        var request = LeaveRequest.Create(
             Guid.NewGuid(), companyId, employeeId, Guid.NewGuid(), Guid.NewGuid(),
             startDate, LeaveDayPart.FullDay, startDate.AddDays(3), LeaveDayPart.FullDay,
-            3m, "Trip", Now));
+            3m, "Trip", Now);
+        db.LeaveRequests.Add(request);
+        await db.SaveChangesAsync();
+        await SeedLinkedTaskAsync(companyId, request.Id, TaskActionType.Approve);
+    }
+
+    private async Task SeedLinkedTaskAsync(Guid companyId, Guid sourceEntityId, TaskActionType actionType)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<TasksDbContext>();
+        db.TaskItems.Add(TaskItem.Create(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), "Linked task", null,
+            TaskPriority.Medium, TaskSource.Workflow, actionType, Today.AddDays(5),
+            null, null, Now, sourceEntityId: sourceEntityId));
         await db.SaveChangesAsync();
     }
 
@@ -302,9 +317,11 @@ public class GetManagerDashboardSummaryEndpointTests
             new DateOnly(2026, 7, 1), SicknessDayPart.FullDay, null, null, null, null,
             SicknessEvidenceStatus.NotRequired, Now);
         db.SicknessRecords.Add(record);
-        db.ReturnToWorkReviews.Add(ReturnToWorkReview.Create(
-            Guid.NewGuid(), companyId, record.Id, employeeId, dueDate, Now));
+        var review = ReturnToWorkReview.Create(
+            Guid.NewGuid(), companyId, record.Id, employeeId, dueDate, Now);
+        db.ReturnToWorkReviews.Add(review);
         await db.SaveChangesAsync();
+        await SeedLinkedTaskAsync(companyId, review.Id, TaskActionType.Review);
     }
 
     private async Task SeedPendingInvitationAsync(Guid companyId, Guid employeeId)
@@ -328,7 +345,12 @@ public class GetManagerDashboardSummaryEndpointTests
         bool Required,
         int ActionableCount,
         bool IsTruncated,
-        List<ActionItemPayload> Items);
+        List<ActionItemPayload> Items,
+        List<ActionItemPayload>? WaitingItems = null,
+        int WaitingOnOthersCount = 0)
+    {
+        public List<ActionItemPayload> WaitingItems { get; init; } = WaitingItems ?? [];
+    }
 
     private sealed record ActionItemPayload(
         Guid? EmployeeId,

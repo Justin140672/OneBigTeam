@@ -5,7 +5,13 @@ internal sealed record DashboardSummaryResponse(
     int TotalActionableCount,
     bool AllRequiredLoaded,
     bool HasPartialFailure,
-    DateOnly AsOfDate);
+    DateOnly AsOfDate,
+    int TotalWaitingOnOthersCount = 0,
+    IReadOnlyList<DashboardExceptionItem>? Exceptions = null,
+    int TotalUnavailableCount = 0)
+{
+    public IReadOnlyList<DashboardExceptionItem> Exceptions { get; init; } = Exceptions ?? [];
+}
 
 internal enum DashboardCategoryStatus
 {
@@ -19,7 +25,20 @@ internal sealed record DashboardCategoryResult(
     bool Required,
     int ActionableCount,
     bool IsTruncated,
-    IReadOnlyList<DashboardActionItem> Items);
+    IReadOnlyList<DashboardActionItem> Items,
+    IReadOnlyList<DashboardActionItem>? WaitingItems = null,
+    int WaitingOnOthersCount = 0,
+    bool WaitingIsTruncated = false,
+    int UnavailableCount = 0)
+{
+    public IReadOnlyList<DashboardActionItem> WaitingItems { get; init; } = WaitingItems ?? [];
+}
+
+internal static class DashboardActionability
+{
+    public const string CanAct = "CanAct";
+    public const string VisibilityOnly = "VisibilityOnly";
+}
 
 internal sealed record DashboardActionItem(
     Guid? EmployeeId,
@@ -34,4 +53,13 @@ internal sealed record DashboardActionItem(
     string DeepLinkUrl,
     Guid? TaskId,
     bool IsOwnerActionable = true,
-    string? OwnerLabel = null);
+    string? OwnerLabel = null,
+    string Actionability = DashboardActionability.CanAct,
+    string? VisibilityReason = null,
+    string? MonitoringUrl = null);
+
+internal sealed record DashboardExceptionItem(
+    string Category,
+    string Message,
+    string? EmployeeName,
+    string? InvestigationUrl);
