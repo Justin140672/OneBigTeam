@@ -45,6 +45,7 @@ internal sealed class EmployeeProvisioningService(
                 SourceReference   = request.SourceReference,
                 Salary            = request.Salary,
                 SalaryFrequency   = request.SalaryFrequency,
+                IsInitialCompanyAdmin = request.IsInitialCompanyAdmin,
             },
             cancellationToken);
 

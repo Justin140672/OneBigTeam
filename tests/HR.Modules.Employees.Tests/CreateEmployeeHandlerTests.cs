@@ -627,6 +627,42 @@ public class CreateEmployeeHandlerTests
         var created = await SingleStagedEventAsync(context);
         Assert.Equal(companyId, created.CompanyId);
         Assert.Equal(result.Value!.Id, created.EmployeeId);
+        Assert.False(created.IsInitialCompanyAdmin);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Flags_Event_As_InitialCompanyAdmin_When_Requested()
+    {
+        await using var context = BuildContext();
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                CompanyId = companyId,
+                DepartmentId = departmentId,
+                LocationId = locationId,
+                PositionProfileId = positionProfileId,
+                EmploymentTypeId = employmentTypeId,
+                EmployeeNumber = "EMP-0001",
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "alice@example.com",
+                StartDate = StartDate,
+                DateOfBirth = new DateOnly(1990, 5, 20),
+                Nationality = "British",
+                Gender = "Female",
+                HasSystemAccess = true,
+                IsInitialCompanyAdmin = true
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var created = await SingleStagedEventAsync(context);
+        Assert.True(created.IsInitialCompanyAdmin);
     }
 
     [Fact]

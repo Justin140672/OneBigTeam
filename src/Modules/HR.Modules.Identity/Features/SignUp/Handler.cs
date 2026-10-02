@@ -157,7 +157,8 @@ internal sealed class SignUpHandler(
             EmploymentTypeId: defaults.EmploymentTypeId,
             DepartmentId: defaults.DepartmentId,
             LocationId: defaults.LocationId,
-            PositionProfileId: defaults.PositionProfileId);
+            PositionProfileId: defaults.PositionProfileId,
+            IsInitialCompanyAdmin: true);
 
         return await employeeProvisioningService.CreateFromCandidateAsync(provisioningRequest, cancellationToken);
     }

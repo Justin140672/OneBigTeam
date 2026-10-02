@@ -32,7 +32,8 @@ public class CreateOnboardingPlanOnEmployeeCreatedHandlerTests
         DateOnly startDate,
         Guid? managerId = null,
         Guid? positionProfileId = null,
-        bool isImported = false) =>
+        bool isImported = false,
+        bool isInitialCompanyAdmin = false) =>
         new(
             CompanyId: companyId,
             EmployeeId: employeeId,
@@ -41,7 +42,29 @@ public class CreateOnboardingPlanOnEmployeeCreatedHandlerTests
             ProbationEndDate: startDate.AddDays(90),
             PositionProfileId: positionProfileId,
             DefaultLeavePolicyId: null,
-            IsImported: isImported);
+            IsImported: isImported,
+            IsInitialCompanyAdmin: isInitialCompanyAdmin);
+
+    [Fact]
+    public async Task IsInitialCompanyAdmin_True_Creates_No_Plan_No_Tasks_And_No_TaskCreator_Calls()
+    {
+        await using var dbContext = BuildContext();
+        var taskCreator = new FakeTaskCreator();
+        var handler = new EmployeeCreatedHandler(
+            dbContext,
+            taskCreator,
+            new FakeEmployeeNameReader(),
+            new FakeOnboardingTemplateReader(),
+            new FakeClock(FixedUtcNow));
+
+        var e = BuildEvent(Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 7, 1), isInitialCompanyAdmin: true);
+
+        await handler.HandleAsync(e, CancellationToken.None);
+
+        Assert.Empty(dbContext.OnboardingPlans);
+        Assert.Empty(dbContext.OnboardingTasks);
+        Assert.Empty(taskCreator.Created);
+    }
 
     [Fact]
     public async Task IsImported_True_Creates_No_Plan_No_Tasks_And_No_TaskCreator_Calls()

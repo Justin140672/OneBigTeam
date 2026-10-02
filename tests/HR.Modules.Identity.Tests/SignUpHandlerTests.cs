@@ -90,6 +90,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Equal(deps.DefaultDataSeeder.ResultToReturn.LocationId, employeeRequest.LocationId);
         Assert.Equal(deps.DefaultDataSeeder.ResultToReturn.PositionProfileId, employeeRequest.PositionProfileId);
         Assert.Equal(deps.DefaultDataSeeder.ResultToReturn.EmploymentTypeId, employeeRequest.EmploymentTypeId);
+        Assert.True(employeeRequest.IsInitialCompanyAdmin);
 
         var createdUser = Assert.Single(deps.SupabaseAuthGateway.CreatedUsers);
         Assert.Equal(request.AdminEmail, createdUser.Email);

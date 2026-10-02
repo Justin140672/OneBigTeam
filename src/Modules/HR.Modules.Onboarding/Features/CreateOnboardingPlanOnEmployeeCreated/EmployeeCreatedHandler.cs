@@ -16,7 +16,7 @@ internal sealed class EmployeeCreatedHandler(
 {
     public async Task HandleAsync(EmployeeCreatedIntegrationEvent e, CancellationToken cancellationToken)
     {
-        if (e.IsImported)
+        if (e.IsImported || e.IsInitialCompanyAdmin)
             return;
 
         var now = clock.UtcNowOffset();

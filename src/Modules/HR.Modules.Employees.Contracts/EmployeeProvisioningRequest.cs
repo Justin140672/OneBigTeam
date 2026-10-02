@@ -32,4 +32,5 @@ public sealed record EmployeeProvisioningRequest(
     /// unrecognised). Both null for human-initiated creation, which manages compensation separately.
     /// </summary>
     decimal? Salary = null,
-    string? SalaryFrequency = null);
+    string? SalaryFrequency = null,
+    bool IsInitialCompanyAdmin = false);

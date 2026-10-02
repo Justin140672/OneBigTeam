@@ -346,7 +346,8 @@ internal sealed class CreateEmployeeHandler
         _dbContext.AuditOutboxEntries.EnqueueIntegrationOutbox(
             new EmployeeCreatedIntegrationEvent(
                 employee.CompanyId, employee.Id, employee.StartDate, employee.ManagerId, probationEndDate,
-                employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId),
+                employee.PositionProfileId, positionProfile?.DefaultLeavePolicyId,
+                IsInitialCompanyAdmin: request.IsInitialCompanyAdmin),
             request.CompanyId, now, _executionContextAccessor);
 
         try
