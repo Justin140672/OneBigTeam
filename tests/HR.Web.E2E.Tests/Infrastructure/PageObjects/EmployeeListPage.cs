@@ -64,6 +64,24 @@ public sealed class EmployeeListPage(IPage page, string baseUrl)
         await page.WaitForTimeoutAsync(400);
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
+        try
+        {
+            await page.WaitForFunctionAsync(
+                @"frag => {
+                    const grid = document.querySelector('.e-grid');
+                    if (!grid) return false;
+                    if (grid.querySelector('.e-emptyrow')) return true;
+                    const rows = [...grid.querySelectorAll('.e-row')];
+                    const needle = frag.toLowerCase();
+                    return rows.length > 0 && rows.every(r => r.textContent.toLowerCase().includes(needle));
+                }",
+                nameFragment,
+                new() { Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+        }
+
         return await page.Locator(".e-grid .e-row").CountAsync() > 0;
     }
 

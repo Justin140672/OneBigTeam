@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Components.Forms;
 
 namespace HR.Web.Components.Controls;
 
-public abstract class AccessibleFieldBase<TValue> : ComponentBase
+public abstract class AccessibleFieldBase<TValue> : ComponentBase, IDisposable
 {
     [Parameter, EditorRequired] public string Label { get; set; } = string.Empty;
 
@@ -81,5 +81,30 @@ public abstract class AccessibleFieldBase<TValue> : ComponentBase
     {
         Value = value;
         return ValueChanged.InvokeAsync(value);
+    }
+
+    private EditContext? _subscribedEditContext;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_subscribedEditContext, EditContext))
+            return;
+
+        if (_subscribedEditContext is not null)
+            _subscribedEditContext.OnValidationStateChanged -= OnValidationStateChanged;
+
+        _subscribedEditContext = EditContext;
+
+        if (_subscribedEditContext is not null)
+            _subscribedEditContext.OnValidationStateChanged += OnValidationStateChanged;
+    }
+
+    private void OnValidationStateChanged(object? sender, ValidationStateChangedEventArgs e) =>
+        _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        if (_subscribedEditContext is not null)
+            _subscribedEditContext.OnValidationStateChanged -= OnValidationStateChanged;
     }
 }

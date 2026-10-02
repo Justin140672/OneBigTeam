@@ -97,7 +97,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected no Offboarding tab yet");
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, E2eDates.DaysFromToday(0), "Resignation");
 
         Assert.True(
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
@@ -123,7 +123,7 @@ public sealed class EmployeeLifecycleTabVisibilityTests(HrAdminPersonaFixture fi
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, "OffComplete");
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, E2eDates.DaysFromToday(0), "Resignation");
 
         Assert.True(await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Offboarding"),
             "Expected the Offboarding tab to be visible once started");

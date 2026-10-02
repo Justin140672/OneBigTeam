@@ -346,6 +346,10 @@ a:focus-visible {
     color: #343a40;
 }
 
+html:not([data-theme="dark"]) .e-grid .e-groupdroparea {
+    color: #343a40;
+}
+
 /* nav-tabs' active state is text-color-only (transparent background, bordered underline), so the
    color-only override is correct there. nav-pills' active state is a solid colored *background*
    with light text (Bootstrap's default $primary pill) — color-only wasn't enough, the pill's

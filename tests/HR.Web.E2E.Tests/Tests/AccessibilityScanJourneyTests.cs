@@ -46,7 +46,7 @@ public sealed class AccessibilityScanJourneyTests(HrAdminPersonaFixture fixture)
         var edit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
         await list.GoToAsync(AcmeId);
         await list.ClickEmployeeAsync("Tom Williams");
-        await edit.OpenEmploymentTabAsync();
+        await edit.OpenEmploymentTabAsync(warmUpDropdowns: false);
 
         await AccessibilityScan.AssertNoSeriousViolationsAsync(_page, "employee edit page (Employment tab)");
     }

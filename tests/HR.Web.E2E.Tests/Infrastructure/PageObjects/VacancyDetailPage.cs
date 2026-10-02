@@ -980,6 +980,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
 
     public async Task<string> GetOfferedSalaryValueAsync()
     {
+        await page.Locator(".offer-candidate-dialog .e-dlg-header-content").ClickAsync();
         await Assertions.Expect(OfferSalaryInput).ToHaveValueAsync(
             new System.Text.RegularExpressions.Regex(@"\d,\d{3}"), new() { Timeout = 15_000 });
         return await OfferSalaryInput.InputValueAsync();

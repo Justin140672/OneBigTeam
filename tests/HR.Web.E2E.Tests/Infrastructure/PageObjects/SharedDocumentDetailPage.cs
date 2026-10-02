@@ -859,7 +859,7 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
-    public Task<bool> IsReviewHistoryCardVisibleAsync() => ReviewHistoryTab.IsVisibleAsync();
+    public Task<bool> IsReviewHistoryCardVisibleAsync() => ReviewHistoryTab.WaitUntilVisibleAsync(15_000);
 
     public async Task<int> GetReviewHistoryRowCountAsync()
     {

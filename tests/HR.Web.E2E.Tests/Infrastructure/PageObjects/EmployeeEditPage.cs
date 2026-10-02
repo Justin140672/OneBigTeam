@@ -395,10 +395,17 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
 
-    public async Task OpenEmploymentTabAsync()
+    public async Task OpenEmploymentTabAsync(bool warmUpDropdowns = true)
     {
         await OpenSectionAsync("Employment");
         await page.WaitForSelectorAsync(".card-header:has-text('Employment Details')", new() { Timeout = 15_000 });
+
+        if (!warmUpDropdowns)
+        {
+            await page.Locator("#emp-employment-manager").WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 15_000 });
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+            return;
+        }
 
         // The heading above is on the FIRST card of this tab; every combobox further down still
         // needs Syncfusion's JS interop to attach before it's genuinely click-ready, and the very

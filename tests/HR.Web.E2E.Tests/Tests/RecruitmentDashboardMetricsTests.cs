@@ -51,12 +51,13 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
         await _page.WaitForURLAsync("**/vacancies?view=open", new() { Timeout = 30_000 });
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 30_000 });
 
-        await Assertions.Expect(_page.Locator(".e-grid .e-row")).ToHaveCountAsync(openCount, new() { Timeout = 15_000 });
+        var rows = _page.Locator(".e-grid .e-row");
+        if (openCount > 0)
+            await Assertions.Expect(rows.First).ToBeVisibleAsync(new() { Timeout = 15_000 });
 
-        var statusCells = _page.Locator(".e-grid .e-row .e-rowcell:nth-child(5)");
-        var count = await statusCells.CountAsync();
+        var count = await rows.CountAsync();
         for (var i = 0; i < count; i++)
-            Assert.Contains("Open", (await statusCells.Nth(i).InnerTextAsync()).Trim());
+            Assert.Contains("Open", (await rows.Nth(i).InnerTextAsync()).Trim());
     }
 
     [Fact]

@@ -308,7 +308,6 @@ public sealed class AdministrativeRoleSeparationCompanyAdminPlusManagerTests(Sar
 
     [Theory]
     [InlineData(AdminRoutes.CompanyEdit)]
-    [InlineData(AdminRoutes.Employees)]
     [InlineData(AdminRoutes.Reporting)]
     public async Task CompanyAdminPlusManager_IsAllowed(string route)
     {
@@ -317,6 +316,7 @@ public sealed class AdministrativeRoleSeparationCompanyAdminPlusManagerTests(Sar
     }
 
     [Theory]
+    [InlineData(AdminRoutes.Employees)]
     [InlineData(AdminRoutes.UserAdministration)]
     [InlineData(AdminRoutes.HrSettings)]
     public async Task CompanyAdminPlusManager_IsDenied(string route)

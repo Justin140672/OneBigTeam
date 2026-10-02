@@ -51,10 +51,10 @@ public sealed class SidebarNavigationTests(ParallelBlankPersonaFixture fixture)
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        Assert.True(await sidebar.HasTopLevelMenuItemAsync("Dashboard"),
-            "Expected an HR Administrator to see a 'Dashboard' link in the sidebar");
+        Assert.True(await sidebar.HasTopLevelMenuItemAsync("HR Dashboard"),
+            "Expected an HR Administrator to see an 'HR Dashboard' link in the sidebar");
 
-        await sidebar.ClickTopLevelMenuItemAsync("Dashboard");
+        await sidebar.ClickTopLevelMenuItemAsync("HR Dashboard");
 
         await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 15_000 });
         Assert.Contains("/dashboard/hr", _page.Url);

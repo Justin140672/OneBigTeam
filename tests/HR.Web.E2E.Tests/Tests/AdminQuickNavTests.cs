@@ -138,7 +138,7 @@ public sealed class AdminQuickNavTests(HrAdminPersonaFixture fixture) : RoleE2ET
     private async Task MakeLeaverViaWizardAsync(StartLeavingProcessDialog dialog)
     {
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(E2eDates.DaysFromToday(0));
         await dialog.ClickNextAsync();
 
         var leavingDateRaw = await dialog.GetLeavingDateTextAsync();

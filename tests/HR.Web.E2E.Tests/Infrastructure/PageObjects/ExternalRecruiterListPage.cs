@@ -41,10 +41,7 @@ public sealed class ExternalRecruiterListPage(IPage page, string baseUrl)
     {
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
 
-        return await page.Locator(".e-rowcell")
-            .Filter(new() { HasText = agencyNameFragment })
-            .First
-            .WaitUntilVisibleAsync();
+        return await page.HasGridCellOnAnyPageAsync(agencyNameFragment);
     }
 
     private ILocator Row(string agencyNameFragment) =>

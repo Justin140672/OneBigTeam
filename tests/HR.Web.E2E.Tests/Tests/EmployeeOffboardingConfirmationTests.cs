@@ -80,7 +80,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         await GetSharedEmployeeAsync(empList, empEdit);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(E2eDates.DaysFromToday(0));
         await dialog.ClickNextAsync();
 
         var leavingDateRaw = await dialog.GetLeavingDateTextAsync();
@@ -120,7 +120,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         var originalStatus = await empEdit.GetEmployeeStatusBadgeTextAsync();
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync("01/09/2026");
+        await dialog.FillResignationReceivedDateAsync(E2eDates.DaysFromToday(0));
         await dialog.ClickNextAsync();
 
         await dialog.CancelAsync();

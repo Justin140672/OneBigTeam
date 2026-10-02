@@ -81,7 +81,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
 
         var employeeId = await CreateEmployeeAsync(empList, empEdit, slot: 1);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, E2eDates.DaysFromToday(0), "Resignation");
 
         await offboarding.OpenAsync();
 
@@ -114,7 +114,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 3);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "01/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, E2eDates.DaysFromToday(0), "Resignation");
 
         await offboarding.OpenAsync();
 
@@ -166,7 +166,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
 
         await CreateEmployeeAsync(empList, empEdit, slot: 2);
 
-        await StartLeavingProcessViaWizardAsync(startDialog, "15/09/2026", "Resignation");
+        await StartLeavingProcessViaWizardAsync(startDialog, E2eDates.DaysFromToday(7), "Resignation");
 
         await offboarding.OpenAsync();
 

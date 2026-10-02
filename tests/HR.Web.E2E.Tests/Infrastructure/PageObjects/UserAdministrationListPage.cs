@@ -78,7 +78,20 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
         var row = page.Locator(".e-row")
             .Filter(new() { HasText = nameOrEmailFragment })
             .First;
-        await row.ClickAsync();
+
+        for (var attempt = 1; ; attempt++)
+        {
+            await row.ClickAsync();
+            try
+            {
+                await Assertions.Expect(row).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("e-active"), new() { Timeout = 3_000 });
+                return;
+            }
+            catch (PlaywrightException) when (attempt < 4)
+            {
+                await page.WaitForTimeoutAsync(300);
+            }
+        }
     }
 
     public async Task ClickResendInvitationAsync()
