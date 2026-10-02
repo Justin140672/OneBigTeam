@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// <summary>
 /// Direct coverage of the Close / unsaved-changes prompt on the Company edit page.
 /// CompanyEdit is a non-trivial host for this shared EditPageBase behavior: it has no
-/// dedicated "list" page (Close navigates to the dashboard instead), and its own Save button
+/// dedicated "list" page (Close navigates to Subscription & Billing for a company-admin-only user, whose landing page is this one), and its own Save button
 /// intentionally stays on the page showing an inline success banner (unlike most edit pages).
 ///
 /// This used to also cover an edit made purely on the (now-removed) Settings tab, which had its
@@ -23,7 +23,7 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
     private const string CompanyAdminEmail = "priya.shah@acme.example";
 
     [Fact]
-    public async Task Close_WithNoChanges_NavigatesDirectlyToDashboard()
+    public async Task Close_WithNoChanges_NavigatesToSubscriptionNotBackToCompanyProfile()
     {
         var login       = new LoginPage(_page, _fixture.WebBaseUrl);
         var companyEdit = new CompanyEditPage(_page, _fixture.WebBaseUrl);
@@ -33,9 +33,9 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
 
         await companyEdit.GoToAsync(AcmeId);
 
-        await companyEdit.CloseAndWaitForDashboardAsync(_fixture.WebBaseUrl, AcmeId);
+        await companyEdit.CloseAndWaitForSubscriptionAsync(_fixture.WebBaseUrl, AcmeId);
 
-        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
+        Assert.Equal($"{_fixture.WebBaseUrl}/subscription", _page.Url);
     }
 
     [Fact]
@@ -79,7 +79,7 @@ public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixtur
         Assert.True(await companyEdit.IsUnsavedChangesDialogVisibleAsync());
 
         await companyEdit.ConfirmSaveFromUnsavedChangesDialogAsync(_fixture.WebBaseUrl, AcmeId);
-        Assert.Equal($"{_fixture.WebBaseUrl}/companies/{AcmeId}/edit", _page.Url);
+        Assert.Equal($"{_fixture.WebBaseUrl}/subscription", _page.Url);
 
         try
         {

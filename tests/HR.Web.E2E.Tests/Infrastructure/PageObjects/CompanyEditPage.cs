@@ -140,30 +140,30 @@ public sealed class CompanyEditPage(IPage page, string baseUrl)
     public Task<bool> IsUnsavedChangesDialogVisibleAsync() =>
         UnsavedChangesDialog.WaitUntilVisibleAsync();
 
-    public Task CloseAndWaitForDashboardAsync(string baseUrl, Guid companyId) =>
-        ClickAndWaitForRoundTripBackToEditAsync(ClickCloseAsync, baseUrl, companyId);
+    public Task CloseAndWaitForSubscriptionAsync(string baseUrl, Guid companyId) =>
+        ClickAndWaitForSubscriptionAsync(ClickCloseAsync, baseUrl, companyId);
 
     public Task ConfirmDiscardChangesAsync(string baseUrl, Guid companyId) =>
-        ClickAndWaitForRoundTripBackToEditAsync(
+        ClickAndWaitForSubscriptionAsync(
             () => UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Discard Changes" }).ClickAsync(),
             baseUrl, companyId);
 
     public Task ConfirmSaveFromUnsavedChangesDialogAsync(string baseUrl, Guid companyId) =>
-        ClickAndWaitForRoundTripBackToEditAsync(
+        ClickAndWaitForSubscriptionAsync(
             () => UnsavedChangesDialog.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync(),
             baseUrl, companyId);
 
-    private async Task ClickAndWaitForRoundTripBackToEditAsync(Func<Task> click, string baseUrl, Guid companyId)
+    private async Task ClickAndWaitForSubscriptionAsync(Func<Task> click, string baseUrl, Guid companyId)
     {
         await page.RunAndWaitForNavigationAsync(click, new()
         {
-            UrlFunc = url => new Uri(url).AbsolutePath == "/",
+            UrlFunc = url => new Uri(url).AbsolutePath is "/" or "/subscription",
             WaitUntil = WaitUntilState.Commit,
             Timeout = 30_000,
         });
-        await page.WaitForURLAsync($"{baseUrl}/companies/{companyId}/edit",
+        await page.WaitForURLAsync($"{baseUrl}/subscription",
             new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
-        await page.WaitForSelectorAsync("#company-name", new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync("h1", new() { Timeout = 20_000 });
     }
 
     public Task CancelUnsavedChangesDialogAsync() =>

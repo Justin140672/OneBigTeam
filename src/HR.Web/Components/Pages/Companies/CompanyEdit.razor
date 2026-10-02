@@ -144,5 +144,6 @@
         return base.OnSavedAsync();
     }
 
-    protected override string? ListUrl => "/";
+    protected override string? ListUrl =>
+        SaveNavigationTarget.IsSamePage(null, Session.LandingUrl, $"/companies/{Id}/edit") ? "/subscription" : "/";
 }

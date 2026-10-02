@@ -92,7 +92,7 @@
                 else
                 {
                     <span title="@CancelUnavailableReason">
-                        <SfButton Disabled="@(!CancelIsAvailable || _cancelBusy)" OnClick="RequestCancelAsync">
+                        <SfButton CssClass="e-outline e-danger" Disabled="@(!CancelIsAvailable || _cancelBusy)" OnClick="RequestCancelAsync">
                             @if (_cancelBusy)
                             {
                                 <span class="spinner-border spinner-border-sm me-1" role="status"></span>

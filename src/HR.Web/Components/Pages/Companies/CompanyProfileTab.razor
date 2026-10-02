@@ -5,9 +5,8 @@
     </div>
     <div class="card-body">
         <div class="mb-4">
-            <label class="form-label fw-semibold" for="company-name">Name <span class="text-danger">*</span></label>
-            <HrTextBox ID="company-name" Enabled="@(!Session.IsReadOnly)" @bind-Value="Model.Name" Placeholder="Company name" />
-            <ValidationMessage For="@(() => Model.Name)" />
+            <HrTextField Id="company-name" Label="Name" Required="true" LabelClass="form-label fw-semibold"
+                         Disabled="@Session.IsReadOnly" @bind-Value="Model.Name" Placeholder="Company name" />
         </div>
 
         @if (Model.Addresses.Count == 0)
@@ -19,38 +18,35 @@
             @foreach (var (addr, i) in Model.Addresses.Select((a, i) => (a, i)))
             {
                 <div class="col-md-6">
-                    <div class="border rounded p-3 h-100">
-                        <h6 class="text-uppercase text-muted small mb-3">@EnumDisplay.Humanize(addr.Type)</h6>
+                    <fieldset class="border rounded p-3 h-100">
+                        <legend class="text-uppercase text-muted small fw-normal mb-3">@EnumDisplay.Humanize(addr.Type)</legend>
                         <div class="row g-3">
                             <div class="col-12">
-                                <label class="form-label" for="@($"addr-{i}-line1")">Address Line 1 <span class="text-danger">*</span></label>
-                                <HrTextBox ID="@($"addr-{i}-line1")" Enabled="@(!Session.IsReadOnly)" @bind-Value="addr.Line1" Placeholder="Line 1" />
-                                <ValidationMessage For="@(() => addr.Line1)" />
+                                <HrTextField Id="@($"addr-{i}-line1")" Label="Address Line 1" Required="true"
+                                             Disabled="@Session.IsReadOnly" @bind-Value="addr.Line1" Placeholder="Line 1" />
                             </div>
                             <div class="col-12">
-                                <label class="form-label" for="@($"addr-{i}-line2")">Address Line 2</label>
-                                <HrTextBox ID="@($"addr-{i}-line2")" Enabled="@(!Session.IsReadOnly)" @bind-Value="addr.Line2" Placeholder="Line 2" />
+                                <HrTextField Id="@($"addr-{i}-line2")" Label="Address Line 2"
+                                             Disabled="@Session.IsReadOnly" @bind-Value="addr.Line2" Placeholder="Line 2" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="@($"addr-{i}-city")">Town/City <span class="text-danger">*</span></label>
-                                <HrTextBox ID="@($"addr-{i}-city")" Enabled="@(!Session.IsReadOnly)" @bind-Value="addr.City" Placeholder="City" />
-                                <ValidationMessage For="@(() => addr.City)" />
+                                <HrTextField Id="@($"addr-{i}-city")" Label="Town/City" Required="true"
+                                             Disabled="@Session.IsReadOnly" @bind-Value="addr.City" Placeholder="City" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="@($"addr-{i}-region")">County/Region</label>
-                                <HrTextBox ID="@($"addr-{i}-region")" Enabled="@(!Session.IsReadOnly)" @bind-Value="addr.Region" Placeholder="County" />
+                                <HrTextField Id="@($"addr-{i}-region")" Label="County/Region"
+                                             Disabled="@Session.IsReadOnly" @bind-Value="addr.Region" Placeholder="County" />
                             </div>
                             <div class="col-md-6">
-                                <label class="form-label" for="@($"addr-{i}-postcode")">Postcode</label>
-                                <HrTextBox ID="@($"addr-{i}-postcode")" Enabled="@(!Session.IsReadOnly)" @bind-Value="addr.PostalCode" Placeholder="Postal Code" />
-                                <ValidationMessage For="@(() => addr.PostalCode)" />
+                                <HrTextField Id="@($"addr-{i}-postcode")" Label="Postcode"
+                                             Disabled="@Session.IsReadOnly" @bind-Value="addr.PostalCode" Placeholder="Postal Code" />
                             </div>
                             @* Country Code deliberately not shown — UK-only customers for now (same
                                reasoning as the removed Settings tab's TimeZone/Locale), so it's
                                always "GB", set in code (CompanyEdit.razor's LoadAsync /
                                CompanyProvisioner's default address) rather than user-editable. *@
                         </div>
-                    </div>
+                    </fieldset>
                 </div>
             }
         </div>
