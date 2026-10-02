@@ -48,7 +48,7 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
 
         await _page.Locator(".widget-kpi-row[role='list'] .widget-kpi")
             .Filter(new() { HasText = "Open vacancies" }).First.ClickAsync();
-        await _page.WaitForURLAsync("**/vacancies?view=open", new() { Timeout = 30_000 });
+        await _page.WaitForURLAsync("**/vacancies?view=open", new() { WaitUntil = WaitUntilState.Commit, Timeout = 30_000 });
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 30_000 });
 
         var rows = _page.Locator(".e-grid .e-row");
@@ -73,7 +73,7 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
 
         await _page.Locator(".widget-kpi-row[role='list'] .widget-kpi")
             .Filter(new() { HasText = "Stale vacancies" }).First.ClickAsync();
-        await _page.WaitForURLAsync("**/vacancies?view=stale", new() { Timeout = 30_000 });
+        await _page.WaitForURLAsync("**/vacancies?view=stale", new() { WaitUntil = WaitUntilState.Commit, Timeout = 30_000 });
         await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 30_000 });
 
         await Assertions.Expect(_page.Locator("[data-testid='vacancy-list-stale-banner']"))

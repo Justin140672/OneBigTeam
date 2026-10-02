@@ -26,6 +26,8 @@ public abstract class AccessibleFieldBase<TValue> : ComponentBase, IDisposable
 
     [Parameter] public string? ValidationClass { get; set; }
 
+    protected string ValidationMessageClass => string.IsNullOrWhiteSpace(ValidationClass) ? "validation-message" : ValidationClass;
+
     protected string WrapperClass => string.IsNullOrWhiteSpace(FieldClass) ? "hr-field" : $"hr-field {FieldClass}";
 
     [CascadingParameter] protected EditContext? EditContext { get; set; }

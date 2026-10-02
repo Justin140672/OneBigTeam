@@ -1,5 +1,6 @@
 using HR.Web.E2E.Tests.Infrastructure;
 using HR.Web.E2E.Tests.Infrastructure.PageObjects;
+using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
@@ -27,8 +28,8 @@ public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixtur
         {
             await companyEdit.SetFirstAddressLine1Async("");
             await companyEdit.SaveAsync();
-            Assert.True(await companyEdit.IsAddressLine1ValidationMessageVisibleAsync(),
-                "Expected the 'Line 1 is required.' message after saving with it blank");
+            await _page.Locator(".validation-message", new() { HasText = "Line 1 is required." }).First
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
 
             await companyEdit.SetFirstAddressLine1Async("1 Example Street");
 

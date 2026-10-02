@@ -84,7 +84,7 @@ public sealed class UserAdministrationListPage(IPage page, string baseUrl)
             await row.ClickAsync();
             try
             {
-                await Assertions.Expect(row).ToHaveClassAsync(new System.Text.RegularExpressions.Regex("e-active"), new() { Timeout = 3_000 });
+                await Assertions.Expect(row).ToHaveAttributeAsync("aria-selected", "true", new() { Timeout = 3_000 });
                 return;
             }
             catch (PlaywrightException) when (attempt < 4)
