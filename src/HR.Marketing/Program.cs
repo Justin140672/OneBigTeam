@@ -128,13 +128,12 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
 
     if (!signUpResponse.IsSuccessStatusCode)
     {
-        // 409 Conflict means an account/company already exists for this email — we don't reveal
-        // which, to avoid leaking account existence, but we do point the visitor at login/password
-        // recovery instead of leaving them stuck retrying signup with the same email.
+        // 409 Conflict means an account already exists for this email. Say so plainly and point
+        // the visitor at login/password recovery instead of leaving them stuck retrying signup.
         if (signUpResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
             return Results.Redirect(BuildRetryUrl(
-                "We couldn't create your account with those details.",
+                "You already have an account with this email address.",
                 existingEmail: true));
         }
 

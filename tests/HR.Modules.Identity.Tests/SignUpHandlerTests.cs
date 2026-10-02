@@ -2,6 +2,7 @@ using HR.Modules.Identity.Services.AccountEmailPolicy;
 using HR.Modules.Identity.Domain;
 using HR.Modules.Identity.Features.SignUp;
 using HR.Modules.Identity.Tests.Infrastructure;
+using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -106,6 +107,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.True(registrationEvent.Succeeded);
         Assert.Equal(result.Value.CompanyId, registrationEvent.CompanyId);
         Assert.Equal(result.Value.UserId, registrationEvent.AdminUserId);
+        Assert.Equal(AuditActorType.Human, ((IAuditEvent)registrationEvent).ActorType);
     }
 
     [Fact]
@@ -205,6 +207,7 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
         Assert.False(registrationEvent.Succeeded);
         Assert.Null(registrationEvent.AdminUserId);
+        Assert.Equal(AuditActorType.Anonymous, ((IAuditEvent)registrationEvent).ActorType);
     }
 
     [Fact]

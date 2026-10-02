@@ -90,6 +90,8 @@ public sealed class SignupPageRedesignTests(ParallelBlankPersonaFixture fixture)
         Assert.Contains("existingEmail=true", _page.Url);
 
         Assert.True(await signUp.IsExistingAccountMessageVisibleAsync());
+        await Assertions.Expect(_page.Locator(".form-status-error"))
+            .ToContainTextAsync("You already have an account with this email address.");
         await Assertions.Expect(signUp.LogInInsteadLink).ToBeVisibleAsync();
         await Assertions.Expect(signUp.ResetPasswordLink).ToBeVisibleAsync();
 

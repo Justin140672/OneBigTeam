@@ -9,6 +9,7 @@ internal sealed record RegistrationCreatedAuditEvent(
     bool Succeeded,
     string? FailureReason) : IAuditEvent
 {
+    AuditActorType IAuditEvent.ActorType => AdminUserId.HasValue ? AuditActorType.Human : AuditActorType.Anonymous;
     string IAuditEvent.EventType => Succeeded ? "registration.created" : "registration.failed";
     string IAuditEvent.EntityType => "Company";
     Guid IAuditEvent.EntityId => CompanyId;
