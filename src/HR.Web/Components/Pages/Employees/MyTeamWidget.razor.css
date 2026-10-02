@@ -155,9 +155,8 @@ html[data-theme="dark"] .team-card-alert-badge {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 2px 6px;
+    padding: 2px 0;
     border-radius: var(--hr-radius-sm);
-    background: var(--hr-gray-50);
     color: var(--hr-gray-500);
     font-size: 0.68rem;
     text-decoration: none;
@@ -178,7 +177,6 @@ html[data-theme="dark"] .team-card-alert-badge {
 }
 
 .team-card-contact-link:hover {
-    background: var(--hr-color-primary-subtle);
     color: var(--hr-color-primary);
 }
 
@@ -195,7 +193,6 @@ html[data-theme="dark"] .team-card-title {
 }
 
 html[data-theme="dark"] .team-card-contact-link {
-    background: var(--hr-gray-800);
     color: var(--hr-gray-400);
 }
 
