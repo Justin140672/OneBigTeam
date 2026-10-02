@@ -25,6 +25,80 @@ This repository restores dependencies **reproducibly** and gates them for **know
   `Newtonsoft.Json 11.0.1` (GHSA-5crp-9r3c-p9vr). Remove the pin only once every consumer of
   Hangfire brings a patched transitive version.
 
+## Polly governance
+
+Polly is **not** a dependency we chose. It arrives transitively through Microsoft's resilience
+package:
+
+```text
+HR.ServiceDefaults
+└── Microsoft.Extensions.Http.Resilience
+    └── Microsoft.Extensions.Resilience
+        ├── Polly.Extensions 8.4.2 └── Polly.Core 8.4.2
+        └── Polly.RateLimiting 8.4.2 └── Polly.Core 8.4.2
+```
+
+Approved packages (authoritative source: `.github/scripts/dependency-policy/polly-policy.json`):
+
+| Package | Approved version |
+|---|---:|
+| `Polly.Core` | `8.4.2` |
+| `Polly.Extensions` | `8.4.2` |
+| `Polly.RateLimiting` | `8.4.2` |
+
+No other package named `Polly` or `Polly.*` is approved.
+
+Locked restore stops an *unnoticed* upgrade, but an intentional bump of
+`Microsoft.Extensions.Http.Resilience` followed by lock file regeneration could move Polly without
+a reviewer noticing the licensing and maintenance-fee implications. The Polly policy check closes
+that gap. It reads the committed `packages.lock.json` files (every target framework) and all
+`*.csproj`/`*.props`/`*.targets` files, reports **every** violation in one run, never modifies
+files, and fails when:
+
+- an approved package resolves to a version other than the approved one;
+- a new `Polly` / `Polly.*` package appears;
+- projects or target frameworks resolve different Polly versions;
+- a Polly package becomes `Direct` or `CentralTransitive` in a lock file;
+- a Polly `<PackageReference>`, `<PackageVersion>` or `<GlobalPackageReference>` is declared.
+
+**Do not add Polly as a direct or centrally pinned dependency.** Central transitive pinning is
+enabled (`CentralPackageTransitivePinningEnabled`), so a `<PackageVersion Include="Polly...">`
+would promote it to an implicit top-level dependency and defeat the purpose of the guard. The
+approved versions live only in the policy file above.
+
+### Running the check
+
+Locally, before committing any dependency update (requires PowerShell 7):
+
+```bash
+pwsh ./.github/scripts/dependency-policy/Test-PollyPolicy.ps1
+```
+
+The checker's own tests (Pester 5):
+
+```bash
+pwsh -Command "Invoke-Pester -Path .github/scripts/dependency-policy/tests -Output Detailed"
+```
+
+CI runs the same script in the `dependency-audit` job immediately after the locked restore, so a
+violation fails the pipeline before build or deployment. The Pester tests run in the
+`deploy-scripts-test` job. Both use the same module and policy file.
+
+### Changing an approved Polly version
+
+1. Raise the change (for example a `Microsoft.Extensions.Http.Resilience` update that moves
+   Polly) as its own pull request, regenerate lock files normally and run the check; it will fail
+   and list exactly what moved.
+2. Complete the licensing and compatibility review **before** approving the new version: confirm
+   the new Polly licence terms and any maintenance-fee or funding obligations with whoever owns
+   dependency and licensing policy, and confirm compatibility with our retry, timeout and
+   circuit-breaker settings.
+3. Update `polly-policy.json` and the lock files together in the reviewed change, with the review
+   outcome recorded in the pull request.
+
+This check is a dependency-governance safeguard. It is not legal advice and not a substitute for
+organisational licence review.
+
 ## Vulnerability scanning and severity thresholds
 
 `NuGetAudit` runs on every restore (`NuGetAuditMode=all`, audits direct **and** transitive

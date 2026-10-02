@@ -1,0 +1,8 @@
+{
+  "approvedPackages": {
+    "Polly.Core": "8.4.2",
+    "Polly.Extensions": "8.4.2",
+    "Polly.RateLimiting": "8.4.2"
+  },
+  "reviewProcess": "Polly is a transitive dependency of Microsoft.Extensions.Http.Resilience and must stay one. Do not change this file, or any Polly resolution, without completing the Polly dependency review in specifications/engineering/dependency-management.md (section 'Polly governance'). Update this policy and the lockfiles together in the reviewed change."
+}

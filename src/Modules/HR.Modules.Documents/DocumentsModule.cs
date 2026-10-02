@@ -408,6 +408,15 @@ public static class DocumentsModule
         await db.Database.MigrateAsync();
     }
 
+    public static async Task SeedStagingProfilePhotosAsync(
+        this IServiceProvider services,
+        Guid companyId,
+        IReadOnlyDictionary<int, Guid> employeeIdsByNumber)
+    {
+        using var scope = services.CreateScope();
+        await StagingProfilePhotoSeeder.SeedAsync(scope.ServiceProvider, companyId, employeeIdsByNumber);
+    }
+
     public static async Task SeedDocumentsAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();

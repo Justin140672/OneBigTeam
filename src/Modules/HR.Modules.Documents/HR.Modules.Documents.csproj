@@ -21,6 +21,9 @@
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
   </ItemGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Seed\StagingPhotos\*.jpg" />
+  </ItemGroup>
+  <ItemGroup>
     <InternalsVisibleTo Include="HR.Architecture.Tests" />
     <InternalsVisibleTo Include="HR.Modules.Documents.Tests" />
     <InternalsVisibleTo Include="HR.Integration.Tests" />

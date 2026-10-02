@@ -65,6 +65,10 @@ jobs:
       - name: Restore (locked mode - fails if any packages.lock.json is stale)
         run: dotnet restore OneBigTeam.slnx --locked-mode
 
+      - name: Polly dependency policy (approved transitive versions only)
+        shell: pwsh
+        run: ./.github/scripts/dependency-policy/Test-PollyPolicy.ps1
+
       - name: Vulnerability scan (transitive, fail on moderate+)
         shell: bash
         run: |
@@ -276,7 +280,7 @@ jobs:
           $mods = Get-Module -ListAvailable Pester | Where-Object { $_.Version -ge [version]'5.0.0' }
           if (-not $mods) { Install-Module Pester -MinimumVersion 5.5.0 -Force -SkipPublisherCheck -Scope CurrentUser }
           Import-Module Pester -MinimumVersion 5.0.0
-          $r = Invoke-Pester -Path .github/scripts/deploy/tests -Output Detailed -PassThru
+          $r = Invoke-Pester -Path .github/scripts/deploy/tests, .github/scripts/dependency-policy/tests -Output Detailed -PassThru
           if ($r.FailedCount -gt 0) { exit 1 }
 
   # ------------------------------------------------------------------

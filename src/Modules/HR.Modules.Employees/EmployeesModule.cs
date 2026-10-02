@@ -530,6 +530,9 @@ public static class EmployeesModule
     public static IReadOnlyDictionary<string, Guid> GetStagingSeedPositionProfileIds() =>
         StagingOrgDefinition.Positions.ToDictionary(p => p.Name, p => StagingEmployeesSeeder.PositionProfileId(p.Number));
 
+    public static IReadOnlyDictionary<int, Guid> GetStagingSeedEmployeeIdsByNumber() =>
+        StagingOrgDefinition.Employees.ToDictionary(e => e.Number, e => StagingEmployeesSeeder.EmployeeId(e.Number));
+
     public static IReadOnlyDictionary<string, Guid> GetStagingSeedEmployeeIds() =>
         StagingOrgDefinition.Employees.ToDictionary(
             e => $"{e.FirstName} {e.LastName}", e => StagingEmployeesSeeder.EmployeeId(e.Number));
