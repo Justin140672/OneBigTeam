@@ -4,30 +4,20 @@
    offers a read-only monitoring link where one exists. Orphaned or inconsistent records are listed
    separately as explicit exceptions so they are never a silent dead end. *@
 
+@if (!Loading && (Items.Count > 0 || Exceptions.Count > 0))
+{
 <div class="widget-card waiting-on-others-card" data-testid="waiting-on-others">
     <div class="widget-header">
         <i class="fa-solid fa-hourglass-half widget-icon" aria-hidden="true"></i>
         <h2 class="widget-title mb-0 fs-6">Waiting on others</h2>
-        @if (!Loading && WaitingCount > 0)
+        @if (WaitingCount > 0)
         {
             <span class="widget-count-badge" aria-label="@(WaitingCount + " items waiting on others")">@WaitingCount</span>
         }
     </div>
 
     <div class="widget-body">
-        <p class="text-muted small mb-2">
-            Outstanding items that someone else is responsible for. You can monitor them here but cannot complete them.
-        </p>
-
-        @if (Loading)
-        {
-            <HrLoadingIndicator Label="Loading items waiting on others…" />
-        }
-        else if (Items.Count == 0)
-        {
-            <p class="waiting-empty text-muted mb-0">Nothing is waiting on anyone else right now.</p>
-        }
-        else
+        @if (Items.Count > 0)
         {
             <ul class="list-unstyled mb-0 waiting-list">
                 @foreach (var item in Items)
@@ -60,7 +50,7 @@
             </ul>
         }
 
-        @if (!Loading && Exceptions.Count > 0)
+        @if (Exceptions.Count > 0)
         {
             <section class="waiting-exceptions mt-3" aria-label="Items that need investigation" data-testid="dashboard-exceptions">
                 <h3 class="fs-6"><i class="fa-solid fa-triangle-exclamation me-1" aria-hidden="true"></i>Needs investigation</h3>
@@ -84,6 +74,7 @@
         }
     </div>
 </div>
+}
 
 @code {
     [Parameter] public bool Loading { get; set; }

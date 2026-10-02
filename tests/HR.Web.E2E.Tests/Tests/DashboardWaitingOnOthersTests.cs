@@ -79,7 +79,7 @@ public sealed class DashboardWaitingOnOthersTests(HrAdminPersonaFixture fixture)
     }
 
     [Fact]
-    public async Task EachSectionHasItsOwnEmptyState()
+    public async Task WaitingCard_IsHiddenWhenNothingIsWaitingOnOthers()
     {
         var dashboard = await LoginAndOpenAsync();
 
@@ -88,8 +88,9 @@ public sealed class DashboardWaitingOnOthersTests(HrAdminPersonaFixture fixture)
             Assert.True(await dashboard.AttentionQueueIsAllClearAsync());
 
         var waitingRows = await WaitingCard.Locator(".waiting-item").CountAsync();
-        if (waitingRows == 0)
-            await Assertions.Expect(WaitingCard.Locator(".waiting-empty")).ToContainTextAsync("Nothing is waiting on anyone else");
+        var exceptions = await WaitingCard.Locator(".waiting-exception").CountAsync();
+        if (waitingRows == 0 && exceptions == 0)
+            await Assertions.Expect(WaitingCard).ToHaveCountAsync(0);
     }
 
     [Fact]

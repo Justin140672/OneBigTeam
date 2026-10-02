@@ -120,7 +120,18 @@ public class WaitingOnOthersTests
         Assert.DoesNotContain("@onclick", source);
         Assert.DoesNotContain("TaskId", source);
         Assert.Contains("Responsible:", source);
-        Assert.Contains("Nothing is waiting on anyone else right now.", source);
+    }
+
+    [Fact]
+    public void Waiting_Panel_Is_Only_Rendered_When_There_Is_Something_To_Show()
+    {
+        var source = File.ReadAllText(Path.Combine(
+            FindRepoRoot(), "src", "HR.Web", "Components", "Pages", "Dashboards", "WaitingOnOthersPanel.razor"));
+
+        Assert.Contains("@if (!Loading && (Items.Count > 0 || Exceptions.Count > 0))", source);
+        Assert.DoesNotContain("Nothing is waiting on anyone else", source);
+        Assert.DoesNotContain("waiting-empty", source);
+        Assert.DoesNotContain("Outstanding items that someone else is responsible for", source);
     }
 
     private static string FindRepoRoot()
