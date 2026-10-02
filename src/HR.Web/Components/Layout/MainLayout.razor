@@ -66,11 +66,11 @@ else
                             }
                             @if (Session.IsHrAdministrator)
                             {
-                                <MenuItem Text="Dashboard" IconCss="fa-solid fa-house" Url="/dashboard/hr" />
+                                <MenuItem Text="HR Dashboard" IconCss="fa-solid fa-house" Url="/dashboard/hr" />
                             }
                             @if (Session.IsManager)
                             {
-                                <MenuItem Text="Manager Dashboard" IconCss="fa-solid fa-gauge" Url="/dashboard/manager" />
+                                <MenuItem Text="My Team" IconCss="fa-solid fa-gauge" Url="/dashboard/manager" />
                             }
                             @if (Session.CanManageRecruitment)
                             {

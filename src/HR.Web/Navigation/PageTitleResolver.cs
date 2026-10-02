@@ -53,7 +53,7 @@ public static class PageTitleResolver
     {
         ["dashboard/hr"] = "HR Dashboard",
         ["dashboard/recruitment"] = "Recruitment Dashboard",
-        ["dashboard/manager"] = "Manager Dashboard",
+        ["dashboard/manager"] = "My Team",
         ["getting-started"] = "Getting Started",
         ["subscription"] = "Subscription & Billing",
         ["access-denied"] = "Access Denied",

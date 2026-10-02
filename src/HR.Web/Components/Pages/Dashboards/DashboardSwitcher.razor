@@ -27,7 +27,7 @@
     protected override void OnInitialized()
     {
         var options = new List<DashboardOption>();
-        if (Session.IsHrAdministrator) options.Add(new DashboardOption("hr", "HR", "/dashboard/hr"));
+        if (Session.IsHrAdministrator) options.Add(new DashboardOption("hr", "HR Dashboard", "/dashboard/hr"));
         if (Session.IsRecruiter) options.Add(new DashboardOption("recruitment", "Recruitment", "/dashboard/recruitment"));
         if (Session.IsManager) options.Add(new DashboardOption("manager", "My Team", "/dashboard/manager"));
         _options = options;

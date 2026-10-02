@@ -1789,6 +1789,13 @@ html[data-theme="dark"] .hbar-row--button:hover {
     color: #fff;
 }
 
+.dashboard-switcher-item.dashboard-switcher-item--active:hover,
+.dashboard-switcher-item.dashboard-switcher-item--active:focus {
+    background: var(--hr-color-primary-hover);
+    border-color: var(--hr-color-primary-hover);
+    color: #fff;
+}
+
 /* Sub-heading inside a single widget-card body that groups more than one list
    (e.g. OffersAwaitingResponseWidget's "Offers Awaiting Response" / "Recently Hired"). */
 .task-widget-section-label {

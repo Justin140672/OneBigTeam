@@ -24,7 +24,7 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
         await switcher.WaitForAsync(new() { Timeout = 15_000 });
 
         var itemTexts = await switcher.Locator(".dashboard-switcher-item").AllTextContentsAsync();
-        Assert.Contains(itemTexts, t => t.Trim() == "HR");
+        Assert.Contains(itemTexts, t => t.Trim() == "HR Dashboard");
         Assert.Contains(itemTexts, t => t.Trim() == "My Team");
         Assert.DoesNotContain(itemTexts, t => t.Trim() == "Recruitment");
         Assert.Equal(2, itemTexts.Count);
