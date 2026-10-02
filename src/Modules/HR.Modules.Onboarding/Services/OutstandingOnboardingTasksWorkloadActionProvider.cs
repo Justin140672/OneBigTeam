@@ -71,6 +71,7 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
         // sub-tree — exactly the hierarchy GetTask enforces. The HR workspace is unaffected
         // (reporting:view-hr callers are HR Administrators, who may open any task).
         HashSet<Guid>? managerAccessibleAssignees = null;
+        IReadOnlyCollection<Guid>? hrViewerTeamIds = null;
         IReadOnlyDictionary<Guid, Guid?> assigneesByTaskId = new Dictionary<Guid, Guid?>();
         if (managerCallerId is { } managerId)
         {
@@ -80,6 +81,9 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
         }
         else if (requestedScope == WorkloadScope.Hr && openTaskIds.Count > 0)
         {
+            if (currentUser.UserId is { } hrViewerId)
+                hrViewerTeamIds = await directReportsReader.GetAllDescendantIdsAsync(companyId, hrViewerId, cancellationToken);
+
             assigneesByTaskId = await taskReader.GetTaskAssigneesAsync(
                 companyId, openTaskIds.Values, cancellationToken);
         }
@@ -108,7 +112,8 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
                     var assignee = assigneesByTaskId.TryGetValue(hrLinked, out var hrAssignee) ? hrAssignee : null;
                     var decision = WorkloadOwnership.ForHrViewer(
                         assignee, currentUser.UserId, unassignedBelongsToHr: true,
-                        string.IsNullOrWhiteSpace(task.Owner) ? null : task.Owner, "Assigned to another user");
+                        string.IsNullOrWhiteSpace(task.Owner) ? null : task.Owner, "Assigned to another user",
+                        viewerManagesAssignee: WorkloadOwnership.Manages(hrViewerTeamIds, assignee));
                     isOwnerActionable = decision.IsOwnerActionable;
                     ownerLabel = decision.OwnerLabel;
                     visibilityReason = decision.VisibilityReason;

@@ -17,6 +17,34 @@ public class WorkloadOwnershipTests
     }
 
     [Fact]
+    public void Unassigned_Manager_Owned_Task_Is_Actionable_When_The_Viewer_Manages_The_Employee()
+    {
+        var managing = WorkloadOwnership.ForHrViewer(null, Viewer, unassignedBelongsToHr: false, null, "Owned by the employee's manager", viewerManagesSubject: true);
+        var notManaging = WorkloadOwnership.ForHrViewer(null, Viewer, unassignedBelongsToHr: false, null, "Owned by the employee's manager", viewerManagesSubject: false);
+
+        Assert.Equal(WorkloadActionability.CanAct, managing.Actionability);
+        Assert.Equal(WorkloadActionability.VisibilityOnly, notManaging.Actionability);
+    }
+
+    [Fact]
+    public void Task_Assigned_To_Someone_Else_Stays_Visibility_Only_Even_When_The_Viewer_Manages_The_Employee()
+    {
+        var decision = WorkloadOwnership.ForHrViewer(
+            Guid.NewGuid(), Viewer, unassignedBelongsToHr: false, "Priya Shah", "Owned by the employee's manager", viewerManagesSubject: true);
+
+        Assert.Equal(WorkloadActionability.VisibilityOnly, decision.Actionability);
+    }
+
+    [Fact]
+    public void Task_Assigned_To_Someone_In_The_Viewers_Reporting_Line_Is_Actionable()
+    {
+        var decision = WorkloadOwnership.ForHrViewer(
+            Guid.NewGuid(), Viewer, unassignedBelongsToHr: false, null, "Owned by the employee's manager", viewerManagesAssignee: true);
+
+        Assert.Equal(WorkloadActionability.CanAct, decision.Actionability);
+    }
+
+    [Fact]
     public void Unassigned_Task_Is_An_Hr_Action_Only_When_The_Process_Is_Hr_Owned()
     {
         var hrOwned = WorkloadOwnership.ForHrViewer(null, Viewer, unassignedBelongsToHr: true, null, "Assigned to another user");

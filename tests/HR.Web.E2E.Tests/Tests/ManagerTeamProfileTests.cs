@@ -97,6 +97,29 @@ public sealed class ManagerTeamProfileTests(ManagerPersonaFixture fixture) : Rol
     }
 
     [Fact]
+    public async Task ViewAllTeam_RosterPage_ScopeSwitcher_ExposesPressedState()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var roster = new MyTeamRosterPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(NinaEmail);
+        await roster.GoToAsync(AcmeId);
+        await roster.WaitForLoadedAsync();
+
+        var direct = _page.GetByRole(AriaRole.Button, new() { Name = "Direct Reports" });
+        var all = _page.GetByRole(AriaRole.Button, new() { Name = "All Reports" });
+
+        await Assertions.Expect(direct).ToHaveAttributeAsync("aria-pressed", "true");
+        await Assertions.Expect(all).ToHaveAttributeAsync("aria-pressed", "false");
+
+        await roster.SetScopeAsync(true);
+
+        await Assertions.Expect(direct).ToHaveAttributeAsync("aria-pressed", "false");
+        await Assertions.Expect(all).ToHaveAttributeAsync("aria-pressed", "true");
+    }
+
+    [Fact]
     public async Task ViewAllTeam_RosterPage_ReachableDirectly_AndSearchNarrowsResults()
     {
         var searchable = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "TeamSearchable", managerId: NinaId, activate: true);

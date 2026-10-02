@@ -200,4 +200,37 @@ public class DashboardSummaryComposerActionabilityTests
 
         Assert.Equal(WorkloadActionability.VisibilityOnly, DashboardSummaryComposer.Classify(action));
     }
+
+    [Fact]
+    public async Task Duplicate_Task_Surfaced_Twice_Is_Listed_Once_And_Prefers_The_Actionable_Copy()
+    {
+        var employeeId = Guid.NewGuid();
+        var taskId = Guid.NewGuid();
+
+        var result = await ComposeAsync(
+            WorkloadScope.Hr,
+            Action("Emma", taskId: taskId, isOwnerActionable: false, ownerLabel: "Owned by the employee's manager", employeeId: employeeId),
+            Action("Emma", taskId: taskId, employeeId: employeeId),
+            Action("Emma", taskId: taskId, employeeId: employeeId));
+
+        var category = Assert.Single(result.Categories);
+        Assert.Equal(1, category.ActionableCount);
+        Assert.Single(category.Items);
+        Assert.Equal(0, category.WaitingOnOthersCount);
+        Assert.Empty(category.WaitingItems);
+        Assert.Equal(1, result.TotalActionableCount);
+    }
+
+    [Fact]
+    public async Task Manager_Owned_Item_Without_Task_But_With_Destination_Is_Actionable_Not_Unavailable()
+    {
+        var result = await ComposeAsync(
+            WorkloadScope.Manager,
+            Action("Emma", deepLink: "/companies/x/employees/y?tab=leave"));
+
+        var category = Assert.Single(result.Categories);
+        Assert.Equal(1, category.ActionableCount);
+        Assert.Equal(0, category.UnavailableCount);
+        Assert.Equal(category.ActionableCount, category.Items.Count);
+    }
 }

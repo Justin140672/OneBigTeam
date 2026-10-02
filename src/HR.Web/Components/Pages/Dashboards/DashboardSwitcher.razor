@@ -8,19 +8,19 @@
         @foreach (var option in _options)
         {
             var opt = option;
-            <SfButton CssClass="@("dashboard-switcher-item " + (IsCurrent(opt.Key) ? "dashboard-switcher-item--active" : ""))"
-                      HtmlAttributes="@(IsCurrent(opt.Key) ? CurrentAttributes : null)"
-                      OnClick="() => SwitchToAsync(opt.Key, opt.Url)">
+            var current = IsCurrent(opt.Key);
+            <button type="button"
+                    class="e-btn dashboard-switcher-item @(current ? "dashboard-switcher-item--active" : "")"
+                    aria-pressed="@(current ? "true" : "false")"
+                    @onclick="() => SwitchToAsync(opt.Key, opt.Url)">
                 @opt.Label
-            </SfButton>
+            </button>
         }
     </div>
 }
 
 @code {
     private sealed record DashboardOption(string Key, string Label, string Url);
-
-    private static readonly Dictionary<string, object> CurrentAttributes = new() { ["aria-current"] = "page" };
 
     private List<DashboardOption> _options = [];
 

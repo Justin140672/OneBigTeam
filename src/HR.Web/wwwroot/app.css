@@ -1796,6 +1796,28 @@ html[data-theme="dark"] .hbar-row--button:hover {
     color: #fff;
 }
 
+.dashboard-switcher-item[aria-pressed="true"],
+.team-scope-btn[aria-pressed="true"] {
+    box-shadow: inset 0 -3px 0 rgba(255, 255, 255, 0.85);
+    font-weight: 700;
+}
+
+html[data-theme="dark"] .dashboard-switcher-item {
+    background: var(--hr-gray-800);
+    border-color: var(--hr-gray-700);
+    color: var(--hr-gray-300);
+}
+
+html[data-theme="dark"] .dashboard-switcher-item:hover {
+    background: var(--hr-gray-700);
+}
+
+html[data-theme="dark"] .dashboard-switcher-item.dashboard-switcher-item--active {
+    background: var(--hr-color-primary);
+    border-color: var(--hr-color-primary);
+    color: #fff;
+}
+
 /* Sub-heading inside a single widget-card body that groups more than one list
    (e.g. OffersAwaitingResponseWidget's "Offers Awaiting Response" / "Recently Hired"). */
 .task-widget-section-label {

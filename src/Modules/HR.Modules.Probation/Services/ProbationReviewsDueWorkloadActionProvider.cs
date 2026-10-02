@@ -136,6 +136,10 @@ internal static class ProbationReviewWorkloadActions
             companyId, reviews.Select(r => r.Id), cancellationToken, TaskActionType.Review);
 
         var hrScope = requestedScope == WorkloadScope.Hr;
+        var viewerTeamIds = employeeIds;
+        if (hrScope && currentUser.UserId is { } viewerId)
+            viewerTeamIds = await directReportsReader.GetAllDescendantIdsAsync(companyId, viewerId, cancellationToken);
+
         IReadOnlyDictionary<Guid, Guid?> assigneesByTask = new Dictionary<Guid, Guid?>();
         IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> assigneeNames = new Dictionary<Guid, EmployeeDepartmentInfo>();
         if (hrScope && taskIdsByReview.Count > 0)
@@ -158,8 +162,14 @@ internal static class ProbationReviewWorkloadActions
                 Guid? assignee = assigneesByTask.TryGetValue(linked, out var a) ? a : null;
                 string? assigneeName = assignee is { } assigneeId && assigneeNames.TryGetValue(assigneeId, out var info) ? info.EmployeeName : null;
                 decision = WorkloadOwnership.ForHrViewer(
-                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager");
+                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager",
+                    viewerManagesSubject: WorkloadOwnership.Manages(viewerTeamIds, employeeId),
+                    viewerManagesAssignee: WorkloadOwnership.Manages(viewerTeamIds, assignee));
             }
+
+            var deepLink = decision.IsOwnerActionable && taskId is null && WorkloadOwnership.Manages(viewerTeamIds, employeeId)
+                ? WorkloadOwnership.EmployeeTabUrl(companyId, employeeId, "probation")
+                : "";
 
             return new WorkloadAction(
                 EmployeeId: employeeId,
@@ -170,7 +180,7 @@ internal static class ProbationReviewWorkloadActions
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: overdueOnly ? "Overdue" : "Due",
-                DeepLinkUrl: "",
+                DeepLinkUrl: deepLink,
                 TaskId: taskId,
                 IsOwnerActionable: decision.IsOwnerActionable,
                 OwnerLabel: decision.OwnerLabel,

@@ -124,6 +124,36 @@ public class HrDashboardActionabilityEndpointTests
     }
 
     [Fact]
+    public async Task HrAndManager_DirectReportLeaveWithoutTask_IsActionableOnceInBothDashboards()
+    {
+        var companyId = Guid.NewGuid();
+        var hrManagerId = await SeedEmployeeAsync(companyId, "David", "Park");
+        var reportId = await SeedEmployeeAsync(companyId, "Emma", "Jones");
+        await SeedLeaveRequestAsync(companyId, reportId);
+
+        using var client = await HrClientAsync(companyId, hrManagerId, alsoManager: true);
+        var assign = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{reportId}/manager",
+            new { companyId, id = reportId, managerId = hrManagerId });
+        assign.EnsureSuccessStatusCode();
+
+        var hr = await client.GetFromJsonAsync<SummaryPayload>(Url(companyId));
+        var manager = await client.GetFromJsonAsync<SummaryPayload>(
+            $"/api/companies/{companyId}/dashboards/manager/summary");
+
+        var hrCategory = Assert.Single(hr!.Categories, c => c.Category == "Pending Leave Approvals");
+        var managerCategory = Assert.Single(manager!.Categories, c => c.Category == "Pending Leave Approvals");
+
+        Assert.Equal(reportId, Assert.Single(hrCategory.Items).EmployeeId);
+        Assert.Empty(hrCategory.WaitingItems);
+        Assert.Equal(1, hrCategory.ActionableCount);
+        Assert.Equal(reportId, Assert.Single(managerCategory.Items).EmployeeId);
+        Assert.Equal(1, managerCategory.ActionableCount);
+        Assert.Equal(0, managerCategory.UnavailableCount);
+        Assert.Contains("tab=leave", managerCategory.Items[0].DeepLinkUrl);
+    }
+
+    [Fact]
     public async Task UserWithBothHrAndManagerRoles_CanActOnTheirOwnApprovals_ButOnlyMonitorOthers()
     {
         var companyId = Guid.NewGuid();

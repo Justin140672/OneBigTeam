@@ -90,11 +90,13 @@ public static class WorkloadOwnership
         Guid? viewerEmployeeId,
         bool unassignedBelongsToHr,
         string? assigneeName,
-        string fallbackOwnerLabel)
+        string fallbackOwnerLabel,
+        bool viewerManagesSubject = false,
+        bool viewerManagesAssignee = false)
     {
         if (assigneeId is null)
         {
-            return unassignedBelongsToHr
+            return unassignedBelongsToHr || viewerManagesSubject
                 ? new WorkloadOwnerDecision(WorkloadActionability.CanAct, null, null)
                 : new WorkloadOwnerDecision(
                     WorkloadActionability.VisibilityOnly,
@@ -102,7 +104,7 @@ public static class WorkloadOwnership
                     $"Shown so you can monitor it. {fallbackOwnerLabel}.");
         }
 
-        if (viewerEmployeeId is { } viewer && viewer == assigneeId)
+        if ((viewerEmployeeId is { } viewer && viewer == assigneeId) || viewerManagesAssignee)
             return new WorkloadOwnerDecision(WorkloadActionability.CanAct, null, null);
 
         var label = string.IsNullOrWhiteSpace(assigneeName) ? fallbackOwnerLabel : $"Assigned to {assigneeName}";
@@ -111,4 +113,10 @@ public static class WorkloadOwnership
             label,
             $"Shown so you can monitor it. {label}.");
     }
+
+    public static bool Manages(IReadOnlyCollection<Guid>? viewerTeamIds, Guid? employeeId) =>
+        viewerTeamIds is not null && employeeId is { } id && viewerTeamIds.Contains(id);
+
+    public static string EmployeeTabUrl(Guid companyId, Guid employeeId, string tab) =>
+        $"/companies/{companyId}/employees/{employeeId}?tab={tab}";
 }

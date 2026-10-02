@@ -67,6 +67,10 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
             companyId, pending.Select(p => p.Id), cancellationToken, TaskActionType.Approve);
 
         var hrScope = requestedScope == WorkloadScope.Hr;
+        var viewerTeamIds = employeeIds;
+        if (hrScope && currentUser.UserId is { } viewerId)
+            viewerTeamIds = await directReportsReader.GetAllDescendantIdsAsync(companyId, viewerId, cancellationToken);
+
         IReadOnlyDictionary<Guid, Guid?> assigneesByTask = new Dictionary<Guid, Guid?>();
         IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> assigneeNames = new Dictionary<Guid, EmployeeDepartmentInfo>();
         if (hrScope && taskIdsByRequest.Count > 0)
@@ -89,8 +93,14 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 Guid? assignee = taskId is { } linked && assigneesByTask.TryGetValue(linked, out var a) ? a : null;
                 string? assigneeName = assignee is { } assigneeId && assigneeNames.TryGetValue(assigneeId, out var info) ? info.EmployeeName : null;
                 decision = WorkloadOwnership.ForHrViewer(
-                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager");
+                    assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName, "Owned by the employee's manager",
+                    viewerManagesSubject: WorkloadOwnership.Manages(viewerTeamIds, p.EmployeeId),
+                    viewerManagesAssignee: WorkloadOwnership.Manages(viewerTeamIds, assignee));
             }
+
+            var deepLink = decision.IsOwnerActionable && taskId is null
+                ? WorkloadOwnership.EmployeeTabUrl(companyId, p.EmployeeId, "leave")
+                : "";
 
             return new WorkloadAction(
                 EmployeeId: p.EmployeeId,
@@ -101,7 +111,7 @@ internal sealed class LeavePendingApprovalsWorkloadActionProvider(
                 DueDate: p.StartDate,
                 AssignedTo: null,
                 Status: "Pending",
-                DeepLinkUrl: "",
+                DeepLinkUrl: deepLink,
                 TaskId: taskId,
                 IsOwnerActionable: decision.IsOwnerActionable,
                 OwnerLabel: decision.OwnerLabel,

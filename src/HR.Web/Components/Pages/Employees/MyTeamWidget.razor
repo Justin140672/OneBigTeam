@@ -38,8 +38,8 @@
             </div>
 
             <div class="team-widget-scope" role="group" aria-label="Team scope">
-                <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" Disabled="_scopeSwitching" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
-                <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" Disabled="_scopeSwitching" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
+                <button type="button" class="e-btn e-small team-scope-btn @(!_includeIndirect ? "e-primary" : "")" aria-pressed="@(!_includeIndirect ? "true" : "false")" disabled="@_scopeSwitching" @onclick="@(() => SetScopeAsync(false))">Direct Reports</button>
+                <button type="button" class="e-btn e-small team-scope-btn @(_includeIndirect ? "e-primary" : "")" aria-pressed="@(_includeIndirect ? "true" : "false")" disabled="@_scopeSwitching" @onclick="@(() => SetScopeAsync(true))">All Reports</button>
             </div>
 
             <div class="widget-body @(_scopeSwitching ? "team-widget-body--switching" : "")">

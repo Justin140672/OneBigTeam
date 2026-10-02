@@ -96,6 +96,10 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
             companyId, evidenceRows.Select(e => e.Id), cancellationToken, TaskActionType.Upload);
 
         var hrScope = requestedScope == WorkloadScope.Hr;
+        var viewerTeamIds = managerTeamIds;
+        if (hrScope && currentUser.UserId is { } viewerId)
+            viewerTeamIds = await directReportsReader.GetAllDescendantIdsAsync(companyId, viewerId, cancellationToken);
+
         IReadOnlyDictionary<Guid, Guid?> assigneesByTask = new Dictionary<Guid, Guid?>();
         IReadOnlyDictionary<Guid, EmployeeDepartmentInfo> assigneeNames = new Dictionary<Guid, EmployeeDepartmentInfo>();
         if (hrScope && reviewTaskIds.Count > 0)
@@ -132,8 +136,14 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
                     : null;
                 decision = WorkloadOwnership.ForHrViewer(
                     assignee, currentUser.UserId, unassignedBelongsToHr: false, assigneeName,
-                    "Owned by the employee's manager");
+                    "Owned by the employee's manager",
+                    viewerManagesSubject: WorkloadOwnership.Manages(viewerTeamIds, r.EmployeeId),
+                    viewerManagesAssignee: WorkloadOwnership.Manages(viewerTeamIds, assignee));
             }
+
+            var deepLink = decision.IsOwnerActionable && taskId is null && WorkloadOwnership.Manages(viewerTeamIds, r.EmployeeId)
+                ? WorkloadOwnership.EmployeeTabUrl(companyId, r.EmployeeId, "sickness")
+                : "";
 
             actions.Add(new WorkloadAction(
                 EmployeeId: r.EmployeeId,
@@ -144,7 +154,7 @@ internal sealed class SicknessPendingActionsWorkloadActionProvider(
                 DueDate: r.DueDate,
                 AssignedTo: null,
                 Status: r.Status.ToString(),
-                DeepLinkUrl: "",
+                DeepLinkUrl: deepLink,
                 TaskId: taskId,
                 IsOwnerActionable: decision.IsOwnerActionable,
                 OwnerLabel: decision.OwnerLabel,

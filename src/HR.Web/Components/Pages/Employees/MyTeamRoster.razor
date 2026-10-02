@@ -13,8 +13,8 @@
 
     <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
         <div class="team-widget-scope" role="group" aria-label="Team scope">
-            <SfButton CssClass="e-small" IsPrimary="@(!_includeIndirect)" Disabled="_loading" OnClick="@(() => SetScopeAsync(false))">Direct Reports</SfButton>
-            <SfButton CssClass="e-small" IsPrimary="@_includeIndirect" Disabled="_loading" OnClick="@(() => SetScopeAsync(true))">All Reports</SfButton>
+            <button type="button" class="e-btn e-small team-scope-btn @(!_includeIndirect ? "e-primary" : "")" aria-pressed="@(!_includeIndirect ? "true" : "false")" disabled="@_loading" @onclick="@(() => SetScopeAsync(false))">Direct Reports</button>
+            <button type="button" class="e-btn e-small team-scope-btn @(_includeIndirect ? "e-primary" : "")" aria-pressed="@(_includeIndirect ? "true" : "false")" disabled="@_loading" @onclick="@(() => SetScopeAsync(true))">All Reports</button>
         </div>
 
         <SfTextBox @bind-Value="_search"

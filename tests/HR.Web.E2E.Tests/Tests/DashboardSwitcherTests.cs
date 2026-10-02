@@ -62,6 +62,22 @@ public sealed class DashboardSwitcherTests(ManagerPersonaFixture fixture) : Role
     }
 
     [Fact]
+    public async Task Switcher_ExposesCurrentDashboard_ViaAriaPressed()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(HrAndManagerEmail);
+        await _page.WaitForURLAsync(new Regex("/dashboard/hr"), new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+
+        var hrButton = _page.Locator(".dashboard-switcher-item").Filter(new() { HasText = "HR Dashboard" });
+        var myTeamButton = _page.Locator(".dashboard-switcher-item").Filter(new() { HasText = "My Team" });
+
+        await Assertions.Expect(hrButton).ToHaveAttributeAsync("aria-pressed", "true", new() { Timeout = 15_000 });
+        await Assertions.Expect(myTeamButton).ToHaveAttributeAsync("aria-pressed", "false");
+    }
+
+    [Fact]
     public async Task SingleRoleUser_DoesNotSeeSwitcher()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

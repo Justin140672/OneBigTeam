@@ -104,6 +104,7 @@ internal sealed class DashboardSummaryComposer(
                     .Select(a => a with { Urgency = WorkloadAction.ComputeUrgency(a.DueDate, today) })
                     .Select(a => (Action: a, Actionability: Classify(a)))
                     .ToList();
+                classified = Deduplicate(classified);
 
                 var actionable = classified.Where(c => c.Actionability == WorkloadActionability.CanAct).Select(c => c.Action).ToList();
                 var waiting = classified.Where(c => c.Actionability == WorkloadActionability.VisibilityOnly).Select(c => c.Action).ToList();
@@ -160,6 +161,15 @@ internal sealed class DashboardSummaryComposer(
 
         return actionability;
     }
+
+    internal static List<(WorkloadAction Action, WorkloadActionability Actionability)> Deduplicate(
+        List<(WorkloadAction Action, WorkloadActionability Actionability)> classified) =>
+        classified
+            .GroupBy(c => (c.Action.EmployeeId, c.Action.ActionType, c.Action.DueDate, c.Action.TaskId))
+            .SelectMany(g => g.Key.TaskId is null || g.Key.EmployeeId == Guid.Empty
+                ? g.AsEnumerable()
+                : [g.OrderBy(c => (int)c.Actionability).First()])
+            .ToList();
 
     private static bool HasDestination(WorkloadAction action) =>
         action.TaskId is not null || !string.IsNullOrWhiteSpace(action.DeepLinkUrl);
