@@ -1,4 +1,5 @@
 @using HR.Web.Models
+@using HR.Web.Components.Pages.Tasks
 @inject OnboardingService OnboardingService
 
 @if (_loading)
@@ -12,21 +13,41 @@ else if (_overview is null || !_overview.HasPlan)
 else
 {
     <OnboardingProgressPanel Overview="_overview" />
-    <OnboardingChecklist Overview="_overview" />
-    <OnboardingTimeline Overview="_overview" />
+    <OnboardingChecklist Overview="_overview" EmployeeNames="EmployeeNames" OnOpenTask="OpenTaskDialog" />
 }
+
+<TaskViewDialog CompanyId="CompanyId"
+                TaskId="_selectedTaskId"
+                IsOpen="_dialogOpen"
+                OnClosed="CloseTaskDialogAsync" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public IReadOnlyList<string> EmployeeNames { get; set; } = [];
 
     private bool _loading = true;
     private OnboardingOverviewModel? _overview;
+
+    private Guid? _selectedTaskId;
+    private bool _dialogOpen;
 
     protected override async Task OnParametersSetAsync()
     {
         _loading = true;
         _overview = await OnboardingService.GetOverviewAsync(CompanyId, EmployeeId);
         _loading = false;
+    }
+
+    private void OpenTaskDialog(Guid taskId)
+    {
+        _selectedTaskId = taskId;
+        _dialogOpen = true;
+    }
+
+    private async Task CloseTaskDialogAsync()
+    {
+        _dialogOpen = false;
+        _overview = await OnboardingService.GetOverviewAsync(CompanyId, EmployeeId);
     }
 }

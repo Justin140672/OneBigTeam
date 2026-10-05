@@ -1,8 +1,10 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Employees.Contracts;
 using HR.Modules.Onboarding.Domain;
 using HR.Modules.Onboarding.Features.GetOnboardingOverview;
 using HR.Modules.Onboarding.Persistence;
 using HR.Modules.Onboarding.Tests.Infrastructure;
+using HR.Modules.Tasks.Contracts;
 using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Onboarding.Tests;
@@ -61,12 +63,56 @@ public class GetOnboardingOverviewHandlerTests
         OnboardingDbContext dbContext,
         IOutstandingDocumentRequestReader? documentReader = null,
         IOutstandingAssetAcknowledgementReader? assetReader = null,
-        IProbationSummaryReader? probationReader = null) =>
+        IProbationSummaryReader? probationReader = null,
+        ITaskLinkBySourceEntityReader? taskLinkReader = null,
+        IEmployeeNameReader? employeeNameReader = null) =>
         new(
             dbContext,
             documentReader ?? new FakeOutstandingDocumentRequestReader(),
             assetReader ?? new FakeOutstandingAssetAcknowledgementReader(),
-            probationReader ?? new FakeProbationSummaryReader());
+            probationReader ?? new FakeProbationSummaryReader(),
+            taskLinkReader ?? new FakeTaskLinkBySourceEntityReader(),
+            employeeNameReader ?? new FakeEmployeeNameReader());
+
+    [Fact]
+    public async Task HandleAsync_Surfaces_Linked_TaskId_And_Owner_Name_For_Each_Task()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId = Guid.NewGuid();
+
+        var plan = SeedPlan(db, companyId, employeeId, Now, OnboardingStatus.InProgress);
+        var assigned = SeedTask(db, companyId, plan.Id, Now, "Welcome email");
+        var unassigned = SeedTask(db, companyId, plan.Id, Now, "Set up workstation");
+        var unlinked = SeedTask(db, companyId, plan.Id, Now, "No task yet");
+        await db.SaveChangesAsync();
+
+        var assignedTaskId = Guid.NewGuid();
+        var unassignedTaskId = Guid.NewGuid();
+        var handler = BuildHandler(
+            db,
+            taskLinkReader: new FakeTaskLinkBySourceEntityReader(new Dictionary<Guid, TaskLink>
+            {
+                [assigned.Id] = new(assignedTaskId, managerId, managerId, true),
+                [unassigned.Id] = new(unassignedTaskId, null, null, true),
+            }),
+            employeeNameReader: new FakeEmployeeNameReader(new Dictionary<Guid, string> { [managerId] = "Maya Manager" }));
+
+        var result = await handler.HandleAsync(
+            new GetOnboardingOverviewRequest { CompanyId = companyId, EmployeeId = employeeId },
+            CancellationToken.None);
+
+        var byId = result.Tasks.ToDictionary(t => t.Id);
+        Assert.Equal(assignedTaskId, byId[assigned.Id].TaskId);
+        Assert.Equal(managerId, byId[assigned.Id].AssignedEmployeeId);
+        Assert.Equal("Maya Manager", byId[assigned.Id].AssignedToName);
+        Assert.Equal(unassignedTaskId, byId[unassigned.Id].TaskId);
+        Assert.Null(byId[unassigned.Id].AssignedEmployeeId);
+        Assert.Equal("Unassigned", byId[unassigned.Id].AssignedToName);
+        Assert.Null(byId[unlinked.Id].TaskId);
+        Assert.Equal("Unassigned", byId[unlinked.Id].AssignedToName);
+    }
 
     [Fact]
     public async Task HandleAsync_Returns_Plan_And_Tasks_When_Plan_Exists()

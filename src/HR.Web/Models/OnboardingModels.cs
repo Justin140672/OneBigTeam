@@ -21,7 +21,10 @@ public sealed record OnboardingTaskOverviewItem(
     DateOnly? DueDate,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? TaskId,
+    Guid? AssignedEmployeeId,
+    string AssignedToName);
 
 public sealed record OutstandingDocumentRequestItem(
     Guid Id,

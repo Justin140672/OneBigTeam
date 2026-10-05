@@ -19,4 +19,7 @@ internal sealed record OnboardingTaskOverviewItem(
     DateOnly? DueDate,
     DateTimeOffset CreatedAt,
     DateTimeOffset? CompletedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? TaskId,
+    Guid? AssignedEmployeeId,
+    string AssignedToName);

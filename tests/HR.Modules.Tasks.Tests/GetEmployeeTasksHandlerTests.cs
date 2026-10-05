@@ -48,7 +48,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -61,7 +61,7 @@ public class GetEmployeeTasksHandlerTests
     {
         await using var context = BuildContext();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = Guid.NewGuid(), EmployeeId = Guid.NewGuid() },
             CancellationToken.None);
 
@@ -82,7 +82,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyA, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -104,7 +104,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "Completed" },
             CancellationToken.None);
 
@@ -125,7 +125,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "cancelled" },
             CancellationToken.None);
 
@@ -146,7 +146,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId, Status = "bogus" },
             CancellationToken.None);
 
@@ -167,7 +167,7 @@ public class GetEmployeeTasksHandlerTests
 
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -194,7 +194,7 @@ public class GetEmployeeTasksHandlerTests
         context.TaskItems.Add(task);
         await context.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(context, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
             CancellationToken.None);
 
@@ -212,6 +212,43 @@ public class GetEmployeeTasksHandlerTests
         Assert.Equal(createdBy, item.CreatedBy);
         Assert.Null(item.CompletedBy);
         Assert.Null(item.CompletedAt);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Includes_Tasks_From_Related_Source_Providers_Regardless_Of_Assignee()
+    {
+        await using var context = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var managerId  = Guid.NewGuid();
+        var sourceId   = Guid.NewGuid();
+
+        var onboarding = TaskItem.Create(
+            Guid.NewGuid(), companyId, employeeId, "Welcome email", null,
+            TaskPriority.Medium, TaskSource.Onboarding, TaskActionType.Complete,
+            null, managerId, managerId, Now, sourceId);
+        context.TaskItems.AddRange(
+            onboarding,
+            MakeTask(companyId, managerId, "Unrelated manager task"),
+            MakeTask(companyId, employeeId, "Own task"));
+        await context.SaveChangesAsync();
+
+        var result = await new GetEmployeeTasksHandler(
+                context, new FakeEmployeeNameReader(), [new StubSourceProvider(sourceId)])
+            .HandleAsync(
+                new GetEmployeeTasksRequest { CompanyId = companyId, EmployeeId = employeeId },
+                CancellationToken.None);
+
+        Assert.Equal(2, result.Items.Count);
+        Assert.Contains(result.Items, i => i.Id == onboarding.Id && i.AssignedEmployeeId == managerId);
+        Assert.Contains(result.Items, i => i.Title == "Own task");
+    }
+
+    private sealed class StubSourceProvider(params Guid[] ids) : IEmployeeRelatedTaskSourceProvider
+    {
+        public Task<IReadOnlyCollection<Guid>> GetSourceEntityIdsAsync(
+            Guid companyId, Guid employeeId, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyCollection<Guid>>(ids);
     }
 
     private static TasksDbContext BuildContext()

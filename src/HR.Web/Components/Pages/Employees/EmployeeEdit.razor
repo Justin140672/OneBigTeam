@@ -692,7 +692,7 @@
                                     <ChildContent><TabHeader Text="Tasks" /></ChildContent>
                                     <ContentTemplate>
                                         <div class="mt-4">
-                                            <EmployeeTasksTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                            <EmployeeTasksTab CompanyId="CompanyId" EmployeeId="Id!.Value" EmployeeNames="EmployeeNameVariants" />
                                         </div>
                                     </ContentTemplate>
                                 </TabItem>
@@ -718,7 +718,7 @@
                                         <ChildContent><TabHeader Text="Onboarding" /></ChildContent>
                                         <ContentTemplate>
                                             <div class="mt-4">
-                                                <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" />
+                                                <EmployeeOnboardingTab CompanyId="CompanyId" EmployeeId="Id!.Value" EmployeeNames="EmployeeNameVariants" />
                                             </div>
                                         </ContentTemplate>
                                     </TabItem>
@@ -818,7 +818,7 @@
                 <SfButton OnClick="RequestClose">Back to employees</SfButton>
             </div>
         }
-        else
+        else if (ActiveSectionHasEditableFields)
         {
             <!-- Sticky so Save/Cancel stay reachable while scrolling through the long form/tabs
                  below; only rendered in edit mode, per AC3. -->
@@ -854,6 +854,17 @@
 
             <CancelLeavingProcessDialog IsOpen="_showCancelLeavingProcessDialog"
                                          CompanyId="CompanyId"
+    private bool ActiveSectionHasEditableFields =>
+        _activeSection is EmployeeProfileSection.Details or EmployeeProfileSection.Employment;
+
+    private IReadOnlyList<string> EmployeeNameVariants => _employee is null
+        ? []
+        :
+        [
+            PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName),
+            PersonName.Legal(_employee.FirstName, _employee.LastName)
+        ];
+
                                          EmployeeId="Id!.Value"
                                          ShowOffboardingTab="_showOffboardingTab"
                                          OnCancelled="CloseCancelLeavingProcessDialog"

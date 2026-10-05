@@ -7,11 +7,15 @@
 }
 else if (_tasks.Count == 0)
 {
-    <p class="text-muted">No tasks assigned to this employee.</p>
+    <p class="text-muted">No tasks for this employee.</p>
 }
 else
 {
-    <TaskList Tasks="@_tasks" ShowAssignedTo="false" OnViewTask="OpenTaskDialog" />
+    <TaskList Tasks="@_tasks"
+              ShowAssignedTo="true"
+              HighlightDueDates="true"
+              TitleTransform="StripEmployeeName"
+              OnViewTask="OpenTaskDialog" />
 }
 
 <TaskViewDialog CompanyId="CompanyId"
@@ -22,6 +26,10 @@ else
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
     [Parameter, EditorRequired] public Guid EmployeeId { get; set; }
+    [Parameter] public IReadOnlyList<string> EmployeeNames { get; set; } = [];
+
+    private string StripEmployeeName(string title) =>
+        TaskTitleFormatter.StripEmployeeSuffix(title, [.. EmployeeNames]);
 
     private IReadOnlyList<TaskListItem> _tasks = [];
     private bool _loading = true;

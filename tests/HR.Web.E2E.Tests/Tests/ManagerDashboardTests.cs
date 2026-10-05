@@ -190,7 +190,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
             $"Expected onboarding progress to be greater than 0% after completing one of the " +
             $"three default checklist tasks, got {percent}%");
 
-        var taskStatus = await empEdit.GetOnboardingChecklistTaskStatusAsync(claimedTitle);
+        var taskStatus = await empEdit.GetOnboardingChecklistTaskStatusAsync(claimedTitle.Split(" — ")[0]);
         Assert.Equal("Completed", taskStatus);
 
         var planStatus = await empEdit.GetOnboardingStatusBadgeTextAsync();

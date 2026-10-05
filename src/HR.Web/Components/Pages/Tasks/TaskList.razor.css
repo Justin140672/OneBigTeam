@@ -55,3 +55,20 @@
     background: #fee2e2;
     color: #b91c1c;
 }
+
+.task-due--overdue {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.task-due--today {
+    color: #b45309;
+    font-weight: 600;
+}
+
+.task-due-flag {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}

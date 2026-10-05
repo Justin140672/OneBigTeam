@@ -1324,6 +1324,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var bar = page.Locator(".progress .progress-bar");
         var value = await bar.GetAttributeAsync("aria-valuenow");
         return int.TryParse(value, out var percent) ? percent : 0;
+    private ILocator OnboardingChecklistRow(string taskTitleFragment) =>
+        page.Locator(".card").Filter(new() { HasText = "Onboarding Checklist" }).First
+            .Locator("table tbody tr").Filter(new() { HasText = taskTitleFragment }).First;
+
+    public async Task<string?> GetOnboardingChecklistRowTitleAsync(string taskTitleFragment) =>
+        (await OnboardingChecklistRow(taskTitleFragment).Locator("td").First.TextContentAsync())?.Trim();
+
+    public async Task<string?> GetOnboardingChecklistOwnerAsync(string taskTitleFragment) =>
+        (await OnboardingChecklistRow(taskTitleFragment).Locator("[data-testid^='onboarding-task-owner-']").TextContentAsync())?.Trim();
+
+    public async Task OpenOnboardingChecklistTaskAsync(string taskTitleFragment)
+    {
+        await OnboardingChecklistRow(taskTitleFragment)
+            .GetByRole(AriaRole.Button, new() { Name = "Open task" }).ClickAsync();
+        await page.WaitForSelectorAsync("[role='dialog'].task-view-dialog", new() { Timeout = 15_000 });
+    }
+
+    public Task OpenDetailsTabAsync() => OpenSectionAsync("Details");
+
     }
 
     public async Task<string?> GetOnboardingChecklistTaskStatusAsync(string taskTitleFragment)

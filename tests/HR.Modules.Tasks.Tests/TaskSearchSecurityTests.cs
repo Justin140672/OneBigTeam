@@ -69,7 +69,7 @@ public class TaskSearchSecurityTests
             MakeTaskForEmployee(companyB, employeeId));
         await ctx.SaveChangesAsync();
 
-        var result = await new GetEmployeeTasksHandler(ctx, new FakeEmployeeNameReader()).HandleAsync(
+        var result = await new GetEmployeeTasksHandler(ctx, new FakeEmployeeNameReader(), []).HandleAsync(
             new GetEmployeeTasksRequest { CompanyId = companyA, EmployeeId = employeeId },
             CancellationToken.None);
 

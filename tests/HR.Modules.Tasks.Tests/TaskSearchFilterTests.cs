@@ -125,7 +125,7 @@ public class TaskSearchFilterTests
         new(ctx, new FakeEmployeeNameReader());
 
     private static GetEmployeeTasksHandler GetEmployeeTasksHandler(TasksDbContext ctx) =>
-        new(ctx, new FakeEmployeeNameReader());
+        new(ctx, new FakeEmployeeNameReader(), []);
 
     private static TaskItem MakeUserTask(Guid companyId, Guid userId, string title, TaskPriority priority, DateOnly? dueDate) =>
         TaskItem.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), title, null, priority,

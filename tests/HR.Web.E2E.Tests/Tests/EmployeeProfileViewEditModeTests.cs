@@ -126,12 +126,39 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await empEdit.ClickEditDetailsButtonAsync();
 
         Assert.False(empEdit.IsInViewModeUrl, $"Expected to leave the '/view' route after clicking Edit details, got: {_page.Url}");
+        await empEdit.OpenDetailsTabAsync();
         Assert.False(await empEdit.IsTextFieldReadOnlyAsync("First Name"),
             "Expected the First Name field to no longer be readonly in edit mode");
         Assert.True(await empEdit.IsStickyActionBarVisibleAsync(),
             "Expected the sticky Save/Cancel action bar to render in edit mode");
         Assert.False(await empEdit.IsBackToEmployeesButtonVisibleAsync(),
             "'Back to employees' is a view-mode-only action");
+    }
+
+    [Fact]
+    public async Task EditMode_HidesStickyActionBar_OnSectionsWithoutEditableFields()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await GetSharedEmployeeAsync(empList, empEdit);
+        await empEdit.ClickEditDetailsButtonAsync();
+
+        await empEdit.OpenDetailsTabAsync();
+        Assert.True(await empEdit.IsStickyActionBarVisibleAsync(),
+            "Expected Save/Cancel on the Details section, which has editable fields");
+
+        await empEdit.OpenTasksTabAsync();
+        Assert.False(await empEdit.IsStickyActionBarVisibleAsync(),
+            "Expected Save/Cancel to be hidden on the Tasks section, which has no editable fields");
+
+        await empEdit.OpenDetailsTabAsync();
+        Assert.True(await empEdit.IsStickyActionBarVisibleAsync(),
+            "Expected Save/Cancel to return when switching back to an editable section");
     }
 
 

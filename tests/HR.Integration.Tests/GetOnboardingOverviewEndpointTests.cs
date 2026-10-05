@@ -77,6 +77,32 @@ public class GetOnboardingOverviewEndpointTests
     }
 
     [Fact]
+    public async Task Get_OnboardingOverview_Links_Every_Task_To_Its_Task_And_Shows_Owner()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/onboarding-overview");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<OverviewPayload>();
+        Assert.NotNull(payload);
+        Assert.NotEmpty(payload!.Tasks);
+        Assert.All(payload.Tasks, t =>
+        {
+            Assert.NotNull(t.TaskId);
+            Assert.False(string.IsNullOrWhiteSpace(t.AssignedToName));
+        });
+
+        var workstation = Assert.Single(payload.Tasks, t => t.Title.Contains("Set up workstation"));
+        Assert.Null(workstation.AssignedEmployeeId);
+        Assert.Equal("Unassigned", workstation.AssignedToName);
+    }
+
+    [Fact]
     public async Task Get_OnboardingOverview_Includes_Outstanding_Cross_Module_Sections()
     {
         var companyId = Guid.NewGuid();
@@ -356,7 +382,10 @@ public class GetOnboardingOverviewEndpointTests
         DateOnly? DueDate,
         DateTimeOffset CreatedAt,
         DateTimeOffset? CompletedAt,
-        DateTimeOffset UpdatedAt);
+        DateTimeOffset UpdatedAt,
+        Guid? TaskId,
+        Guid? AssignedEmployeeId,
+        string AssignedToName);
 
     private sealed record DocumentRequestItemPayload(Guid Id, string DocumentTypeName, DateOnly? DueDate, bool IsMandatory);
 

@@ -7,15 +7,27 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Tasks.Features.GetEmployeeTasks;
 
-internal sealed class GetEmployeeTasksHandler(TasksDbContext dbContext, IEmployeeNameReader employeeNameReader)
+internal sealed class GetEmployeeTasksHandler(
+    TasksDbContext dbContext,
+    IEmployeeNameReader employeeNameReader,
+    IEnumerable<IEmployeeRelatedTaskSourceProvider> relatedTaskSourceProviders)
 {
     public async Task<GetEmployeeTasksResponse> HandleAsync(
         GetEmployeeTasksRequest request,
         CancellationToken cancellationToken)
     {
+        var relatedSourceEntityIds = new List<Guid>();
+        foreach (var provider in relatedTaskSourceProviders)
+        {
+            relatedSourceEntityIds.AddRange(
+                await provider.GetSourceEntityIdsAsync(request.CompanyId, request.EmployeeId, cancellationToken));
+        }
+
         var query = dbContext.TaskItems
             .AsNoTracking()
-            .Where(t => t.CompanyId == request.CompanyId && t.AssignedEmployeeId == request.EmployeeId);
+            .Where(t => t.CompanyId == request.CompanyId
+                     && (t.AssignedEmployeeId == request.EmployeeId
+                         || (t.SourceEntityId != null && relatedSourceEntityIds.Contains(t.SourceEntityId.Value))));
 
         if (!string.IsNullOrWhiteSpace(request.Status) &&
             Enum.TryParse<TaskItemStatus>(request.Status, ignoreCase: true, out var status))

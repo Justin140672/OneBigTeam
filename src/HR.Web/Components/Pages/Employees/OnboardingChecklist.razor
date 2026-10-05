@@ -17,25 +17,52 @@
                 <thead class="table-light">
                     <tr>
                         <th>Task</th>
+                        <th width="170">Assigned To</th>
                         <th width="130">Due Date</th>
                         <th width="130">Status</th>
                         <th width="150">Completed</th>
+                        <th width="120"></th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach (var t in Overview.Tasks.OrderBy(t => t.DueDate ?? DateOnly.MaxValue))
                     {
                         var (css, label) = GetTaskBadge(t);
-                        <tr>
-                            <td class="align-middle">@t.Title</td>
-                            <td class="align-middle text-muted small">
+                        var urgency = GetDueUrgency(t);
+                        <tr data-testid="@($"onboarding-task-row-{t.Id}")">
+                            <td class="align-middle">
+                                @if (t.TaskId is { } openId)
+                                {
+                                    <a href="javascript:void(0)" class="text-decoration-none" role="button"
+                                       data-testid="@($"onboarding-task-link-{t.Id}")"
+                                       @onclick="() => OnOpenTask.InvokeAsync(openId)"
+                                       @onclick:preventDefault>@DisplayTitle(t.Title)</a>
+                                }
+                                else
+                                {
+                                    @DisplayTitle(t.Title)
+                                }
+                            </td>
+                            <td class="align-middle small" data-testid="@($"onboarding-task-owner-{t.Id}")">@t.AssignedToName</td>
+                            <td class="align-middle small @(urgency is null ? "text-muted" : urgency == "overdue" ? "text-danger fw-semibold" : "text-warning-emphasis fw-semibold")">
                                 @(t.DueDate?.ToString("d MMM yyyy") ?? "—")
+                                @if (urgency is not null)
+                                {
+                                    <div class="small">@(urgency == "overdue" ? "Overdue" : "Due today")</div>
+                                }
                             </td>
                             <td class="align-middle">
                                 <span class="badge @css">@label</span>
                             </td>
                             <td class="align-middle text-muted small">
                                 @(t.CompletedAt?.LocalDateTime.ToString("d MMM yyyy") ?? "—")
+                            </td>
+                            <td class="align-middle text-end">
+                                @if (t.TaskId is { } taskId)
+                                {
+                                    <SfButton CssClass="e-outline e-small" title="Open task"
+                                              OnClick="() => OnOpenTask.InvokeAsync(taskId)">Open task</SfButton>
+                                }
                             </td>
                         </tr>
                     }
@@ -122,6 +149,20 @@
 
 @code {
     [Parameter, EditorRequired] public OnboardingOverviewModel Overview { get; set; } = null!;
+    [Parameter] public IReadOnlyList<string> EmployeeNames { get; set; } = [];
+    [Parameter] public EventCallback<Guid> OnOpenTask { get; set; }
+
+    private string DisplayTitle(string title) =>
+        TaskTitleFormatter.StripEmployeeSuffix(title, [.. EmployeeNames]);
+
+    private string? GetDueUrgency(OnboardingTaskOverviewItem t)
+    {
+        if (t.DueDate is not { } due || t.Status is not ("Pending" or "InProgress"))
+            return null;
+
+        var today = CompanyTimeProvider.Today;
+        return due < today ? "overdue" : due == today ? "today" : null;
+    }
 
     private (string Css, string Label) GetTaskBadge(OnboardingTaskOverviewItem t)
     {

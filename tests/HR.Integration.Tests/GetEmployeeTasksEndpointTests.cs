@@ -57,7 +57,7 @@ public class GetEmployeeTasksEndpointTests
 
 
     [Fact]
-    public async Task Get_EmployeeTasks_Returns_Empty_When_Employee_Has_No_Tasks()
+    public async Task Get_EmployeeTasks_Returns_No_NonOnboarding_Tasks_When_Employee_Has_None()
     {
         using var client = await AuthenticatedClient();
 
@@ -68,7 +68,7 @@ public class GetEmployeeTasksEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
-        Assert.Empty(payload!.Items);
+        Assert.DoesNotContain(payload!.Items, i => i.Source != "Onboarding");
     }
 
     [Fact]
@@ -88,8 +88,9 @@ public class GetEmployeeTasksEndpointTests
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
-        Assert.Equal(2, payload!.Items.Count);
-        Assert.All(payload.Items, item => Assert.Equal(employee.Id, item.AssignedEmployeeId));
+        var assigned = payload!.Items.Where(i => i.Source != "Onboarding").ToList();
+        Assert.Equal(2, assigned.Count);
+        Assert.All(assigned, item => Assert.Equal(employee.Id, item.AssignedEmployeeId));
     }
 
     [Fact]
@@ -204,6 +205,23 @@ public class GetEmployeeTasksEndpointTests
             $"/api/companies/{SeededCompanyId}/employees/{target}/tasks");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Get_EmployeeTasks_Includes_Onboarding_Tasks_Not_Assigned_To_The_Employee()
+    {
+        using var client = await AuthenticatedAsAsync(Guid.NewGuid(), hrAdministrator: true);
+        var employee = await CreateEmployeeAsync(client, "Onboard", $"Subject-{Guid.NewGuid():N}"[..20]);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{SeededCompanyId}/employees/{employee.Id}/tasks?pageSize=200");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<ListPayload>();
+        Assert.NotNull(payload);
+        var onboarding = payload!.Items.Where(i => i.Source == "Onboarding").ToList();
+        Assert.NotEmpty(onboarding);
+        Assert.Contains(onboarding, i => i.AssignedEmployeeId != employee.Id);
     }
 
     [Fact]

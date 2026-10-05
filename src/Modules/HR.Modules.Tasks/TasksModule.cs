@@ -65,6 +65,7 @@ public static class TasksModule
         services.AddScoped<ITaskRescheduler, TaskRescheduler>();
         services.AddScoped<ITaskReassigner, TaskReassigner>();
         services.AddScoped<IOpenTaskBySourceEntityReader, OpenTaskBySourceEntityReader>();
+        services.AddScoped<ITaskLinkBySourceEntityReader, TaskLinkBySourceEntityReader>();
         services.AddScoped<IWorkloadActionProvider, EmployeeTasksOverdueWorkloadActionProvider>();
         services.AddScoped<IWorkloadActionProvider, ManagerTasksOverdueWorkloadActionProvider>();
         services.AddScoped<TaskCompletionDispatcher>();

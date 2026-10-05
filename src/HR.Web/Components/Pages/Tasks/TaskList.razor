@@ -10,7 +10,7 @@
                     var item = (TaskListItem)context;
                 }
                 <div class="task-cell">
-                    <span class="task-title task-title-link" role="button" data-testid="@($"task-view-btn-{item.Id}")" @onclick="() => OnViewTask.InvokeAsync(item.Id)">@item.Title</span>
+                    <span class="task-title task-title-link" role="button" data-testid="@($"task-view-btn-{item.Id}")" @onclick="() => OnViewTask.InvokeAsync(item.Id)">@(TitleTransform?.Invoke(item.Title) ?? item.Title)</span>
                     @if (item.Description is not null)
                     {
                         <span class="task-description">@item.Description</span>
@@ -29,7 +29,28 @@
             </Template>
         </GridColumn>
         <GridColumn Field="@nameof(TaskListItem.Priority)" HeaderText="Priority" Width="120" />
-        <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
+        @if (HighlightDueDates)
+        {
+            <GridColumn HeaderText="Due Date" Width="140">
+                <Template>
+                    @{
+                        var item = (TaskListItem)context;
+                        var urgency = DueUrgency(item);
+                    }
+                    <span class="@(urgency is null ? "" : $"task-due--{urgency}")" data-testid="@($"task-due-{item.Id}")">
+                        @(item.DueDate?.ToString("d") ?? "")
+                        @if (urgency is not null)
+                        {
+                            <span class="task-due-flag">@(urgency == "overdue" ? "Overdue" : "Due today")</span>
+                        }
+                    </span>
+                </Template>
+            </GridColumn>
+        }
+        else
+        {
+            <GridColumn Field="@nameof(TaskListItem.DueDate)" HeaderText="Due Date" Width="140" Format="d" />
+        }
         @if (ShowAssignedTo)
         {
             <GridColumn Field="@nameof(TaskListItem.AssignedTo)" HeaderText="Assigned To" Width="180" />
@@ -52,8 +73,26 @@
     [Parameter]
     public bool ShowAssignedTo { get; set; } = true;
 
+    [Parameter]
+    public bool HighlightDueDates { get; set; }
+
+    [Parameter]
+    public Func<string, string>? TitleTransform { get; set; }
+
     [Parameter, EditorRequired]
     public EventCallback<Guid> OnViewTask { get; set; }
+
+    [Inject]
+    private ICompanyTimeProvider CompanyTimeProvider { get; set; } = null!;
+
+    private string? DueUrgency(TaskListItem item)
+    {
+        if (item.DueDate is not { } due || item.Status is not ("Open" or "InProgress"))
+            return null;
+
+        var today = CompanyTimeProvider.Today;
+        return due < today ? "overdue" : due == today ? "today" : null;
+    }
 
     private static string StatusLabel(string status) => status switch
     {

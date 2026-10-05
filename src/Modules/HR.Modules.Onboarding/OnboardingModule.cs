@@ -40,6 +40,7 @@ public static class OnboardingModule
         services.AddScoped<OnboardingReminderJob>();
         services.AddScoped<IOnboardingHistoryReplayer, OnboardingHistoryReplayer>();
         services.AddScoped<IWorkloadActionProvider, OutstandingOnboardingTasksWorkloadActionProvider>();
+        services.AddScoped<IEmployeeRelatedTaskSourceProvider, OnboardingEmployeeTaskSourceProvider>();
 
         return services;
     }

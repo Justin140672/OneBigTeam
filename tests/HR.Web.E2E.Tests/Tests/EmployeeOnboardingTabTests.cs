@@ -115,7 +115,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
     }
 
     [Fact]
-    public async Task OnboardingTab_ShowsTimeline()
+    public async Task OnboardingTab_DoesNotShowTimeline()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -127,8 +127,54 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
-        Assert.True(await empEdit.HasOnboardingTimelineAsync(),
-            "Expected the Onboarding Timeline card to be visible");
+        Assert.True(await empEdit.HasOnboardingChecklistAsync(),
+            "Expected the Onboarding Checklist card to be visible");
+        Assert.False(await empEdit.HasOnboardingTimelineAsync(),
+            "Expected the Onboarding Timeline card to be removed");
+    }
+
+    [Fact]
+    public async Task OnboardingTab_Checklist_ShowsOwner_AndOpensTaskDialog_WithoutEmployeeNameSuffix()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var (_, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
+        await empEdit.OpenOnboardingTabAsync();
+
+        const string workstationTitle = "Set up workstation and system access";
+        var rowTitle = await empEdit.GetOnboardingChecklistRowTitleAsync(workstationTitle);
+        Assert.NotNull(rowTitle);
+        Assert.DoesNotContain(lastName, rowTitle!, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal("Unassigned", await empEdit.GetOnboardingChecklistOwnerAsync(workstationTitle));
+
+        var urlBefore = _page.Url;
+        await empEdit.OpenOnboardingChecklistTaskAsync(workstationTitle);
+        Assert.Equal(urlBefore, _page.Url);
+    }
+
+    [Fact]
+    public async Task EmployeeTasksTab_IncludesOnboardingTasks_WithoutEmployeeNameSuffix()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var (_, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
+        await empEdit.OpenTasksTabAsync();
+
+        var workstationTask = _page.Locator(".e-row").Filter(new() { HasText = "Set up workstation and system access" }).First;
+        await workstationTask.WaitForAsync(new() { Timeout = 15_000 });
+        var title = (await workstationTask.Locator(".task-title").TextContentAsync())!;
+        Assert.DoesNotContain(lastName, title, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
