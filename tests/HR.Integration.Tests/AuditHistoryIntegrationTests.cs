@@ -89,7 +89,7 @@ public class AuditHistoryIntegrationTests
             {
                 companyId,
                 employeeId,
-                effectiveFrom = "2026-01-01",
+                effectiveFrom = "2026-06-01",
                 salaryType = "Annual",
                 salary = 55000m,
                 currency = "GBP",
@@ -105,10 +105,14 @@ public class AuditHistoryIntegrationTests
         var history = await historyResp.Content.ReadFromJsonAsync<AuditHistoryPayload>();
         Assert.NotNull(history);
 
-        var entry = Assert.Single(history!.Items, i => i.Action == "Compensation record created");
-        Assert.Equal("Employees", entry.Module);
-        Assert.DoesNotContain(entry.Changes, c => c.After == "55000");
-        Assert.Contains(entry.Changes, c => c.Field == "Currency" && c.After == "GBP");
+        var entries = history!.Items.Where(i => i.Action == "Compensation record created").ToList();
+        Assert.NotEmpty(entries);
+        Assert.All(entries, entry =>
+        {
+            Assert.Equal("Employees", entry.Module);
+            Assert.DoesNotContain(entry.Changes, c => c.After == "55000");
+            Assert.Contains(entry.Changes, c => c.Field == "Currency" && c.After == "GBP");
+        });
     }
 
     [Fact]
@@ -1066,6 +1070,9 @@ public class AuditHistoryIntegrationTests
                 gender = "Male",
                 employeeNumber = $"AUD-{Guid.NewGuid():N}",
                 employmentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId,
                 locationId,
                 positionProfileId

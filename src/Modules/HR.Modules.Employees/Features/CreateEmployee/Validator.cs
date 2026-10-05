@@ -96,11 +96,11 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
         RuleFor(r => r.SalaryFrequency)
             .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Salary type is required.")
-            .Must(value => Enum.TryParse<SalaryType>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+            .Must(value => !int.TryParse(value, out _) && Enum.TryParse<SalaryType>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
                 .WithMessage("Salary type must be Annual, Hourly or Daily.");
 
         RuleFor(r => r.Currency)
             .NotEmpty().WithMessage("Currency is required.")
-            .Length(3).WithMessage("Currency must be a 3-letter ISO 4217 code (e.g. GBP).");
+            .Matches("^[A-Za-z]{3}$").WithMessage("Currency must be a 3-letter ISO 4217 code (e.g. GBP).");
     }
 }

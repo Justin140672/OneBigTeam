@@ -147,6 +147,9 @@ public class GetLeaveRequestAuditHistoryEndpointTests
                 gender = "Male",
                 employeeNumber = $"LAH-{unique}",
                 employmentTypeId = EmploymentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId = DepartmentId,
                 locationId = LocationId,
                 positionProfileId = PositionProfileId

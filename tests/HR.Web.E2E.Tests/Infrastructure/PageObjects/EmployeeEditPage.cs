@@ -152,6 +152,59 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public async Task<string?> GetAddressFieldErrorAsync(string fieldId) =>
         (await page.Locator($"#{fieldId}-error").First.TextContentAsync())?.Trim();
 
+    private ILocator AddEmployeeCompensationCard => page.Locator("[data-testid='add-employee-compensation-card']");
+
+    public async Task FillRequiredCompensationAsync(
+        string salary = "45000", string? salaryType = null, string? currency = null)
+    {
+        await FillSalaryAsync(salary);
+        if (salaryType is not null)
+            await SelectSalaryTypeAsync(salaryType);
+        if (currency is not null)
+            await FillCurrencyAsync(currency);
+    }
+
+    public async Task FillSalaryAsync(string value)
+    {
+        var input = AddEmployeeCompensationCard.Locator("input.e-numerictextbox").First;
+        await FillNumericAndVerifyAsync(input, value, decimal.Parse(value));
+    }
+
+    public Task SelectSalaryTypeAsync(string salaryType) =>
+        DropDownSelector.SelectAsync(
+            page,
+            AddEmployeeCompensationCard.Locator(".col-md-4").Filter(new() { HasText = "Salary Type" }).First,
+            salaryType);
+
+    public async Task FillCurrencyAsync(string value)
+    {
+        await FillAddressFieldAsync("emp-currency", value);
+    }
+
+    public Task<bool> IsAddEmployeeCompensationCardVisibleAsync() =>
+        AddEmployeeCompensationCard.IsVisibleAsync();
+
+    public async Task<string?> GetSalaryErrorAsync()
+    {
+        var error = page.Locator("#emp-salary-error").First;
+        try
+        {
+            await error.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+
+        return (await error.TextContentAsync())?.Trim();
+    }
+
+    public Task<string> GetSalaryTypeTextAsync() =>
+        AddEmployeeCompensationCard.Locator("span[role='combobox'] input").First.InputValueAsync();
+
+    public Task<string> GetCurrencyValueAsync() =>
+        page.Locator("#emp-currency").InputValueAsync();
+
     public async Task FillStartDateAsync(string ddMMyyyy)
     {
         var inputs = page.Locator(".e-date-wrapper input.e-input");

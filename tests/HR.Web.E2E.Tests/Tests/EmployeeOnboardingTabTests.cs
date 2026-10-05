@@ -39,6 +39,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync($"e2e.onbfresh{unique}@acme.example");
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");

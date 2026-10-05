@@ -170,6 +170,9 @@ public class CreateEmployeeAddressRequirementTests
         AddressLine1 = "1 High Street",
         City = "London",
         PostCode = "SW1A 1AA",
+        Salary = 50000m,
+        SalaryFrequency = "Annual",
+        Currency = "GBP",
     };
 
     private static CreateEmployeeHandler BuildHandler(EmployeesDbContext context, bool ukRules = false) =>

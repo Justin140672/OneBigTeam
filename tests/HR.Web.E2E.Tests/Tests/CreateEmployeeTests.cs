@@ -51,6 +51,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
 
         await empEdit.SelectDropdownAsync("Gender", "Male");
 
@@ -142,6 +143,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         Assert.Contains("Postcode is required", await empEdit.GetAddressFieldErrorAsync("emp-post-code"));
 
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SaveNewEmployeeAsync();
 
         Assert.True(await empList.HasEmployeeAsync(lastName),
@@ -241,6 +243,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -436,6 +439,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
                 await empEdit.FillLastNameAsync(lastName);
                 await empEdit.FillWorkEmailAsync(workEmail);
                 await empEdit.FillRequiredAddressAsync();
+                await empEdit.FillRequiredCompensationAsync();
                 await empEdit.SelectDropdownAsync("Gender", "Male");
                 await empEdit.SelectDropdownAsync("Nationality", "British");
                 await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -481,6 +485,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -516,6 +521,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -601,6 +607,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");

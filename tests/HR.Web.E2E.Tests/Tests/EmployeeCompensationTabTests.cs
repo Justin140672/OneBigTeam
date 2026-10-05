@@ -82,8 +82,11 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         Assert.Contains("Annual", gridText);
     }
 
-    [Fact]
-    public async Task CompensationTab_ShowsEmptyState_ForEmployeeWithNoCompensationRecord()
+    [Theory]
+    [InlineData("Annual", "52000", "52,000.00")]
+    [InlineData("Hourly", "25.5", "25.50")]
+    public async Task CompensationTab_ShowsInitialRecord_ForEmployeeCreatedWithSalary(
+        string salaryType, string salary, string expectedGridAmount)
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -93,8 +96,8 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await login.LoginAsync(LauraEmail);
 
         var unique    = Guid.NewGuid().ToString("N")[..8];
-        var lastName  = $"NoCompensation{unique}";
-        var workEmail = $"e2e.nocomp{unique}@acme.example";
+        var lastName  = $"InitComp{unique}";
+        var workEmail = $"e2e.initcomp{unique}@acme.example";
 
         await empList.GoToAsync(AcmeId);
         await empList.ClickNewEmployeeAsync();
@@ -102,6 +105,7 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync(salary, salaryType, "GBP");
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -118,11 +122,73 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empList.ClickEmployeeAsync(lastName);
         await empEdit.OpenCompensationTabAsync();
 
-        Assert.False(await empEdit.HasCurrentCompensationPanelAsync(),
-            "Expected no Current Compensation panel for an employee without a compensation record");
+        Assert.False(await _page.Locator("[data-testid='no-compensation-message']").IsVisibleAsync(),
+            "Did not expect the empty-state message: the new-employee form creates the first compensation record");
 
-        Assert.True(await _page.Locator("[data-testid='no-compensation-message']").IsVisibleAsync(),
-            "Expected a single unified empty-state message when there is no compensation data at all");
+        var row = empEdit.CompensationHistoryRow("1 Mar 2026");
+        Assert.True(await row.First.IsVisibleAsync(),
+            "Expected the first compensation record to be effective from the employee's start date");
+
+        var rowText = await row.First.TextContentAsync();
+        Assert.Contains(expectedGridAmount, rowText);
+        Assert.Contains(salaryType, rowText);
+    }
+
+    [Fact]
+    public async Task AddEmployee_CompensationCard_DefaultsToAnnualAndGbp()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToNewAsync(AcmeId);
+
+        Assert.True(await empEdit.IsAddEmployeeCompensationCardVisibleAsync(),
+            "Expected the Compensation card on the add-employee form");
+        Assert.Equal("Annual", await empEdit.GetSalaryTypeTextAsync());
+        Assert.Equal("GBP", await empEdit.GetCurrencyValueAsync());
+    }
+
+    [Fact]
+    public async Task AddEmployee_WithoutSalary_ShowsRequiredError_AndDoesNotCreateEmployee()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var unique    = Guid.NewGuid().ToString("N")[..8];
+        var lastName  = $"NoSalary{unique}";
+        var workEmail = $"e2e.nosalary{unique}@acme.example";
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+
+        await empEdit.ClickSaveButtonAsync();
+
+        Assert.Contains("Please enter a salary.", await empEdit.GetSalaryErrorAsync());
+        Assert.Contains("/employees/new", _page.Url);
+
+        await empEdit.FillRequiredCompensationAsync();
+        await empEdit.SaveNewEmployeeAsync();
+
+        Assert.True(await empList.HasEmployeeAsync(lastName),
+            $"Expected the new employee '{lastName}' to appear once a salary was entered");
     }
 
     private async Task<EmployeeEditPage> CreateFreshEmployeeOnCompensationTabAsync(string labelSuffix)
@@ -140,6 +206,7 @@ public sealed class EmployeeCompensationTabTests(HrAdminPersonaFixture fixture) 
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");

@@ -97,6 +97,9 @@ public class UpdateMyContactDetailsEndpointTests
             gender = "Male",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             departmentId = refData.DepartmentId,
             locationId = refData.LocationId,
             positionProfileId = refData.PositionProfileId

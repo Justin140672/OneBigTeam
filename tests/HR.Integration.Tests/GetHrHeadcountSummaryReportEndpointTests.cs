@@ -115,7 +115,8 @@ public class GetHrHeadcountSummaryReportEndpointTests
         var emp1Response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
-                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com"));
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2020, 1, 1)));
         emp1Response.EnsureSuccessStatusCode();
         var emp1Id = (await emp1Response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
         await AddCompensationAsync(client, companyId, emp1Id, 1.0m);
@@ -123,7 +124,8 @@ public class GetHrHeadcountSummaryReportEndpointTests
         var emp2Response = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
-                companyId, refData, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com"));
+                companyId, refData, "Bob", "Jones", $"bob.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2020, 1, 1)));
         emp2Response.EnsureSuccessStatusCode();
         var emp2Id = (await emp2Response.Content.ReadFromJsonAsync<IdPayload>())!.Id;
         await AddCompensationAsync(client, companyId, emp2Id, 0.5m);
@@ -133,7 +135,7 @@ public class GetHrHeadcountSummaryReportEndpointTests
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
                 companyId, refData, "Carl", "NoComp", $"carl.{Guid.NewGuid():N}@example.com"));
         emp3Response.EnsureSuccessStatusCode();
-        // Carl deliberately has no Compensation record seeded.
+        // Carl keeps only his initial compensation record, which carries no FTE.
 
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");

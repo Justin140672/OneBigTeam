@@ -158,6 +158,9 @@ public class GetEmployeePromotionHistoryEndpointTests
             gender = "Male",
             employeeNumber = $"PROMOHIST-{Guid.NewGuid():N}",
             employmentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             departmentId,
             locationId,
             positionProfileId

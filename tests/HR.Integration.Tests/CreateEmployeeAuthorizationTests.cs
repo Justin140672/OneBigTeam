@@ -118,6 +118,9 @@ public class CreateEmployeeAuthorizationTests
             gender = "Female",
             employeeNumber = $"AUTH-{Guid.NewGuid():N}",
             employmentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             departmentId,
             locationId,
             positionProfileId

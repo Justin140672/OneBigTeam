@@ -820,6 +820,9 @@ public class LeaveResourceAuthorizationTests(ApiWebApplicationFactory factory)
                 gender = "Male",
                 employeeNumber = $"LEN-{unique}",
                 employmentTypeId = EmploymentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId = DepartmentId,
                 locationId = LocationId,
                 positionProfileId = PositionProfileId

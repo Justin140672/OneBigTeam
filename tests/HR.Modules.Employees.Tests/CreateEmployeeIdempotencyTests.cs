@@ -57,6 +57,31 @@ public class CreateEmployeeIdempotencyTests
     }
 
     [Fact]
+    public async Task Retrying_With_Same_SourceReference_Does_Not_Create_Second_Compensation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var (departmentId, locationId, employmentTypeId, positionProfileId) = await SeedAsync(context, companyId);
+        var handler = BuildHandler(context);
+        const string sourceRef = "recruitment:application:22222222-2222-2222-2222-222222222222";
+
+        var first = await handler.HandleAsync(
+            RequestFor(companyId, departmentId, locationId, employmentTypeId, positionProfileId,
+                "emma.clarke@example.com", "EMP-0001", sourceRef),
+            CancellationToken.None);
+        var second = await handler.HandleAsync(
+            RequestFor(companyId, departmentId, locationId, employmentTypeId, positionProfileId,
+                "emma.clarke.retry@example.com", "EMP-0002", sourceRef),
+            CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        var compensation = Assert.Single(await context.Compensations.ToListAsync());
+        Assert.Equal(first.Value!.Id, compensation.EmployeeId);
+        Assert.Equal(StartDate, compensation.EffectiveFrom);
+    }
+
+    [Fact]
     public async Task Different_SourceReference_Creates_Distinct_Employees()
     {
         await using var context = BuildContext();
@@ -148,6 +173,9 @@ public class CreateEmployeeIdempotencyTests
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
+            Salary = 52000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
         };
 
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid EmploymentTypeId, Guid PositionProfileId)> SeedAsync(

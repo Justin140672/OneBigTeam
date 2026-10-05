@@ -36,6 +36,18 @@ The system shall:
 
 ---
 
+## Compensation on Add Employee
+
+Salary information is mandatory when an employee is added through the Add Employee form or the create-employee API.
+
+- The request must include a salary greater than zero, a salary type (Annual, Hourly or Daily) and a 3-letter currency code.
+- The employee's first compensation record is created in the same transaction as the employee, effective from the employee's start date, with the reason New Hire.
+- The creating user must hold `employee:manage`, the same permission required to add compensation separately; no additional permission is needed.
+- The compensation creation is audited (`employee.compensation.created`) with the same redaction as any other compensation record.
+- Automated paths that do not use the Add Employee form keep their own behaviour: Hire Candidate seeds compensation from the accepted offer, company sign-up seeds a zero-value placeholder for the initial administrator, and data import writes its own opening record.
+
+---
+
 ## Compensation History
 
 The system must preserve historical compensation records.

@@ -124,6 +124,9 @@ public class GetOrganisationChartEndpointTests
             gender = "Prefer not to say",
             employeeNumber,
             employmentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             departmentId,
             locationId,
             positionProfileId

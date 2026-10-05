@@ -159,6 +159,9 @@ public class GetRecentEmployeeChangesEndpointTests
                 gender = "Male",
                 employeeNumber = $"RC-{Guid.NewGuid():N}",
                 employmentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId,
                 locationId,
                 positionProfileId

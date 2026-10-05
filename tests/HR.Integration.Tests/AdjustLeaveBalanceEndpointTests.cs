@@ -290,6 +290,9 @@ public class AdjustLeaveBalanceEndpointTests
                 gender = "Male",
                 employeeNumber = $"BAL-{Guid.NewGuid():N}",
                 employmentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId,
                 locationId,
                 positionProfileId

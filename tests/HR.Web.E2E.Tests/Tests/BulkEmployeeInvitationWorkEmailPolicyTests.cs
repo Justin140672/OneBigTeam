@@ -175,6 +175,9 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
                 gender = "Male",
                 employeeNumber = $"E2E-WEP-{employeeNumberSuffix}",
                 employmentTypeId = EmploymentTypeId,
+                salary = 45000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 hasSystemAccess = true,
             });
         Assert.True(response.IsSuccessStatusCode,

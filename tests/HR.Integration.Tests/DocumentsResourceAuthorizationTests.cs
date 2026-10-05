@@ -465,6 +465,9 @@ public class DocumentsResourceAuthorizationTests(ApiWebApplicationFactory factor
                 gender = "Male",
                 employeeNumber = $"DEN-{unique}",
                 employmentTypeId = EmploymentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId = DepartmentId,
                 locationId = LocationId,
                 positionProfileId = PositionProfileId

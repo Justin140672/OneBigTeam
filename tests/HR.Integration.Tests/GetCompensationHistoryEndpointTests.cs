@@ -80,10 +80,14 @@ public class GetCompensationHistoryEndpointTests
 
         var payload = await response.Content.ReadFromJsonAsync<HistoryPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(2, payload!.Items.Count);
+        Assert.Equal(3, payload!.Items.Count);
 
         Assert.Equal(secondPayload!.Id, payload.Items[0].Id);
         Assert.True(payload.Items[0].EffectiveFrom > payload.Items[1].EffectiveFrom);
+        Assert.True(payload.Items[1].EffectiveFrom > payload.Items[2].EffectiveFrom);
+        Assert.Equal(CompensationTestHelpers.InitialStartDate, payload.Items[2].EffectiveFrom);
+        Assert.Equal(new DateOnly(2025, 12, 31), payload.Items[2].EffectiveTo);
+        Assert.Equal("NewHire", payload.Items[2].Reason);
 
         Assert.All(payload.Items, i => Assert.NotEqual(Guid.Empty, i.CreatedBy));
         Assert.Contains(payload.Items, i => i.Reason == "NewHire");

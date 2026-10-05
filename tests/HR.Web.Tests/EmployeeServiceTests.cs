@@ -41,7 +41,10 @@ public class EmployeeServiceTests
         County: null,
         PostCode: null,
         Country: null,
-        HasSystemAccess: true);
+        HasSystemAccess: true,
+        Salary: 45000m,
+        SalaryFrequency: "Annual",
+        Currency: "GBP");
 
     private static UpdateEmployeeProfileRequest SampleUpdateRequest() => new(
         CompanyId: Guid.NewGuid(),

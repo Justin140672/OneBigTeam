@@ -197,6 +197,7 @@ public sealed class EmployeeAssetsTabTests(HrAdminPersonaFixture fixture) : Role
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
         await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");

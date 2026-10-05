@@ -191,6 +191,9 @@ public class GetOffboardingOverviewEndpointTests
             gender = "Male",
             employeeNumber = $"OFB-{Guid.NewGuid():N}",
             employmentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             departmentId,
             locationId,
             positionProfileId

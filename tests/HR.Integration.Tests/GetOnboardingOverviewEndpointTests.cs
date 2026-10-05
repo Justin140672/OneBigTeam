@@ -184,6 +184,9 @@ public class GetOnboardingOverviewEndpointTests
             departmentId = refData.DepartmentId,
             locationId = refData.LocationId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             positionProfileId,
         };
 

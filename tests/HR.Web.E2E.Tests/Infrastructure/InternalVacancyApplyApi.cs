@@ -81,6 +81,9 @@ internal static class InternalVacancyApplyApi
                 gender = "Male",
                 employeeNumber,
                 employmentTypeId = EmploymentTypeId,
+                salary = 45000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 hasSystemAccess = true,
             });
         Assert.True(createResponse.IsSuccessStatusCode,

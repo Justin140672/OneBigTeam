@@ -1370,7 +1370,7 @@ public class CreateEmployeeHandlerTests
 
     private static CreateEmployeeRequest BuildRequestWithLookups(
         Guid companyId, Guid departmentId, Guid locationId, Guid positionProfileId, Guid employmentTypeId,
-        decimal? salary = null, string? salaryFrequency = null) => new()
+        decimal? salary = null, string? salaryFrequency = null, string? currency = null) => new()
     {
         AddressLine1 = "1 High Street",
         City = "London",
@@ -1390,6 +1390,7 @@ public class CreateEmployeeHandlerTests
         Gender = "Female",
         Salary = salary,
         SalaryFrequency = salaryFrequency,
+        Currency = currency,
     };
 
     [Theory]
@@ -1449,6 +1450,144 @@ public class CreateEmployeeHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Empty(await context.Compensations.ToListAsync());
+    }
+
+    [Theory]
+    [InlineData("gbp", "GBP")]
+    [InlineData(" eur ", "EUR")]
+    [InlineData("USD", "USD")]
+    [InlineData(null, "GBP")]
+    [InlineData("  ", "GBP")]
+    public async Task HandleAsync_Normalises_Compensation_Currency(string? currency, string expected)
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m, "Annual", currency),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(expected, (await context.Compensations.SingleAsync()).Currency);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Creates_Single_Compensation_Effective_From_StartDate_Attributed_To_Actor()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var actorId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 45.5m, "hourly", "eur")
+                with { ActorEmployeeId = actorId },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensation = Assert.Single(await context.Compensations.ToListAsync());
+        Assert.Equal(result.Value!.Id, compensation.EmployeeId);
+        Assert.Equal(companyId, compensation.CompanyId);
+        Assert.Equal(StartDate, compensation.EffectiveFrom);
+        Assert.Null(compensation.EffectiveTo);
+        Assert.Equal(SalaryType.Hourly, compensation.SalaryType);
+        Assert.Equal(45.5m, compensation.Salary);
+        Assert.Equal("EUR", compensation.Currency);
+        Assert.Equal(CompensationChangeReason.NewHire, compensation.Reason);
+        Assert.Equal(actorId, compensation.CreatedBy);
+        Assert.Null(compensation.Notes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Without_Actor_Attributes_Compensation_To_New_Employee_With_Offer_Note()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m, "Annual", "GBP"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensation = await context.Compensations.SingleAsync();
+        Assert.Equal(result.Value!.Id, compensation.CreatedBy);
+        Assert.Equal("Created from accepted recruitment offer.", compensation.Notes);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Employee_And_Compensation_In_One_Save_And_Enqueues_Compensation_Audit()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m, "Annual", "GBP")
+                with { ActorEmployeeId = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.False(context.ChangeTracker.HasChanges());
+        Assert.Single(await context.Employees.AsNoTracking().Where(e => e.Id == result.Value!.Id).ToListAsync());
+        var compensation = await context.Compensations.AsNoTracking().SingleAsync();
+        Assert.Equal(result.Value!.Id, compensation.EmployeeId);
+
+        var audit = Assert.Single(
+            await context.AuditOutboxEntries.Where(e => e.EventTypeName.Contains("CompensationRecordCreatedAuditEvent")).ToListAsync());
+        Assert.Contains(compensation.Id.ToString(), audit.PayloadJson, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Without_Salary_Enqueues_No_Compensation_Audit()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Empty(await context.Compensations.ToListAsync());
+        Assert.DoesNotContain(
+            await context.AuditOutboxEntries.ToListAsync(),
+            e => e.EventTypeName.Contains("CompensationRecordCreatedAuditEvent"));
+    }
+
+    [Fact]
+    public async Task HandleAsync_Idempotent_Replay_Does_Not_Create_Second_Compensation()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+        var request = BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m, "Annual", "GBP")
+            with { IdempotencyKey = Guid.NewGuid().ToString(), ActorEmployeeId = Guid.NewGuid() };
+
+        var first = await handler.HandleAsync(request, CancellationToken.None);
+        var second = await handler.HandleAsync(request, CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsSuccess);
+        Assert.Equal(first.Value!.Id, second.Value!.Id);
+        Assert.Single(await context.Employees.ToListAsync());
+        Assert.Single(await context.Compensations.ToListAsync());
+        Assert.Single(
+            await context.AuditOutboxEntries.Where(e => e.EventTypeName.Contains("CompensationRecordCreatedAuditEvent")).ToListAsync());
     }
 
     // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
@@ -1550,7 +1689,7 @@ public class CreateEmployeeHandlerTests
     // IIntegrationEventPublisher - so tests read the staged payload back instead of a fake publisher.
     private static async Task<EmployeeCreatedIntegrationEvent> SingleStagedEventAsync(EmployeesDbContext context)
     {
-        var entry = await context.AuditOutboxEntries.SingleAsync();
+        var entry = await context.AuditOutboxEntries.SingleAsync(e => e.EventTypeName.Contains(nameof(EmployeeCreatedIntegrationEvent)));
         Assert.Contains(nameof(EmployeeCreatedIntegrationEvent), entry.EventTypeName);
         return System.Text.Json.JsonSerializer.Deserialize<EmployeeCreatedIntegrationEvent>(entry.PayloadJson)!;
     }

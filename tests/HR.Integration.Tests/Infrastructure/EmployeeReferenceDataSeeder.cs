@@ -112,7 +112,10 @@ internal static class EmployeeReferenceDataSeeder
         Guid? managerId = null,
         string? addressLine1 = "1 Test Street",
         string? city = "London",
-        string? postCode = "SW1A 1AA") =>
+        string? postCode = "SW1A 1AA",
+        decimal salary = 50000m,
+        string salaryFrequency = "Annual",
+        string currency = "GBP") =>
         new
         {
             companyId,
@@ -132,6 +135,9 @@ internal static class EmployeeReferenceDataSeeder
             addressLine1,
             city,
             postCode,
+            salary,
+            salaryFrequency,
+            currency,
         };
 
     public static async Task SetEmployeeNumberModeManualAsync(HttpClient client, Guid companyId)

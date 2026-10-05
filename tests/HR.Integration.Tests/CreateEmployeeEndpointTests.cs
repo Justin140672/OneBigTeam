@@ -191,6 +191,9 @@ public class CreateEmployeeEndpointTests
             locationId = refData.LocationId,
             positionProfileId = pp!.Id,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             managerId = manager!.Id,
             firstName = "Alice",
@@ -256,6 +259,9 @@ public class CreateEmployeeEndpointTests
             locationId = refData.LocationId,
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
@@ -291,6 +297,9 @@ public class CreateEmployeeEndpointTests
             locationId,
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
@@ -329,6 +338,9 @@ public class CreateEmployeeEndpointTests
             locationId = Guid.NewGuid(),
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             firstName = "Alice",
             lastName = "Smith",
@@ -363,6 +375,9 @@ public class CreateEmployeeEndpointTests
             locationId = refData.LocationId,
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             managerId = Guid.NewGuid(),
             firstName = "Alice",
@@ -400,6 +415,9 @@ public class CreateEmployeeEndpointTests
             locationId = refData.LocationId,
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -457,6 +475,9 @@ public class CreateEmployeeEndpointTests
             locationId = refData.LocationId,
             positionProfileId = refData.PositionProfileId,
             employmentTypeId = refData.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -502,6 +523,9 @@ public class CreateEmployeeEndpointTests
                 locationId = refData.LocationId,
                 positionProfileId = refData.PositionProfileId,
                 employmentTypeId = refData.EmploymentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -552,6 +576,9 @@ public class CreateEmployeeEndpointTests
                 locationId = refData.LocationId,
                 positionProfileId = refData.PositionProfileId,
                 employmentTypeId = refData.EmploymentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -604,6 +631,9 @@ public class CreateEmployeeEndpointTests
             locationId = refDataA.LocationId,
             positionProfileId = refDataA.PositionProfileId,
             employmentTypeId = refDataA.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             firstName = "Alice",
             lastName = "Smith",
             workEmail = $"alice.{Guid.NewGuid():N}@example.com",
@@ -626,6 +656,9 @@ public class CreateEmployeeEndpointTests
             locationId = refDataB.LocationId,
             positionProfileId = refDataB.PositionProfileId,
             employmentTypeId = refDataB.EmploymentTypeId,
+            salary = 50000m,
+            salaryFrequency = "Annual",
+            currency = "GBP",
             firstName = "Bob",
             lastName = "Jones",
             workEmail = $"bob.{Guid.NewGuid():N}@example.com",
@@ -710,6 +743,268 @@ public class CreateEmployeeEndpointTests
         Assert.Equal(HttpStatusCode.Created, responseB.StatusCode);
     }
 
+    // -- Starting compensation ----------------------------------------------------------------
+
+    private async Task<(HttpClient Client, Guid CompanyId, EmployeeReferenceDataSeeder.ReferenceData RefData)> SetupHrClientAsync(Guid userId)
+    {
+        var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, userId.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.HrAdministrator, companyId);
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(client, companyId);
+        return (client, companyId, refData);
+    }
+
+    private static Dictionary<string, object?> ToBody(object request)
+    {
+        var json = System.Text.Json.JsonSerializer.Serialize(request);
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object?>>(json)!;
+    }
+
+    private async Task<int> CountCompensationsAsync(Guid companyId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        return await db.Compensations.CountAsync(c => c.CompanyId == companyId);
+    }
+
+    private async Task<int> CountEmployeesAsync(Guid companyId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
+        return await db.Employees.CountAsync(e => e.CompanyId == companyId);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Creates_Initial_NewHire_Compensation_Effective_From_StartDate()
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var startDate = new DateOnly(2020, 3, 15);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                startDate: startDate, salary: 61500.5m, salaryFrequency: "Annual", currency: "GBP"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var employee = (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
+
+        var currentResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/compensation/current");
+        Assert.Equal(HttpStatusCode.OK, currentResponse.StatusCode);
+        var current = (await currentResponse.Content.ReadFromJsonAsync<CurrentCompensationPayload>())!;
+        Assert.Equal(employee.Id, current.EmployeeId);
+        Assert.Equal(61500.5m, current.Salary);
+        Assert.Equal("GBP", current.Currency);
+        Assert.Equal("Annual", current.SalaryType);
+        Assert.Equal(startDate, current.EffectiveFrom);
+        Assert.Null(current.EffectiveTo);
+        Assert.Equal("NewHire", current.Reason);
+
+        var historyResponse = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/compensation/history");
+        historyResponse.EnsureSuccessStatusCode();
+        var history = (await historyResponse.Content.ReadFromJsonAsync<CompensationHistoryPayload>())!;
+        var record = Assert.Single(history.Items);
+        Assert.Equal(current.Id, record.Id);
+    }
+
+    [Theory]
+    [InlineData("Hourly", 18.75)]
+    [InlineData("Daily", 220)]
+    [InlineData("annual", 50000)]
+    public async Task Post_Employees_Persists_Requested_SalaryFrequency(string frequency, double salary)
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2020, 1, 1), salary: (decimal)salary, salaryFrequency: frequency));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var employee = (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
+
+        var current = await client.GetFromJsonAsync<CurrentCompensationPayload>(
+            $"/api/companies/{companyId}/employees/{employee.Id}/compensation/current");
+        Assert.Equal(char.ToUpperInvariant(frequency[0]) + frequency[1..].ToLowerInvariant(), current!.SalaryType);
+        Assert.Equal((decimal)salary, current.Salary);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Normalises_Currency_To_Upper_Case()
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2020, 1, 1), currency: "eur"));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var employee = (await response.Content.ReadFromJsonAsync<EmployeePayload>())!;
+
+        var current = await client.GetFromJsonAsync<CurrentCompensationPayload>(
+            $"/api/companies/{companyId}/employees/{employee.Id}/compensation/current");
+        Assert.Equal("EUR", current!.Currency);
+    }
+
+    [Theory]
+    [InlineData("salary")]
+    [InlineData("salaryFrequency")]
+    [InlineData("currency")]
+    public async Task Post_Employees_Rejects_Missing_Compensation_Field(string field)
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var body = ToBody(EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com"));
+        body.Remove(field);
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", body);
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity,
+            $"Expected a validation failure but got {response.StatusCode}.");
+        Assert.Contains(field, await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, await CountEmployeesAsync(companyId));
+        Assert.Equal(0, await CountCompensationsAsync(companyId));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-0.01)]
+    public async Task Post_Employees_Rejects_Zero_Or_Negative_Salary(double salary)
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var body = ToBody(EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+            salary: (decimal)salary));
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", body);
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity,
+            $"Expected a validation failure but got {response.StatusCode}.");
+        Assert.Contains("salary", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(0, await CountEmployeesAsync(companyId));
+        Assert.Equal(0, await CountCompensationsAsync(companyId));
+    }
+
+    [Fact]
+    public async Task Post_Employees_Accepts_Smallest_Positive_Salary()
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+                salary: 0.01m));
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Weekly")]
+    [InlineData("Monthly")]
+    [InlineData("99")]
+    public async Task Post_Employees_Rejects_Invalid_SalaryFrequency(string frequency)
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var body = ToBody(EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+            salaryFrequency: frequency));
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", body);
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity,
+            $"Expected a validation failure but got {response.StatusCode}.");
+        Assert.Equal(0, await CountEmployeesAsync(companyId));
+        Assert.Equal(0, await CountCompensationsAsync(companyId));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("GB")]
+    [InlineData("GBPX")]
+    public async Task Post_Employees_Rejects_Invalid_Currency(string currency)
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var body = ToBody(EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com",
+            currency: currency));
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", body);
+
+        Assert.True(
+            response.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.UnprocessableEntity,
+            $"Expected a validation failure but got {response.StatusCode}.");
+        Assert.Equal(0, await CountEmployeesAsync(companyId));
+        Assert.Equal(0, await CountCompensationsAsync(companyId));
+    }
+
+    [Fact]
+    public async Task Post_Employees_Failed_Creation_Leaves_No_Extra_Compensation_Record()
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var email = $"duplicate.{Guid.NewGuid():N}@example.com";
+
+        var first = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(companyId, refData, "Alice", "Smith", email));
+        first.EnsureSuccessStatusCode();
+        var firstEmployee = (await first.Content.ReadFromJsonAsync<EmployeePayload>())!;
+        Assert.Equal(1, await CountCompensationsAsync(companyId));
+
+        var second = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees",
+            EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+                companyId, refData, "Alice", "Smith", email, salary: 99999m));
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Equal(1, await CountEmployeesAsync(companyId));
+        Assert.Equal(1, await CountCompensationsAsync(companyId));
+
+        var history = (await client.GetFromJsonAsync<CompensationHistoryPayload>(
+            $"/api/companies/{companyId}/employees/{firstEmployee.Id}/compensation/history"))!;
+        var record = Assert.Single(history.Items);
+        Assert.Equal(50000m, record.Salary);
+    }
+
+    [Fact]
+    public async Task Post_Employees_Failed_Creation_With_Unknown_Department_Leaves_No_Compensation_Record()
+    {
+        var (client, companyId, refData) = await SetupHrClientAsync(User12);
+        using var _ = client;
+        var body = ToBody(EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
+            companyId, refData, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com"));
+        body["departmentId"] = Guid.NewGuid();
+
+        var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees", body);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(0, await CountEmployeesAsync(companyId));
+        Assert.Equal(0, await CountCompensationsAsync(companyId));
+    }
+
     // -- Idempotency-Key (ticket 3, P1 follow-up) --------------------------------------------
 
     private static HttpRequestMessage BuildIdempotentPostRequest(string url, object body, string idempotencyKey)
@@ -753,6 +1048,7 @@ public class CreateEmployeeEndpointTests
         var db = scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>();
         var employees = await db.Employees.Where(e => e.CompanyId == companyId).ToListAsync();
         Assert.Single(employees);
+        Assert.Equal(1, await CountCompensationsAsync(companyId));
     }
 
     [Fact]
@@ -787,6 +1083,19 @@ public class CreateEmployeeEndpointTests
     private sealed record DepartmentPayload(Guid Id);
     private sealed record PositionProfilePayload(Guid Id);
     private sealed record SettingsPayload(int NextEmployeeNumber);
+
+    private sealed record CurrentCompensationPayload(
+        Guid Id,
+        Guid EmployeeId,
+        DateOnly EffectiveFrom,
+        DateOnly? EffectiveTo,
+        string SalaryType,
+        decimal Salary,
+        string Currency,
+        string Reason);
+
+    private sealed record CompensationHistoryItemPayload(Guid Id, decimal Salary, string Reason);
+    private sealed record CompensationHistoryPayload(List<CompensationHistoryItemPayload> Items);
 
     private sealed record EmployeePayload(
         Guid Id,

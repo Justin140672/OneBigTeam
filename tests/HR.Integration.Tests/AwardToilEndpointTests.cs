@@ -184,6 +184,9 @@ public class AwardToilEndpointTests
                 gender = "Male",
                 employeeNumber = $"TOIL-{Guid.NewGuid():N}",
                 employmentTypeId,
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId,
                 locationId,
                 positionProfileId

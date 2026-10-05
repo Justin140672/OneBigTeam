@@ -11,6 +11,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -32,6 +35,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -53,6 +59,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -81,6 +90,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -109,6 +121,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -137,6 +152,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -165,6 +183,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -195,6 +216,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -219,6 +243,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -243,6 +270,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -270,6 +300,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -296,6 +329,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -317,6 +353,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -338,6 +377,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -359,6 +401,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -382,6 +427,9 @@ public class CreateEmployeeValidatorTests
         var localPart = new string('a', 310);
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -404,6 +452,9 @@ public class CreateEmployeeValidatorTests
         var localPart = new string('a', 310);
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -426,6 +477,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -448,6 +502,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -476,6 +533,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -500,6 +560,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -524,6 +587,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -548,6 +614,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -572,6 +641,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -596,6 +668,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -627,6 +702,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -662,6 +740,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -694,6 +775,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -719,6 +803,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -744,6 +831,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",
@@ -765,6 +855,123 @@ public class CreateEmployeeValidatorTests
         Assert.True(result.IsValid);
     }
 
+    private static CreateEmployeeRequest ValidRequest() => new()
+    {
+        AddressLine1 = "1 High Street",
+        City = "London",
+        PostCode = "SW1A 1AA",
+        CompanyId = Guid.NewGuid(),
+        DepartmentId = Guid.NewGuid(),
+        LocationId = Guid.NewGuid(),
+        PositionProfileId = Guid.NewGuid(),
+        EmploymentTypeId = Guid.NewGuid(),
+        EmployeeNumber = "EMP-0001",
+        FirstName = "Alice",
+        LastName = "Smith",
+        WorkEmail = "alice@example.com",
+        StartDate = new DateOnly(2026, 7, 1),
+        DateOfBirth = new DateOnly(1990, 5, 20),
+        Nationality = "British",
+        Gender = "Female",
+        Salary = 50000m,
+        SalaryFrequency = "Annual",
+        Currency = "GBP"
+    };
+
+    [Fact]
+    public void Validate_Passes_For_Valid_Request_Helper()
+    {
+        Assert.True(new CreateEmployeeValidator().Validate(ValidRequest()).IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Salary_Is_Missing()
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { Salary = null });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.Salary));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    [InlineData(-0.01)]
+    public void Validate_Fails_When_Salary_Is_Zero_Or_Negative(double salary)
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { Salary = (decimal)salary });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.Salary));
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Salary_Is_Smallest_Positive_Value()
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { Salary = 0.01m });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("Monthly")]
+    [InlineData("Weekly")]
+    [InlineData("99")]
+    [InlineData("0")]
+    [InlineData("1")]
+    public void Validate_Fails_When_SalaryFrequency_Is_Missing_Or_Invalid(string? frequency)
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { SalaryFrequency = frequency });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.SalaryFrequency));
+    }
+
+    [Theory]
+    [InlineData("Annual")]
+    [InlineData("annual")]
+    [InlineData("HOURLY")]
+    [InlineData("hourly")]
+    [InlineData("Daily")]
+    [InlineData("dAiLy")]
+    public void Validate_Passes_For_Valid_SalaryFrequency_Case_Insensitively(string frequency)
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { SalaryFrequency = frequency });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("GB")]
+    [InlineData("GBPP")]
+    [InlineData("POUNDS")]
+    [InlineData("G1P")]
+    [InlineData("123")]
+    public void Validate_Fails_When_Currency_Is_Missing_Or_Not_Three_Characters(string? currency)
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { Currency = currency });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(CreateEmployeeRequest.Currency));
+    }
+
+    [Theory]
+    [InlineData("GBP")]
+    [InlineData("eur")]
+    [InlineData("Usd")]
+    public void Validate_Passes_For_Three_Letter_Currency(string currency)
+    {
+        var result = new CreateEmployeeValidator().Validate(ValidRequest() with { Currency = currency });
+
+        Assert.True(result.IsValid);
+    }
+
     [Fact]
     public void Validate_Passes_For_Valid_Full_Request()
     {
@@ -772,6 +979,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            Salary = 50000m,
+            SalaryFrequency = "Annual",
+            Currency = "GBP",
             AddressLine1 = "1 High Street",
             City = "London",
             PostCode = "SW1A 1AA",

@@ -204,7 +204,9 @@ public class CrossTenantResourceIsolationTests
         var history = await clientA.GetFromJsonAsync<JsonElement>(
             $"/api/companies/{companyA}/employees/{employeeA}/compensation/history");
         Assert.DoesNotContain("99999", history.GetRawText());
-        Assert.Empty(history.GetProperty("items").EnumerateArray());
+        var remaining = Assert.Single(history.GetProperty("items").EnumerateArray());
+        Assert.Equal("NewHire", remaining.GetProperty("reason").GetString());
+        Assert.Equal(50000m, remaining.GetProperty("salary").GetDecimal());
     }
 
     private static async Task<bool> BulkReportedSuccessForAsync(HttpResponseMessage response, Guid employeeId)

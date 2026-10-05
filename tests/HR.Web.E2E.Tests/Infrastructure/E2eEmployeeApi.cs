@@ -73,6 +73,9 @@ public static class E2eEmployeeApi
                 gender = "Male",
                 employeeNumber,
                 employmentTypeId = EmploymentTypeId,
+                salary = 45000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 hasSystemAccess = true,
             });
         Assert.True(response.IsSuccessStatusCode,

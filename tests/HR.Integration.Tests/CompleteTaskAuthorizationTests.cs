@@ -305,6 +305,9 @@ public class CompleteTaskAuthorizationTests(ApiWebApplicationFactory factory)
                 gender = "Male",
                 employeeNumber = $"EN-{unique}",
                 employmentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001"),
+                salary = 50000m,
+                salaryFrequency = "Annual",
+                currency = "GBP",
                 departmentId = Guid.Parse("10000000-0000-0000-0000-000000000001"),
                 locationId = Guid.Parse("70000000-0000-0000-0000-000000000001"),
                 positionProfileId = Guid.Parse("20000000-0000-0000-0000-000000000002")

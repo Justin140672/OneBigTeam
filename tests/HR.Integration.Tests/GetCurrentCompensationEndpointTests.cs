@@ -76,7 +76,7 @@ public class GetCurrentCompensationEndpointTests
     }
 
     [Fact]
-    public async Task Get_CurrentCompensation_Returns_NotFound_When_Employee_Has_No_Compensation_Record()
+    public async Task Get_CurrentCompensation_Returns_NotFound_When_Employee_Has_No_Compensation_Record_Effective_Today()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -84,7 +84,7 @@ public class GetCurrentCompensationEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
 
-        var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId);
+        var employeeId = await CompensationTestHelpers.CreateEmployeeAsync(client, companyId, new DateOnly(2099, 1, 1));
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/compensation/current");
@@ -93,7 +93,7 @@ public class GetCurrentCompensationEndpointTests
     }
 
     [Fact]
-    public async Task Get_CurrentCompensation_Returns_NotFound_When_Only_Future_Dated_Record_Exists()
+    public async Task Get_CurrentCompensation_Ignores_Future_Dated_Record_And_Returns_Initial_Record()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -112,14 +112,19 @@ public class GetCurrentCompensationEndpointTests
                 salaryType = "Annual",
                 salary = 55000m,
                 currency = "GBP",
-                reason = "NewHire"
+                reason = "AnnualReview"
             });
         createResponse.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/compensation/current");
 
-        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<CurrentCompensationPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(50000m, payload!.Salary);
+        Assert.Equal("NewHire", payload.Reason);
+        Assert.Equal(CompensationTestHelpers.InitialStartDate, payload.EffectiveFrom);
     }
 
     private sealed record CurrentCompensationPayload(
