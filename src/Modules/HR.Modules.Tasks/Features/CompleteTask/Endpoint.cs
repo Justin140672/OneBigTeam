@@ -46,6 +46,17 @@ internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser current
                 return;
             }
 
+            if (result.Error.Details is not null)
+            {
+                await Send.ResultAsync(TypedResults.Conflict(new
+                {
+                    error = result.Error.Message,
+                    code = result.Error.Code,
+                    details = result.Error.Details,
+                }));
+                return;
+            }
+
             await Send.ResultAsync(TypedResults.Conflict(businessError));
             return;
         }

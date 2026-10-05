@@ -44,6 +44,8 @@ internal sealed class CompleteTaskHandler(
             ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
             : null;
 
+        CompleteTaskResponse? storedResponse = null;
+
         if (request.IdempotencyKey is { } precheckKey)
         {
             var replay = await dbContext.TryReplayAsync<IdempotencyRecord, CompleteTaskResponse>(
@@ -52,7 +54,8 @@ internal sealed class CompleteTaskHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
-                    return Result.Success(replay.Response!);
+                    storedResponse = replay.Response!;
+                    break;
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<CompleteTaskResponse>(
                         Error.Conflict("This Idempotency-Key was already used for a different request."));
@@ -79,6 +82,9 @@ internal sealed class CompleteTaskHandler(
             return Result.Failure<CompleteTaskResponse>(
                 Error.Forbidden("You are not authorized to complete this task."));
 
+        if (storedResponse is not null)
+            return await LiveReplayAsync(task.CompanyId, task.Id, storedResponse, cancellationToken);
+
         if (task.Status == TaskItemStatus.Cancelled)
             return Result.Failure<CompleteTaskResponse>(
                 Error.Conflict("Cannot complete a cancelled task."));
@@ -96,6 +102,7 @@ internal sealed class CompleteTaskHandler(
         var wasAlreadyCompleted = task.Status == TaskItemStatus.Completed;
 
         var now = clock.UtcNowOffset();
+        TaskCompletionOperation? existingOperation = null;
 
         // Ticket 3 (P1): validate/execute the underlying business action BEFORE the task is marked
         // Completed and saved. A previous version completed the task first, then discovered
@@ -111,6 +118,33 @@ internal sealed class CompleteTaskHandler(
         // DispatchApplied (business action + TaskItem completion both committed, side effects still
         // pending/retrying), or Processed (fully applied).
         TaskCompletionOperation? operation = null;
+
+        if (wasAlreadyCompleted)
+        {
+            var existing = await dbContext.TaskCompletionOperations.AsNoTracking()
+                .Where(o => o.TaskId == task.Id && o.Status != TaskCompletionOperation.StatusRejected)
+                .OrderByDescending(o => o.CreatedAt)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (existing is null)
+            {
+                logger.LogInformation(
+                    "CompleteTaskHandler: task {TaskId} (company {CompanyId}) is already completed and has no completion operation (legacy task); no effects are replayed.",
+                    task.Id, task.CompanyId);
+            }
+            else
+            {
+                existingOperation = existing;
+
+                if (existing.IsTerminalFailure)
+                {
+                    logger.LogError(
+                        "CompleteTaskHandler: completion retry for task {TaskId} (company {CompanyId}) hit terminal operation {OperationId} ({Status}, FailureCategory={FailureCategory}); operator action required.",
+                        task.Id, task.CompanyId, existing.Id, existing.Status, existing.FailureCategory);
+                    return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.TerminalConflict(existing));
+                }
+            }
+        }
 
         if (!wasAlreadyCompleted)
         {
@@ -151,6 +185,14 @@ internal sealed class CompleteTaskHandler(
                 }
             }
 
+            if (operation.IsTerminalFailure)
+            {
+                logger.LogError(
+                    "CompleteTaskHandler: completion operation {OperationId} for task {TaskId} (company {CompanyId}) is in terminal state {Status} (FailureCategory={FailureCategory}) and requires operator action.",
+                    operation.Id, task.Id, task.CompanyId, operation.Status, operation.FailureCategory);
+                return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.TerminalConflict(operation));
+            }
+
             if (operation.Status == TaskCompletionOperation.StatusPending)
             {
                 var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
@@ -184,6 +226,9 @@ internal sealed class CompleteTaskHandler(
         // decision/reason that was actually dispatched.
         task.Complete(operation?.CompletedBy ?? request.CompletedBy, now);
 
+        operation?.CaptureCompletionSnapshot(
+            task.AssignedEmployeeId, task.Title, task.Description, previousStatus, task.CompletedAt ?? now, now);
+
         var response = new CompleteTaskResponse(
             task.Id,
             task.CompanyId,
@@ -199,7 +244,8 @@ internal sealed class CompleteTaskHandler(
             task.CompletedBy,
             task.CompletedAt,
             task.CreatedAt,
-            task.UpdatedAt);
+            task.UpdatedAt,
+            CompletionStatusMapper.EffectsPending);
 
         if (request.IdempotencyKey is { } key)
         {
@@ -208,7 +254,7 @@ internal sealed class CompleteTaskHandler(
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
             {
-                return Result.Success(outcome.Response!);
+                return await LiveReplayAsync(task.CompanyId, task.Id, outcome.Response!, cancellationToken);
             }
         }
         else
@@ -218,7 +264,9 @@ internal sealed class CompleteTaskHandler(
 
         if (wasAlreadyCompleted)
         {
-            return Result.Success(response);
+            return existingOperation is null
+                ? Result.Success(response with { EffectsStatus = null })
+                : CompletionStatusMapper.Map(response, existingOperation);
         }
 
         // Ticket 4 (P1): the business action and the TaskItem's Completed transition are already
@@ -263,6 +311,29 @@ internal sealed class CompleteTaskHandler(
                 job => job.ProcessAsync(operation.Id, task.CompanyId));
         }
 
-        return Result.Success(response);
+        try
+        {
+            return await LiveReplayAsync(task.CompanyId, task.Id, response, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "CompleteTaskHandler: could not re-read completion operation {OperationId}; reporting effects as pending.",
+                operation!.Id);
+            return Result.Success(response);
+        }
+    }
+
+    private async Task<Result<CompleteTaskResponse>> LiveReplayAsync(
+        Guid companyId, Guid taskId, CompleteTaskResponse stored, CancellationToken cancellationToken)
+    {
+        var current = await dbContext.TaskCompletionOperations.AsNoTracking()
+            .Where(o => o.CompanyId == companyId && o.TaskId == taskId && o.Status != TaskCompletionOperation.StatusRejected)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return current is null
+            ? Result.Success(stored with { EffectsStatus = null, ResolutionType = null })
+            : CompletionStatusMapper.Map(stored, current);
     }
 }

@@ -15,4 +15,6 @@ internal sealed record CompleteTaskResponse(
     Guid? CompletedBy,
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    string? EffectsStatus = null,
+    string? ResolutionType = null);
