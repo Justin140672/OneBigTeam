@@ -38,8 +38,7 @@ internal sealed class PositionConfiguration : IEntityTypeConfiguration<Position>
             .HasMaxLength(200)
             .IsRequired();
 
-        builder.HasIndex(p => new { p.TenantId, p.NormalizedName })
-            .IsUnique();
+        builder.HasIndex(p => new { p.TenantId, p.NormalizedName });
 
         builder.Property(p => p.IsActive)
             .HasColumnName("is_active")
