@@ -451,13 +451,6 @@ namespace HR.Modules.Companies.Migrations
                         .HasDefaultValue(365)
                         .HasColumnName("weekday_pattern_window_days");
 
-                    b.PrimitiveCollection<string[]>("WorkEmailAdditionalDomains")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("text[]")
-                        .HasColumnName("work_email_additional_domains")
-                        .HasDefaultValueSql("'{}'::text[]");
-
                     b.Property<string>("WorkEmailNamingConvention")
                         .IsRequired()
                         .ValueGeneratedOnAdd()

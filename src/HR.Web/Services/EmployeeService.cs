@@ -69,12 +69,11 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
     }
 
     public async Task<WorkEmailSuggestionResponse?> GetWorkEmailSuggestionAsync(
-        Guid companyId, string? firstName, string? lastName, string? domain, CancellationToken ct = default)
+        Guid companyId, string? firstName, string? lastName, CancellationToken ct = default)
     {
         var query = HttpUtility.ParseQueryString(string.Empty);
         query["firstName"] = firstName?.Trim() ?? string.Empty;
         query["lastName"] = lastName?.Trim() ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(domain)) query["domain"] = domain.Trim();
 
         try
         {

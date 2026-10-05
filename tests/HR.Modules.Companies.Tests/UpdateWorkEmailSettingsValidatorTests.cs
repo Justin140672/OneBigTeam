@@ -12,7 +12,6 @@ public class UpdateWorkEmailSettingsValidatorTests
         CompanyId = Guid.NewGuid(),
         SuggestionsEnabled = true,
         PrimaryDomain = "example.com",
-        AdditionalDomains = ["alt.example.com"],
         NamingConvention = WorkEmailNamingConvention.FirstNameDotLastName,
         Version = 1,
     };
@@ -101,41 +100,5 @@ public class UpdateWorkEmailSettingsValidatorTests
     public void Validate_Passes_When_PrimaryDomain_Needs_Normalisation(string primary)
     {
         Assert.True(_validator.Validate(ValidRequest() with { PrimaryDomain = primary }).IsValid);
-    }
-
-    [Fact]
-    public void Validate_Fails_When_An_Additional_Domain_Is_Invalid()
-    {
-        var result = _validator.Validate(ValidRequest() with { AdditionalDomains = ["good.com", "bad_domain"] });
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void Validate_Fails_When_An_Additional_Domain_Is_Blank()
-    {
-        var result = _validator.Validate(ValidRequest() with { AdditionalDomains = ["   "] });
-        Assert.False(result.IsValid);
-    }
-
-    [Fact]
-    public void Validate_Passes_When_AdditionalDomains_Is_Null_Or_Empty()
-    {
-        Assert.True(_validator.Validate(ValidRequest() with { AdditionalDomains = null }).IsValid);
-        Assert.True(_validator.Validate(ValidRequest() with { AdditionalDomains = [] }).IsValid);
-    }
-
-    [Fact]
-    public void Validate_Passes_At_Maximum_Additional_Domains()
-    {
-        var domains = Enumerable.Range(0, WorkEmailAddressBuilder.MaxAdditionalDomains).Select(i => $"d{i}.example.com").ToList();
-        Assert.True(_validator.Validate(ValidRequest() with { AdditionalDomains = domains }).IsValid);
-    }
-
-    [Fact]
-    public void Validate_Fails_When_Additional_Domains_Exceed_Maximum()
-    {
-        var domains = Enumerable.Range(0, WorkEmailAddressBuilder.MaxAdditionalDomains + 1).Select(i => $"d{i}.example.com").ToList();
-        var result = _validator.Validate(ValidRequest() with { AdditionalDomains = domains });
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateWorkEmailSettingsRequest.AdditionalDomains));
     }
 }

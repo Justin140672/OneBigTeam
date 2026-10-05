@@ -75,7 +75,6 @@ internal static class StagingCompanySeeder
         settings.UpdateWorkEmailSettings(
             suggestionsEnabled: true,
             options.ResolvedEmailDomain,
-            additionalDomains: null,
             WorkEmailNamingConvention.FirstNameDotLastName,
             now);
 }

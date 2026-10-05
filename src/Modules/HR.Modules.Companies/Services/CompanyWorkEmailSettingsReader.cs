@@ -18,7 +18,6 @@ internal sealed class CompanyWorkEmailSettingsReader(CompaniesDbContext dbContex
         return new CompanyWorkEmailSettings(
             settings.WorkEmailSuggestionsEnabled,
             settings.WorkEmailPrimaryDomain,
-            settings.WorkEmailAdditionalDomains,
             settings.WorkEmailNamingConvention);
     }
 }

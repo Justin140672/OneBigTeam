@@ -12,7 +12,6 @@ internal static class WorkEmailTestHelper
         Guid companyId,
         bool enabled = true,
         string? primaryDomain = "example.com",
-        string[]? additionalDomains = null,
         string convention = "FirstNameDotLastName")
     {
         var current = await client.GetFromJsonAsync<VersionPayload>($"/api/companies/{companyId}/work-email-settings");
@@ -21,7 +20,6 @@ internal static class WorkEmailTestHelper
         {
             suggestionsEnabled = enabled,
             primaryDomain,
-            additionalDomains = additionalDomains ?? [],
             namingConvention = convention,
             version = current!.Version,
         });

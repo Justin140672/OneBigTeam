@@ -10,14 +10,6 @@ namespace HR.Modules.Companies.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string[]>(
-                name: "work_email_additional_domains",
-                schema: "companies",
-                table: "company_settings",
-                type: "text[]",
-                nullable: false,
-                defaultValueSql: "'{}'::text[]");
-
             migrationBuilder.AddColumn<string>(
                 name: "work_email_naming_convention",
                 schema: "companies",
@@ -47,11 +39,6 @@ namespace HR.Modules.Companies.Migrations
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropColumn(
-                name: "work_email_additional_domains",
-                schema: "companies",
-                table: "company_settings");
-
             migrationBuilder.DropColumn(
                 name: "work_email_naming_convention",
                 schema: "companies",

@@ -803,6 +803,8 @@ public class CreateEmployeeEndpointTests
         Assert.Equal(startDate, current.EffectiveFrom);
         Assert.Null(current.EffectiveTo);
         Assert.Equal("NewHire", current.Reason);
+        Assert.True(current.HoursPerWeek > 0m);
+        Assert.True(current.FTE > 0m);
 
         var historyResponse = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employee.Id}/compensation/history");
@@ -1092,7 +1094,9 @@ public class CreateEmployeeEndpointTests
         string SalaryType,
         decimal Salary,
         string Currency,
-        string Reason);
+        string Reason,
+        decimal? HoursPerWeek,
+        decimal? FTE);
 
     private sealed record CompensationHistoryItemPayload(Guid Id, decimal Salary, string Reason);
     private sealed record CompensationHistoryPayload(List<CompensationHistoryItemPayload> Items);

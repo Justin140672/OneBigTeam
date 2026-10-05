@@ -19,18 +19,17 @@ public class CompanyWorkEmailSettingsReaderTests
         Assert.Equal(CompanyWorkEmailSettings.Default, settings);
         Assert.True(settings.SuggestionsEnabled);
         Assert.Null(settings.PrimaryDomain);
-        Assert.Empty(settings.AllDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstNameDotLastName, settings.NamingConvention);
     }
 
     [Fact]
-    public async Task GetWorkEmailSettingsAsync_Returns_Configured_Values_With_Primary_Domain_First()
+    public async Task GetWorkEmailSettingsAsync_Returns_Configured_Values()
     {
         await using var context = BuildContext();
         var now = DateTimeOffset.UtcNow;
         var company = Company.Create(Guid.NewGuid(), "Acme", now);
         var companySettings = CompanySettings.CreateDefault(company.Id, now);
-        companySettings.UpdateWorkEmailSettings(true, "example.com", ["alt.com"], WorkEmailNamingConvention.FirstName, now);
+        companySettings.UpdateWorkEmailSettings(true, "example.com", WorkEmailNamingConvention.FirstName, now);
         company.SetSettings(companySettings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -40,8 +39,6 @@ public class CompanyWorkEmailSettingsReaderTests
 
         Assert.True(settings.SuggestionsEnabled);
         Assert.Equal("example.com", settings.PrimaryDomain);
-        Assert.Equal(["alt.com"], settings.AdditionalDomains);
-        Assert.Equal(["example.com", "alt.com"], settings.AllDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstName, settings.NamingConvention);
     }
 
@@ -52,7 +49,7 @@ public class CompanyWorkEmailSettingsReaderTests
         var now = DateTimeOffset.UtcNow;
         var company = Company.Create(Guid.NewGuid(), "Acme", now);
         var companySettings = CompanySettings.CreateDefault(company.Id, now);
-        companySettings.UpdateWorkEmailSettings(true, "example.com", [], WorkEmailNamingConvention.FirstName, now);
+        companySettings.UpdateWorkEmailSettings(true, "example.com", WorkEmailNamingConvention.FirstName, now);
         company.SetSettings(companySettings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();

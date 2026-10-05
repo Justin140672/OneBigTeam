@@ -73,6 +73,43 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
     }
 
     [Fact]
+    public async Task CreateEmployee_ShowsCalculatedHoursAndFte_OnEmploymentTab()
+    {
+        var unique   = Guid.NewGuid().ToString("N")[..8];
+        var lastName = $"HoursFte{unique}";
+
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync($"e2e.hoursfte{unique}@acme.example");
+        await empEdit.FillRequiredAddressAsync();
+        await empEdit.FillRequiredCompensationAsync();
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+        await empEdit.SaveNewEmployeeAsync();
+
+        await empList.ClickEmployeeAsync(lastName);
+        await empEdit.OpenEmploymentTabAsync();
+
+        await Assertions.Expect(empEdit.CurrentHoursValue).ToContainTextAsync("hrs/week");
+        await Assertions.Expect(empEdit.CurrentFteValue).ToContainTextAsync("%");
+    }
+
+    [Fact]
     public async Task EditEmployee_ClearingRequiredAddressFields_ShowsFieldErrors_AndDoesNotSave()
     {
         var login   = new LoginPage(_page, _fixture.WebBaseUrl);
@@ -171,6 +208,32 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         var departmentText = await empEdit.GetSelectedDepartmentTextAsync();
         Assert.False(string.IsNullOrWhiteSpace(departmentText),
             "Expected the Department dropdown to be pre-populated from the selected position profile");
+    }
+
+    [Fact]
+    public async Task CreateEmployee_SelectingPositionProfile_ClearsDepartmentAndLocationErrors()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.ClickSaveButtonAsync();
+
+        await Assertions.Expect(empEdit.DepartmentError).ToBeVisibleAsync(new() { Timeout = 15_000 });
+        await Assertions.Expect(empEdit.LocationError).ToBeVisibleAsync(new() { Timeout = 15_000 });
+
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+
+        Assert.True(await empEdit.HasPositionProfileDefaultsSummaryAsync(),
+            "Expected the 'From Position Profile' defaults summary card to appear after selecting a profile");
+        await Assertions.Expect(empEdit.DepartmentError).ToHaveCountAsync(0);
+        await Assertions.Expect(empEdit.LocationError).ToHaveCountAsync(0);
     }
 
     [Fact]

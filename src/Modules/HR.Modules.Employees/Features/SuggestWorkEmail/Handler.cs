@@ -15,27 +15,21 @@ internal sealed class SuggestWorkEmailHandler(
     {
         var settings = await settingsReader.GetWorkEmailSettingsAsync(request.CompanyId, cancellationToken);
 
-        var domains = settings.AllDomains;
-        if (domains.Count == 0)
-            return Result.Success(new SuggestWorkEmailResponse(WorkEmailSuggestionStatus.NotConfigured, null, null, []));
+        if (string.IsNullOrEmpty(settings.PrimaryDomain))
+            return Result.Success(new SuggestWorkEmailResponse(WorkEmailSuggestionStatus.NotConfigured, null));
 
         if (!settings.SuggestionsEnabled)
-            return Result.Success(new SuggestWorkEmailResponse(WorkEmailSuggestionStatus.Disabled, null, null, []));
-
-        var requestedDomain = WorkEmailAddressBuilder.NormalizeDomain(request.Domain);
-        var selectedDomain = requestedDomain is not null && domains.Contains(requestedDomain)
-            ? requestedDomain
-            : domains[0];
+            return Result.Success(new SuggestWorkEmailResponse(WorkEmailSuggestionStatus.Disabled, null));
 
         var suggestion = WorkEmailAddressBuilder.BuildAddress(
             settings.NamingConvention,
             request.FirstName,
             request.LastName,
-            selectedDomain);
+            settings.PrimaryDomain);
 
         if (suggestion is null)
             return Result.Success(new SuggestWorkEmailResponse(
-                WorkEmailSuggestionStatus.NameIncomplete, null, selectedDomain, domains));
+                WorkEmailSuggestionStatus.NameIncomplete, null));
 
         var isTaken = await dbContext.Employees
             .AsNoTracking()
@@ -43,8 +37,6 @@ internal sealed class SuggestWorkEmailHandler(
 
         return Result.Success(new SuggestWorkEmailResponse(
             isTaken ? WorkEmailSuggestionStatus.Unavailable : WorkEmailSuggestionStatus.Available,
-            suggestion,
-            selectedDomain,
-            domains));
+            suggestion));
     }
 }

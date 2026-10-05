@@ -11,7 +11,6 @@ public class SuggestWorkEmailValidatorTests
         CompanyId = Guid.NewGuid(),
         FirstName = "Jane",
         LastName = "Smith",
-        Domain = "example.com",
     };
 
     [Fact]
@@ -21,10 +20,10 @@ public class SuggestWorkEmailValidatorTests
     }
 
     [Fact]
-    public void Validate_Passes_When_Names_And_Domain_Are_Null_Or_Whitespace()
+    public void Validate_Passes_When_Names_Are_Null_Or_Whitespace()
     {
-        Assert.True(_validator.Validate(ValidRequest() with { FirstName = null, LastName = null, Domain = null }).IsValid);
-        Assert.True(_validator.Validate(ValidRequest() with { FirstName = "  ", LastName = "  ", Domain = "  " }).IsValid);
+        Assert.True(_validator.Validate(ValidRequest() with { FirstName = null, LastName = null }).IsValid);
+        Assert.True(_validator.Validate(ValidRequest() with { FirstName = "  ", LastName = "  " }).IsValid);
     }
 
     [Fact]
@@ -58,18 +57,5 @@ public class SuggestWorkEmailValidatorTests
     {
         var result = _validator.Validate(ValidRequest() with { LastName = new string('a', 101) });
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(SuggestWorkEmailRequest.LastName));
-    }
-
-    [Fact]
-    public void Validate_Passes_When_Domain_Is_At_Maximum_Length()
-    {
-        Assert.True(_validator.Validate(ValidRequest() with { Domain = new string('a', 253) }).IsValid);
-    }
-
-    [Fact]
-    public void Validate_Fails_When_Domain_Exceeds_Maximum_Length()
-    {
-        var result = _validator.Validate(ValidRequest() with { Domain = new string('a', 254) });
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(SuggestWorkEmailRequest.Domain));
     }
 }

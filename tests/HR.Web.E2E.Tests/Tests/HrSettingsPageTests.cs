@@ -420,7 +420,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainInput).ToBeVisibleAsync();
         await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainLabel).ToContainTextAsync("*");
         await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainInput).Not.ToHaveValueAsync("");
-        await Assertions.Expect(hrSettings.WorkEmailAdditionalDomainsInput).ToBeVisibleAsync();
         await Assertions.Expect(hrSettings.WorkEmailExample).ToHaveAttributeAsync("aria-live", "polite");
         await Assertions.Expect(hrSettings.WorkEmailSaveButton).ToBeVisibleAsync();
     }
@@ -474,7 +473,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
         var initialEnabled = await hrSettings.IsWorkEmailSuggestionsEnabledAsync();
         var initialPrimary = await hrSettings.GetWorkEmailPrimaryDomainAsync();
-        var initialAdditional = await hrSettings.GetWorkEmailAdditionalDomainsAsync();
         var initialConvention = await hrSettings.GetWorkEmailConventionAsync();
 
         try
@@ -489,7 +487,6 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             await hrSettings.SelectWorkEmailConventionAsync("firstnamelastname");
             Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
 
-            await hrSettings.SetWorkEmailAdditionalDomainsAsync("Alt.E2E-Beta.Example.com, other.example.org");
             await hrSettings.SaveWorkEmailSettingsAsync();
 
             await Assertions.Expect(hrSettings.WorkEmailSaved).ToBeVisibleAsync();
@@ -500,16 +497,13 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
 
             Assert.True(await hrSettings.IsWorkEmailSuggestionsEnabledAsync());
             Assert.Equal("e2e-beta.example.com", await hrSettings.GetWorkEmailPrimaryDomainAsync());
-            Assert.Equal(
-                "alt.e2e-beta.example.com\nother.example.org",
-                (await hrSettings.GetWorkEmailAdditionalDomainsAsync()).Replace("\r\n", "\n").Trim());
             Assert.Equal("firstnamelastname", await hrSettings.GetWorkEmailConventionAsync());
             Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
         }
         finally
         {
             await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
-            await hrSettings.ConfigureWorkEmailAsync(initialEnabled, initialPrimary, initialAdditional, initialConvention);
+            await hrSettings.ConfigureWorkEmailAsync(initialEnabled, initialPrimary, initialConvention);
         }
     }
 

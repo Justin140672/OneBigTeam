@@ -279,14 +279,6 @@
                                             }
                                         </div>
                                         <div class="col-md-6">
-                                            <HrTextField Id="hr-work-email-additional-domains" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
-                                                         Label="Additional email domains"
-                                                         Value="@_weAdditionalDomains"
-                                                         ValueChanged="@OnWeAdditionalDomainsChanged"
-                                                         Multiline="true" Rows="3"
-                                                         HelpText="Optional. Separate domains with commas or new lines." />
-                                        </div>
-                                        <div class="col-md-6">
                                             <HrDropDownField Id="hr-work-email-convention" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
                                                              TValue="WorkEmailNamingConvention" TItem="WorkEmailConventionOption"
                                                              Label="Naming convention" Required="true" AllowFiltering="false"
@@ -431,7 +423,6 @@
 
     private bool _weEnabled;
     private string _wePrimaryDomain = string.Empty;
-    private string _weAdditionalDomains = string.Empty;
     private WorkEmailNamingConvention _weConvention = WorkEmailNamingConvention.FirstNameDotLastName;
     private int _weVersion;
     private List<WorkEmailConventionExampleModel> _weExamples = [];
@@ -442,16 +433,11 @@
     private string? _workEmailSuccess;
 
     private string WorkEmailSnapshot() =>
-        string.Join('|', _weEnabled, _wePrimaryDomain.Trim(), string.Join(',', ParseAdditionalDomains()), _weConvention);
+        string.Join('|', _weEnabled, _wePrimaryDomain.Trim(), _weConvention);
 
     private bool WorkEmailDirty => WorkEmailSnapshot() != _weBaseline;
 
     protected override bool HasUnsavedChanges => base.HasUnsavedChanges || WorkEmailDirty;
-
-    private List<string> ParseAdditionalDomains() =>
-        _weAdditionalDomains
-            .Split([',', ';', '\n', '\r', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .ToList();
 
     private string WorkEmailExample
     {
@@ -481,8 +467,6 @@
     private string? ValidateWorkEmail() =>
         string.IsNullOrWhiteSpace(_wePrimaryDomain.Trim().TrimStart('@')) ? PrimaryDomainRequiredMessage : null;
 
-    private void OnWeAdditionalDomainsChanged(string? v) { _weAdditionalDomains = v ?? string.Empty; ClearWorkEmailMessages(); }
-
     private void OnWeConventionChanged(WorkEmailNamingConvention v) { _weConvention = v; ClearWorkEmailMessages(); }
 
     private void ClearWorkEmailMessages()
@@ -493,11 +477,10 @@
         _wePrimaryDomainError = null;
     }
 
-    private void ApplyWorkEmailSettings(bool enabled, string? primary, IEnumerable<string> additional, WorkEmailNamingConvention convention, int version)
+    private void ApplyWorkEmailSettings(bool enabled, string? primary, WorkEmailNamingConvention convention, int version)
     {
         _weEnabled = enabled;
         _wePrimaryDomain = primary ?? string.Empty;
-        _weAdditionalDomains = string.Join(Environment.NewLine, additional);
         _weConvention = convention;
         _weVersion = version;
         _weBaseline = WorkEmailSnapshot();
@@ -510,7 +493,7 @@
             return;
 
         _weExamples = settings.Examples;
-        ApplyWorkEmailSettings(settings.SuggestionsEnabled, settings.PrimaryDomain, settings.AdditionalDomains, settings.NamingConvention, settings.Version);
+        ApplyWorkEmailSettings(settings.SuggestionsEnabled, settings.PrimaryDomain, settings.NamingConvention, settings.Version);
     }
 
     private async Task ReloadWorkEmailAsync()
@@ -542,7 +525,7 @@
         try
         {
             var request = new UpdateWorkEmailSettingsRequest(
-                _weEnabled, FormText.Optional(_wePrimaryDomain), ParseAdditionalDomains(), _weConvention, _weVersion);
+                _weEnabled, FormText.Optional(_wePrimaryDomain), _weConvention, _weVersion);
             var (response, result) = await CompanyService.UpdateWorkEmailSettingsAsync(Id, request);
             if (!result.Success || response is null)
             {
@@ -550,7 +533,7 @@
                 return result.ErrorMessage ?? "Failed to save work email settings.";
             }
 
-            ApplyWorkEmailSettings(response.SuggestionsEnabled, response.PrimaryDomain, response.AdditionalDomains, response.NamingConvention, response.Version);
+            ApplyWorkEmailSettings(response.SuggestionsEnabled, response.PrimaryDomain, response.NamingConvention, response.Version);
             return null;
         }
         finally

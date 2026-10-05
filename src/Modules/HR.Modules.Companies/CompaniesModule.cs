@@ -151,7 +151,7 @@ public static class CompaniesModule
     {
         if (settings.WorkEmailPrimaryDomain is null)
         {
-            settings.UpdateWorkEmailSettings(true, domain, null, WorkEmailNamingConvention.FirstNameDotLastName, now);
+            settings.UpdateWorkEmailSettings(true, domain, WorkEmailNamingConvention.FirstNameDotLastName, now);
         }
     }
 

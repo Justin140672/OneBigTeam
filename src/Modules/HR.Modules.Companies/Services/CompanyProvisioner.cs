@@ -29,7 +29,6 @@ internal sealed class CompanyProvisioner(
         settings.UpdateWorkEmailSettings(
             suggestionsEnabled: true,
             primaryDomain,
-            additionalDomains: null,
             WorkEmailAddressBuilder.InferNamingConvention(admin.Email, admin.FirstName, admin.LastName),
             now);
         company.SetSettings(settings, now);

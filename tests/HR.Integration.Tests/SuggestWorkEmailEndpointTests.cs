@@ -32,12 +32,12 @@ public class SuggestWorkEmailEndpointTests
         return client;
     }
 
-    private static string Url(Guid companyId, string? firstName = "Jane", string? lastName = "Smith", string? domain = null)
+    private static string Url(Guid companyId, string? firstName = "Jane", string? lastName = "Smith")
     {
         var url = $"/api/companies/{companyId}/employees/work-email-suggestion" +
                   $"?firstName={Uri.EscapeDataString(firstName ?? string.Empty)}" +
                   $"&lastName={Uri.EscapeDataString(lastName ?? string.Empty)}";
-        return domain is null ? url : $"{url}&domain={Uri.EscapeDataString(domain)}";
+        return url;
     }
 
     [Fact]
@@ -97,36 +97,20 @@ public class SuggestWorkEmailEndpointTests
 
         Assert.Equal("Available", payload!.Status);
         Assert.Equal("jane.smith@example.com", payload.Suggestion);
-        Assert.Equal("example.com", payload.SelectedDomain);
-        Assert.Equal(["example.com"], payload.Domains);
     }
 
     [Fact]
-    public async Task Get_WorkEmailSuggestion_Uses_Selected_Additional_Domain_And_Convention()
+    public async Task Get_WorkEmailSuggestion_Uses_Configured_Naming_Convention()
     {
         var tenantId = Guid.NewGuid();
         using var client = await ClientFor(HrAdminUserId, tenantId);
         await WorkEmailTestHelper.ConfigureAsync(
-            client, tenantId, primaryDomain: "example.com", additionalDomains: ["alt.example.com"], convention: "FirstInitialDotLastName");
+            client, tenantId, primaryDomain: "example.com", convention: "FirstInitialDotLastName");
 
-        var payload = await client.GetFromJsonAsync<SuggestionPayload>(Url(tenantId, domain: "alt.example.com"));
+        var payload = await client.GetFromJsonAsync<SuggestionPayload>(Url(tenantId));
 
         Assert.Equal("Available", payload!.Status);
-        Assert.Equal("j.smith@alt.example.com", payload.Suggestion);
-        Assert.Equal(["example.com", "alt.example.com"], payload.Domains);
-    }
-
-    [Fact]
-    public async Task Get_WorkEmailSuggestion_Falls_Back_To_Primary_For_Unknown_Domain()
-    {
-        var tenantId = Guid.NewGuid();
-        using var client = await ClientFor(HrAdminUserId, tenantId);
-        await WorkEmailTestHelper.ConfigureAsync(client, tenantId, primaryDomain: "example.com");
-
-        var payload = await client.GetFromJsonAsync<SuggestionPayload>(Url(tenantId, domain: "unknown.com"));
-
-        Assert.Equal("jane.smith@example.com", payload!.Suggestion);
-        Assert.Equal("example.com", payload.SelectedDomain);
+        Assert.Equal("j.smith@example.com", payload.Suggestion);
     }
 
     [Fact]
@@ -171,5 +155,5 @@ public class SuggestWorkEmailEndpointTests
         Assert.Equal("jane.smith@example.com", payload.Suggestion);
     }
 
-    private sealed record SuggestionPayload(string Status, string? Suggestion, string? SelectedDomain, string[] Domains);
+    private sealed record SuggestionPayload(string Status, string? Suggestion);
 }

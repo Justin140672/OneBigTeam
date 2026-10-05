@@ -86,7 +86,7 @@ public class StagingCompanySeederWorkEmailTests
         var company = Company.Create(StagingSeedOptions.CompanyId, "Staging Demo Ltd", Now);
         var settings = CompanySettings.CreateDefault(company.Id, Now);
         if (domain is not null)
-            settings.UpdateWorkEmailSettings(false, domain, null, WorkEmailNamingConvention.FirstName, Now);
+            settings.UpdateWorkEmailSettings(false, domain, WorkEmailNamingConvention.FirstName, Now);
         company.SetSettings(settings, Now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();

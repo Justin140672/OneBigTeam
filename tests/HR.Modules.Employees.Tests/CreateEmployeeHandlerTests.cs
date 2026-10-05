@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Features.CreateEmployee;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -1453,6 +1454,54 @@ public class CreateEmployeeHandlerTests
         Assert.Equal(CompensationChangeReason.NewHire, compensation.Reason);
         Assert.Equal(result.Value.Id, compensation.CreatedBy);
     }
+
+    [Fact]
+    public async Task HandleAsync_Calculates_HoursPerWeek_And_Fte_From_Company_Default_Pattern()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var handler = BuildHandlerWithWorkingPattern(context);
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensation = await context.Compensations.SingleAsync();
+        Assert.Equal(37.5m, compensation.HoursPerWeek);
+        Assert.Equal(1m, compensation.FTE);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Calculates_Fte_From_Position_Profile_Working_Pattern_Override()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+        var (departmentId, locationId, positionProfileId, employmentTypeId) = await SeedMandatoryLookupsAsync(context, companyId, now);
+        var profile = await context.PositionProfiles.SingleAsync(p => p.Id == positionProfileId);
+        context.Entry(profile).Property(p => p.WorkingDaysOverride).CurrentValue =
+            WorkingDays.Monday | WorkingDays.Tuesday | WorkingDays.Wednesday;
+        context.Entry(profile).Property(p => p.HoursPerDayOverride).CurrentValue = 7.5m;
+        await context.SaveChangesAsync();
+        var handler = BuildHandlerWithWorkingPattern(context);
+
+        var result = await handler.HandleAsync(
+            BuildRequestWithLookups(companyId, departmentId, locationId, positionProfileId, employmentTypeId, 52000m),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var compensation = await context.Compensations.SingleAsync();
+        Assert.Equal(22.5m, compensation.HoursPerWeek);
+        Assert.Equal(0.6m, compensation.FTE);
+    }
+
+    private static CreateEmployeeHandler BuildHandlerWithWorkingPattern(EmployeesDbContext context) =>
+        new(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(),
+            new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator(),
+            workingPatternCalculator: new WorkingPatternCompensationCalculator(new FakeCompanyWorkingPatternSettingsReader()));
 
     [Fact]
     public async Task HandleAsync_Does_Not_Create_Compensation_When_Offer_Salary_Is_Null()

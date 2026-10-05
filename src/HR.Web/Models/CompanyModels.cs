@@ -164,7 +164,6 @@ public record GetWorkEmailSettingsResponse(
     Guid CompanyId,
     bool SuggestionsEnabled,
     string? PrimaryDomain,
-    List<string> AdditionalDomains,
     WorkEmailNamingConvention NamingConvention,
     string ExampleFirstName,
     string ExampleLastName,
@@ -175,7 +174,6 @@ public record GetWorkEmailSettingsResponse(
 public record UpdateWorkEmailSettingsRequest(
     bool SuggestionsEnabled,
     string? PrimaryDomain,
-    List<string> AdditionalDomains,
     WorkEmailNamingConvention NamingConvention,
     int Version);
 
@@ -183,7 +181,6 @@ public record UpdateWorkEmailSettingsResponse(
     Guid CompanyId,
     bool SuggestionsEnabled,
     string? PrimaryDomain,
-    List<string> AdditionalDomains,
     WorkEmailNamingConvention NamingConvention,
     DateTimeOffset UpdatedAt,
     int Version);

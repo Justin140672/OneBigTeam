@@ -8,7 +8,6 @@ internal sealed record GetWorkEmailSettingsResponse(
     Guid CompanyId,
     bool SuggestionsEnabled,
     string? PrimaryDomain,
-    IReadOnlyList<string> AdditionalDomains,
     WorkEmailNamingConvention NamingConvention,
     string ExampleFirstName,
     string ExampleLastName,

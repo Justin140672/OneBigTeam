@@ -38,13 +38,11 @@ public class UpdateWorkEmailSettingsEndpointTests
     private static object Body(
         bool enabled = true,
         string? primaryDomain = "example.com",
-        string[]? additionalDomains = null,
         string convention = "FirstNameDotLastName",
         int version = 1) => new
     {
         suggestionsEnabled = enabled,
         primaryDomain,
-        additionalDomains = additionalDomains ?? [],
         namingConvention = convention,
         version,
     };
@@ -80,7 +78,6 @@ public class UpdateWorkEmailSettingsEndpointTests
 
         var response = await client.PutAsJsonAsync(Url(tenantId), Body(
             primaryDomain: " @Example.CO.uk ",
-            additionalDomains: ["Alt.Example.com", "@alt.example.com", "example.co.uk"],
             convention: "FirstInitialDotLastName"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -89,13 +86,11 @@ public class UpdateWorkEmailSettingsEndpointTests
         Assert.Equal(tenantId, payload!.CompanyId);
         Assert.True(payload.SuggestionsEnabled);
         Assert.Equal("example.co.uk", payload.PrimaryDomain);
-        Assert.Equal(["alt.example.com"], payload.AdditionalDomains);
         Assert.Equal("FirstInitialDotLastName", payload.NamingConvention);
         Assert.Equal(2, payload.Version);
 
         var reloaded = await client.GetFromJsonAsync<SettingsPayload>(Url(tenantId));
         Assert.Equal("example.co.uk", reloaded!.PrimaryDomain);
-        Assert.Equal(["alt.example.com"], reloaded.AdditionalDomains);
         Assert.Equal("FirstInitialDotLastName", reloaded.NamingConvention);
         Assert.Equal(2, reloaded.Version);
     }
@@ -124,17 +119,6 @@ public class UpdateWorkEmailSettingsEndpointTests
         using var client = await ClientFor(HrAdminUserId, tenantId);
 
         var response = await client.PutAsJsonAsync(Url(tenantId), Body(primaryDomain: primaryDomain));
-
-        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
-    }
-
-    [Fact]
-    public async Task Put_WorkEmailSettings_Rejects_Invalid_Additional_Domain()
-    {
-        var tenantId = Guid.NewGuid();
-        using var client = await ClientFor(HrAdminUserId, tenantId);
-
-        var response = await client.PutAsJsonAsync(Url(tenantId), Body(additionalDomains: ["good.com", "bad_domain"]));
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
     }
@@ -232,7 +216,6 @@ public class UpdateWorkEmailSettingsEndpointTests
         Guid CompanyId,
         bool SuggestionsEnabled,
         string? PrimaryDomain,
-        string[] AdditionalDomains,
         string NamingConvention,
         int Version);
 }

@@ -95,7 +95,6 @@ internal sealed class CompanySettings
     // created default row (before provisioning assigns one) and on legacy rows with no derivable domain.
     public bool WorkEmailSuggestionsEnabled { get; private set; }
     public string? WorkEmailPrimaryDomain { get; private set; }
-    public string[] WorkEmailAdditionalDomains { get; private set; } = [];
     public WorkEmailNamingConvention WorkEmailNamingConvention { get; private set; } = WorkEmailNamingConvention.FirstNameDotLastName;
 
     public DateTimeOffset CreatedAt { get; private set; }
@@ -156,7 +155,6 @@ internal sealed class CompanySettings
             DocumentReminderOffsetDays3 = 7,
             WorkEmailSuggestionsEnabled = true,
             WorkEmailPrimaryDomain = null,
-            WorkEmailAdditionalDomains = [],
             WorkEmailNamingConvention = WorkEmailNamingConvention.FirstNameDotLastName,
             CreatedAt = now,
             UpdatedAt = now,
@@ -294,7 +292,6 @@ internal sealed class CompanySettings
     public void UpdateWorkEmailSettings(
         bool suggestionsEnabled,
         string primaryDomain,
-        IEnumerable<string>? additionalDomains,
         WorkEmailNamingConvention namingConvention,
         DateTimeOffset now)
     {
@@ -307,12 +304,6 @@ internal sealed class CompanySettings
 
         WorkEmailSuggestionsEnabled = suggestionsEnabled;
         WorkEmailPrimaryDomain = primary;
-        WorkEmailAdditionalDomains = (additionalDomains ?? [])
-            .Select(WorkEmailAddressBuilder.NormalizeDomain)
-            .OfType<string>()
-            .Where(domain => domain != primary)
-            .Distinct()
-            .ToArray();
         WorkEmailNamingConvention = namingConvention;
         UpdatedAt = now;
         Version++;

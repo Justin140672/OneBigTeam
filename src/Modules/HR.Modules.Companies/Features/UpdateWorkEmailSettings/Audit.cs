@@ -5,7 +5,6 @@ namespace HR.Modules.Companies.Features.UpdateWorkEmailSettings;
 internal sealed record WorkEmailSettingsAuditSnapshot(
     bool SuggestionsEnabled,
     string? PrimaryDomain,
-    IReadOnlyList<string> AdditionalDomains,
     string NamingConvention);
 
 internal sealed record WorkEmailSettingsUpdatedAuditEvent(

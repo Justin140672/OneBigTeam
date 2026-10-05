@@ -17,7 +17,6 @@ public class UpdateWorkEmailSettingsHandlerTests
         CompanyId = companyId,
         SuggestionsEnabled = true,
         PrimaryDomain = "@Example.COM",
-        AdditionalDomains = ["alt.example.com", "ALT.example.com", "example.com"],
         NamingConvention = WorkEmailNamingConvention.FirstInitialDotLastName,
         Version = 1,
     };
@@ -61,7 +60,6 @@ public class UpdateWorkEmailSettingsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.SuggestionsEnabled);
         Assert.Equal("example.com", result.Value.PrimaryDomain);
-        Assert.Equal(["alt.example.com"], result.Value.AdditionalDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstInitialDotLastName, result.Value.NamingConvention);
         Assert.Equal(new DateTimeOffset(UpdateTime, TimeSpan.Zero), result.Value.UpdatedAt);
         Assert.Equal(2, result.Value.Version);
@@ -69,7 +67,6 @@ public class UpdateWorkEmailSettingsHandlerTests
         var saved = await context.CompanySettings.SingleAsync();
         Assert.True(saved.WorkEmailSuggestionsEnabled);
         Assert.Equal("example.com", saved.WorkEmailPrimaryDomain);
-        Assert.Equal(["alt.example.com"], saved.WorkEmailAdditionalDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstInitialDotLastName, saved.WorkEmailNamingConvention);
     }
 
@@ -91,11 +88,9 @@ public class UpdateWorkEmailSettingsHandlerTests
         Assert.NotNull(auditEvent.PreviousSettings);
         Assert.True(auditEvent.PreviousSettings!.SuggestionsEnabled);
         Assert.Null(auditEvent.PreviousSettings.PrimaryDomain);
-        Assert.Empty(auditEvent.PreviousSettings.AdditionalDomains);
 
         Assert.True(auditEvent.CurrentSettings.SuggestionsEnabled);
         Assert.Equal("example.com", auditEvent.CurrentSettings.PrimaryDomain);
-        Assert.Equal(["alt.example.com"], auditEvent.CurrentSettings.AdditionalDomains);
         Assert.Equal(nameof(WorkEmailNamingConvention.FirstInitialDotLastName), auditEvent.CurrentSettings.NamingConvention);
     }
 
@@ -135,7 +130,7 @@ public class UpdateWorkEmailSettingsHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Can_Disable_Suggestions_And_Clear_Additional_Domains_While_Keeping_Primary_Domain()
+    public async Task HandleAsync_Can_Disable_Suggestions_While_Keeping_Primary_Domain()
     {
         await using var context = BuildContext();
         var company = await SeedCompanyAsync(context);
@@ -147,7 +142,6 @@ public class UpdateWorkEmailSettingsHandlerTests
                 CompanyId = company.Id,
                 SuggestionsEnabled = false,
                 PrimaryDomain = "example.com",
-                AdditionalDomains = null,
                 NamingConvention = WorkEmailNamingConvention.FirstName,
                 Version = enabled.Value!.Version,
             },
@@ -156,7 +150,6 @@ public class UpdateWorkEmailSettingsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.False(result.Value!.SuggestionsEnabled);
         Assert.Equal("example.com", result.Value.PrimaryDomain);
-        Assert.Empty(result.Value.AdditionalDomains);
     }
 
     [Theory]

@@ -9,6 +9,5 @@ internal sealed class SuggestWorkEmailValidator : AbstractValidator<SuggestWorkE
         RuleFor(r => r.CompanyId).NotEmpty();
         RuleFor(r => r.FirstName).MaximumLength(100);
         RuleFor(r => r.LastName).MaximumLength(100);
-        RuleFor(r => r.Domain).MaximumLength(253);
     }
 }

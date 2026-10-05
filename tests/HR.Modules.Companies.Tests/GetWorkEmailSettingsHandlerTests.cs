@@ -36,7 +36,6 @@ public class GetWorkEmailSettingsHandlerTests
         Assert.Equal(company.Id, result.Value!.CompanyId);
         Assert.True(result.Value.SuggestionsEnabled);
         Assert.Null(result.Value.PrimaryDomain);
-        Assert.Empty(result.Value.AdditionalDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstNameDotLastName, result.Value.NamingConvention);
         Assert.Equal(1, result.Value.Version);
     }
@@ -48,7 +47,7 @@ public class GetWorkEmailSettingsHandlerTests
         var now = DateTimeOffset.UtcNow;
         var company = Company.Create(Guid.NewGuid(), "Acme", now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
-        settings.UpdateWorkEmailSettings(true, "example.com", ["alt.com"], WorkEmailNamingConvention.FirstNameLastName, now);
+        settings.UpdateWorkEmailSettings(true, "example.com", WorkEmailNamingConvention.FirstNameLastName, now);
         company.SetSettings(settings, now);
         context.Companies.Add(company);
         await context.SaveChangesAsync();
@@ -59,7 +58,6 @@ public class GetWorkEmailSettingsHandlerTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value!.SuggestionsEnabled);
         Assert.Equal("example.com", result.Value.PrimaryDomain);
-        Assert.Equal(["alt.com"], result.Value.AdditionalDomains);
         Assert.Equal(WorkEmailNamingConvention.FirstNameLastName, result.Value.NamingConvention);
         Assert.Equal(2, result.Value.Version);
     }

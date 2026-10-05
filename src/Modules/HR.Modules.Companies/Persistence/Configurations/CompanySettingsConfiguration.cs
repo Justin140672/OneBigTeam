@@ -256,12 +256,6 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .HasColumnName("work_email_primary_domain")
             .HasMaxLength(253);
 
-        builder.Property(settings => settings.WorkEmailAdditionalDomains)
-            .HasColumnName("work_email_additional_domains")
-            .HasColumnType("text[]")
-            .IsRequired()
-            .HasDefaultValueSql("'{}'::text[]");
-
         builder.Property(settings => settings.WorkEmailNamingConvention)
             .HasColumnName("work_email_naming_convention")
             .HasConversion<string>()

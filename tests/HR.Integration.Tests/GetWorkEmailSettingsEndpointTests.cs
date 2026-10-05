@@ -69,7 +69,6 @@ public class GetWorkEmailSettingsEndpointTests
         Assert.Equal(tenantId, payload!.CompanyId);
         Assert.True(payload.SuggestionsEnabled);
         Assert.Null(payload.PrimaryDomain);
-        Assert.Empty(payload.AdditionalDomains);
         Assert.Equal("FirstNameDotLastName", payload.NamingConvention);
         Assert.Equal("Jane", payload.ExampleFirstName);
         Assert.Equal("Smith", payload.ExampleLastName);
@@ -86,13 +85,12 @@ public class GetWorkEmailSettingsEndpointTests
         var tenantId = Guid.NewGuid();
         using var client = await ClientFor(HrAdminUserId, tenantId);
         await WorkEmailTestHelper.ConfigureAsync(
-            client, tenantId, primaryDomain: "example.com", additionalDomains: ["alt.example.com"], convention: "FirstNameLastName");
+            client, tenantId, primaryDomain: "example.com", convention: "FirstNameLastName");
 
         var payload = await client.GetFromJsonAsync<SettingsPayload>(Url(tenantId));
 
         Assert.True(payload!.SuggestionsEnabled);
         Assert.Equal("example.com", payload.PrimaryDomain);
-        Assert.Equal(["alt.example.com"], payload.AdditionalDomains);
         Assert.Equal("FirstNameLastName", payload.NamingConvention);
         Assert.Equal(2, payload.Version);
     }
@@ -114,7 +112,6 @@ public class GetWorkEmailSettingsEndpointTests
         Guid CompanyId,
         bool SuggestionsEnabled,
         string? PrimaryDomain,
-        string[] AdditionalDomains,
         string NamingConvention,
         string ExampleFirstName,
         string ExampleLastName,

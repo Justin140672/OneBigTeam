@@ -42,7 +42,6 @@ internal sealed class GetWorkEmailSettingsHandler(CompaniesDbContext dbContext)
             settings.CompanyId,
             settings.WorkEmailSuggestionsEnabled,
             settings.WorkEmailPrimaryDomain,
-            settings.WorkEmailAdditionalDomains,
             settings.WorkEmailNamingConvention,
             WorkEmailAddressBuilder.SampleFirstName,
             WorkEmailAddressBuilder.SampleLastName,

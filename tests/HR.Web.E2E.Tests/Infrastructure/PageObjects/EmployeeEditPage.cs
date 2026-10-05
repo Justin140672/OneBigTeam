@@ -624,6 +624,14 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
             await SelectNoManagerTopLevelAsync();
     }
 
+    public ILocator CurrentHoursValue => page.Locator("tr:has(> th:text-is('Hours')) > td").First;
+
+    public ILocator CurrentFteValue => page.Locator("tr:has(> th:text-is('FTE')) > td").First;
+
+    public ILocator DepartmentError => page.Locator("#emp-department-error").First;
+
+    public ILocator LocationError => page.Locator("#emp-location-error").First;
+
     public ILocator ManagerError => page.Locator("#emp-manager-error").First;
 
     public ILocator NoManagerWarning => page.Locator("#emp-manager-no-manager-warning");
@@ -631,16 +639,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public ILocator WorkEmailInput => page.GetByPlaceholder("work@company.com");
 
     public ILocator WorkEmailSuggestionStatus => page.Locator("#emp-work-email-suggestion-status");
-
-    public ILocator UseWorkEmailSuggestionButton => page.Locator("#emp-work-email-use-suggestion");
-
-    public ILocator WorkEmailSuggestionNote => page.Locator("#emp-work-email-suggestion-note");
-
-    public ILocator WorkEmailDomainField =>
-        page.Locator("div.mt-2").Filter(new() { Has = page.Locator("label[for='emp-work-email-domain']") }).First;
-
-    public Task SelectWorkEmailSuggestionDomainAsync(string domain) =>
-        DropDownSelector.SelectAsync(page, WorkEmailDomainField, domain);
 
     public Task<string> GetWorkEmailValueAsync() => WorkEmailInput.InputValueAsync();
 
@@ -1324,6 +1322,8 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         var bar = page.Locator(".progress .progress-bar");
         var value = await bar.GetAttributeAsync("aria-valuenow");
         return int.TryParse(value, out var percent) ? percent : 0;
+    }
+
     private ILocator OnboardingChecklistRow(string taskTitleFragment) =>
         page.Locator(".card").Filter(new() { HasText = "Onboarding Checklist" }).First
             .Locator("table tbody tr").Filter(new() { HasText = taskTitleFragment }).First;
@@ -1342,8 +1342,6 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     }
 
     public Task OpenDetailsTabAsync() => OpenSectionAsync("Details");
-
-    }
 
     public async Task<string?> GetOnboardingChecklistTaskStatusAsync(string taskTitleFragment)
     {

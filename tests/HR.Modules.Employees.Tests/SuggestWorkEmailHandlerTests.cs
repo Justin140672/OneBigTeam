@@ -13,16 +13,15 @@ public class SuggestWorkEmailHandlerTests
 
     private static CompanyWorkEmailSettings Enabled(
         string? primary = "example.com",
-        string[]? additional = null,
         WorkEmailNamingConvention convention = WorkEmailNamingConvention.FirstNameDotLastName) =>
-        new(true, primary, additional ?? [], convention);
+        new(true, primary, convention);
 
     private static SuggestWorkEmailHandler BuildHandler(EmployeesDbContext context, CompanyWorkEmailSettings? settings) =>
         new(context, new FakeCompanyWorkEmailSettingsReader(settings));
 
     private static SuggestWorkEmailRequest Request(
-        Guid companyId, string? first = "Jane", string? last = "Smith", string? domain = null) =>
-        new() { CompanyId = companyId, FirstName = first, LastName = last, Domain = domain };
+        Guid companyId, string? first = "Jane", string? last = "Smith") =>
+        new() { CompanyId = companyId, FirstName = first, LastName = last };
 
     private static async Task AddEmployeeAsync(EmployeesDbContext context, Guid companyId, string workEmail, string number = "EMP-0001")
     {
@@ -44,14 +43,13 @@ public class SuggestWorkEmailHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Equal(WorkEmailSuggestionStatus.NotConfigured, result.Value!.Status);
         Assert.Null(result.Value.Suggestion);
-        Assert.Empty(result.Value.Domains);
     }
 
     [Fact]
     public async Task HandleAsync_Returns_NotConfigured_Rather_Than_Disabled_When_Disabled_Without_A_Primary_Domain()
     {
         await using var context = BuildContext();
-        var settings = new CompanyWorkEmailSettings(false, null, [], WorkEmailNamingConvention.FirstNameDotLastName);
+        var settings = new CompanyWorkEmailSettings(false, null, WorkEmailNamingConvention.FirstNameDotLastName);
 
         var result = await BuildHandler(context, settings).HandleAsync(Request(Guid.NewGuid()), CancellationToken.None);
 
@@ -62,7 +60,7 @@ public class SuggestWorkEmailHandlerTests
     public async Task HandleAsync_Returns_Disabled_When_Disabled_Even_If_Domain_Is_Configured()
     {
         await using var context = BuildContext();
-        var settings = new CompanyWorkEmailSettings(false, "example.com", [], WorkEmailNamingConvention.FirstNameDotLastName);
+        var settings = new CompanyWorkEmailSettings(false, "example.com", WorkEmailNamingConvention.FirstNameDotLastName);
 
         var result = await BuildHandler(context, settings).HandleAsync(Request(Guid.NewGuid()), CancellationToken.None);
 
@@ -80,8 +78,6 @@ public class SuggestWorkEmailHandlerTests
 
         Assert.Equal(WorkEmailSuggestionStatus.NotConfigured, result.Value!.Status);
         Assert.Null(result.Value.Suggestion);
-        Assert.Null(result.Value.SelectedDomain);
-        Assert.Empty(result.Value.Domains);
     }
 
     [Theory]
@@ -101,8 +97,6 @@ public class SuggestWorkEmailHandlerTests
 
         Assert.Equal(WorkEmailSuggestionStatus.NameIncomplete, result.Value!.Status);
         Assert.Null(result.Value.Suggestion);
-        Assert.Equal("example.com", result.Value.SelectedDomain);
-        Assert.Equal(["example.com"], result.Value.Domains);
     }
 
     [Fact]
@@ -115,7 +109,6 @@ public class SuggestWorkEmailHandlerTests
 
         Assert.Equal(WorkEmailSuggestionStatus.Available, result.Value!.Status);
         Assert.Equal("jane.smith@example.com", result.Value.Suggestion);
-        Assert.Equal("example.com", result.Value.SelectedDomain);
     }
 
     [Theory]
@@ -194,65 +187,6 @@ public class SuggestWorkEmailHandlerTests
         var result = await BuildHandler(context, Enabled()).HandleAsync(Request(companyId), CancellationToken.None);
 
         Assert.Equal(WorkEmailSuggestionStatus.Available, result.Value!.Status);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Returns_All_Domains_Primary_First_And_Defaults_To_Primary()
-    {
-        await using var context = BuildContext();
-
-        var result = await BuildHandler(context, Enabled(additional: ["alt.example.com", "other.org"]))
-            .HandleAsync(Request(Guid.NewGuid()), CancellationToken.None);
-
-        Assert.Equal(["example.com", "alt.example.com", "other.org"], result.Value!.Domains);
-        Assert.Equal("example.com", result.Value.SelectedDomain);
-        Assert.Equal("jane.smith@example.com", result.Value.Suggestion);
-    }
-
-    [Theory]
-    [InlineData("alt.example.com")]
-    [InlineData("@ALT.Example.com")]
-    [InlineData("  alt.example.com  ")]
-    public async Task HandleAsync_Uses_Selected_Additional_Domain(string requested)
-    {
-        await using var context = BuildContext();
-
-        var result = await BuildHandler(context, Enabled(additional: ["alt.example.com"]))
-            .HandleAsync(Request(Guid.NewGuid(), domain: requested), CancellationToken.None);
-
-        Assert.Equal("alt.example.com", result.Value!.SelectedDomain);
-        Assert.Equal("jane.smith@alt.example.com", result.Value.Suggestion);
-    }
-
-    [Theory]
-    [InlineData("unknown.com")]
-    [InlineData("not a domain")]
-    [InlineData("")]
-    [InlineData("   ")]
-    public async Task HandleAsync_Falls_Back_To_Primary_When_Domain_Is_Not_Configured(string requested)
-    {
-        await using var context = BuildContext();
-
-        var result = await BuildHandler(context, Enabled(additional: ["alt.example.com"]))
-            .HandleAsync(Request(Guid.NewGuid(), domain: requested), CancellationToken.None);
-
-        Assert.Equal("example.com", result.Value!.SelectedDomain);
-        Assert.Equal("jane.smith@example.com", result.Value.Suggestion);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Availability_Depends_On_The_Selected_Domain()
-    {
-        await using var context = BuildContext();
-        var companyId = Guid.NewGuid();
-        await AddEmployeeAsync(context, companyId, "jane.smith@example.com");
-        var handler = BuildHandler(context, Enabled(additional: ["alt.example.com"]));
-
-        var primary = await handler.HandleAsync(Request(companyId), CancellationToken.None);
-        var alternative = await handler.HandleAsync(Request(companyId, domain: "alt.example.com"), CancellationToken.None);
-
-        Assert.Equal(WorkEmailSuggestionStatus.Unavailable, primary.Value!.Status);
-        Assert.Equal(WorkEmailSuggestionStatus.Available, alternative.Value!.Status);
     }
 
     [Fact]

@@ -779,6 +779,4 @@ public enum WorkEmailSuggestionStatus
 
 public record WorkEmailSuggestionResponse(
     WorkEmailSuggestionStatus Status,
-    string? Suggestion,
-    string? SelectedDomain,
-    List<string> Domains);
+    string? Suggestion);

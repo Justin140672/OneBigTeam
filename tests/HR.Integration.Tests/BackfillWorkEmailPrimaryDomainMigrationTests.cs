@@ -36,7 +36,7 @@ public class BackfillWorkEmailPrimaryDomainMigrationTests
         var company = Company.Create(companyId, $"Backfill-{companyId:N}", now);
         var settings = CompanySettings.CreateDefault(companyId, now);
         if (configuredDomain is not null)
-            settings.UpdateWorkEmailSettings(false, configuredDomain, null, WorkEmailNamingConvention.FirstName, now);
+            settings.UpdateWorkEmailSettings(false, configuredDomain, WorkEmailNamingConvention.FirstName, now);
         company.SetSettings(settings, now);
         companiesDb.Companies.Add(company);
         await companiesDb.SaveChangesAsync();

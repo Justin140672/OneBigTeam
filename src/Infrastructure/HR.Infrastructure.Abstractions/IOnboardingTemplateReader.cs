@@ -11,4 +11,8 @@ public interface IOnboardingTemplateReader
         Guid companyId,
         Guid positionProfileId,
         CancellationToken cancellationToken);
+
+    Task<Guid?> GetDefaultOnboardingTemplateIdAsync(
+        Guid companyId,
+        CancellationToken cancellationToken);
 }

@@ -13,7 +13,6 @@ public static partial class WorkEmailAddressBuilder
 {
     public const int MaxLocalPartLength = 64;
     public const int MaxDomainLength = 253;
-    public const int MaxAdditionalDomains = 10;
 
     public const string SampleFirstName = "Jane";
     public const string SampleLastName = "Smith";

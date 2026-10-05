@@ -364,8 +364,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     public ILocator WorkEmailPrimaryDomainError => page.Locator("#hr-work-email-primary-domain-error");
 
-    public ILocator WorkEmailAdditionalDomainsInput => page.Locator("#hr-work-email-additional-domains");
-
     public ILocator WorkEmailExample => page.Locator("#hr-work-email-example");
 
     public ILocator WorkEmailError => page.Locator("#hr-work-email-error");
@@ -412,19 +410,6 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return await WorkEmailPrimaryDomainInput.InputValueAsync();
     }
 
-    public async Task SetWorkEmailAdditionalDomainsAsync(string value)
-    {
-        await OpenWorkEmailTabAsync();
-        await WorkEmailAdditionalDomainsInput.FillAsync(value);
-        await page.Keyboard.PressAsync("Tab");
-    }
-
-    public async Task<string> GetWorkEmailAdditionalDomainsAsync()
-    {
-        await OpenWorkEmailTabAsync();
-        return await WorkEmailAdditionalDomainsInput.InputValueAsync();
-    }
-
     public async Task SelectWorkEmailConventionAsync(string conventionLabel)
     {
         await OpenWorkEmailTabAsync();
@@ -452,14 +437,12 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
     }
 
     public async Task ConfigureWorkEmailAsync(
-        bool enabled, string? primaryDomain = null, string? additionalDomains = null, string? conventionLabel = null)
+        bool enabled, string? primaryDomain = null, string? conventionLabel = null)
     {
         await OpenWorkEmailTabAsync();
         await SetWorkEmailSuggestionsEnabledAsync(enabled);
         if (primaryDomain is not null)
             await SetWorkEmailPrimaryDomainAsync(primaryDomain);
-        if (additionalDomains is not null)
-            await SetWorkEmailAdditionalDomainsAsync(additionalDomains);
         if (conventionLabel is not null)
             await SelectWorkEmailConventionAsync(conventionLabel);
         await SaveWorkEmailSettingsAsync();

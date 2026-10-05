@@ -11,6 +11,4 @@ internal enum WorkEmailSuggestionStatus
 
 internal sealed record SuggestWorkEmailResponse(
     WorkEmailSuggestionStatus Status,
-    string? Suggestion,
-    string? SelectedDomain,
-    IReadOnlyList<string> Domains);
+    string? Suggestion);

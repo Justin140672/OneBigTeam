@@ -37,7 +37,6 @@ internal sealed class UpdateWorkEmailSettingsHandler(
         settings.UpdateWorkEmailSettings(
             request.SuggestionsEnabled,
             request.PrimaryDomain ?? string.Empty,
-            request.AdditionalDomains,
             request.NamingConvention,
             now);
 
@@ -68,7 +67,6 @@ internal sealed class UpdateWorkEmailSettingsHandler(
             company.Id,
             settings.WorkEmailSuggestionsEnabled,
             settings.WorkEmailPrimaryDomain,
-            settings.WorkEmailAdditionalDomains,
             settings.WorkEmailNamingConvention,
             settings.UpdatedAt,
             settings.Version));
@@ -77,6 +75,5 @@ internal sealed class UpdateWorkEmailSettingsHandler(
     private static WorkEmailSettingsAuditSnapshot Snapshot(CompanySettings settings) => new(
         settings.WorkEmailSuggestionsEnabled,
         settings.WorkEmailPrimaryDomain,
-        settings.WorkEmailAdditionalDomains.ToArray(),
         settings.WorkEmailNamingConvention.ToString());
 }

@@ -105,7 +105,6 @@ public class CompanyProvisionerTests
         Assert.True(settings.WorkEmailSuggestionsEnabled);
         Assert.Equal(expectedDomain, settings.WorkEmailPrimaryDomain);
         Assert.Equal(expectedConvention, settings.WorkEmailNamingConvention);
-        Assert.Empty(settings.WorkEmailAdditionalDomains);
     }
 
     [Theory]

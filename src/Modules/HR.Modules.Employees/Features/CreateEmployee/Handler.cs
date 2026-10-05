@@ -27,6 +27,7 @@ internal sealed class CreateEmployeeHandler
     private readonly IIntegrationEventPublisher? _integrationPublisher;
     private readonly ILogger<CreateEmployeeHandler>? _logger;
     private readonly IExecutionContextAccessor? _executionContextAccessor;
+    private readonly WorkingPatternCompensationCalculator? _workingPatternCalculator;
 
     public CreateEmployeeHandler(
         EmployeesDbContext dbContext,
@@ -42,7 +43,8 @@ internal sealed class CreateEmployeeHandler
         // Optional for the same reason as the publishers above — when absent, EnqueueIntegrationOutbox
         // simply stamps no metadata (existing behaviour), rather than requiring every unit test to
         // supply one.
-        IExecutionContextAccessor? executionContextAccessor = null)
+        IExecutionContextAccessor? executionContextAccessor = null,
+        WorkingPatternCompensationCalculator? workingPatternCalculator = null)
     {
         _dbContext = dbContext;
         _clock = clock;
@@ -54,6 +56,7 @@ internal sealed class CreateEmployeeHandler
         _integrationPublisher = integrationPublisher;
         _logger = logger;
         _executionContextAccessor = executionContextAccessor;
+        _workingPatternCalculator = workingPatternCalculator;
     }
 
     public async Task<Result<CreateEmployeeResponse>> HandleAsync(
@@ -334,6 +337,17 @@ internal sealed class CreateEmployeeHandler
 
             var actorEmployeeId = request.ActorEmployeeId ?? employee.Id;
 
+            decimal? hoursPerWeek = null;
+            decimal? fte = null;
+            if (_workingPatternCalculator is not null)
+            {
+                (hoursPerWeek, fte) = await _workingPatternCalculator.CalculateAsync(
+                    request.CompanyId,
+                    positionProfile.WorkingDaysOverride,
+                    positionProfile.HoursPerDayOverride,
+                    cancellationToken);
+            }
+
             var compensation = Compensation.Create(
                 Guid.NewGuid(),
                 request.CompanyId,
@@ -342,8 +356,8 @@ internal sealed class CreateEmployeeHandler
                 salaryType,
                 request.Salary.Value,
                 currency,
-                hoursPerWeek: null,
-                fte: null,
+                hoursPerWeek,
+                fte,
                 notes: request.ActorEmployeeId is null ? "Created from accepted recruitment offer." : null,
                 CompensationChangeReason.NewHire,
                 createdBy: actorEmployeeId,

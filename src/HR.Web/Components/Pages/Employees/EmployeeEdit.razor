@@ -105,36 +105,12 @@
                                     <label class="form-label" for="emp-work-email">Work Email <span class="text-danger" aria-hidden="true">*</span></label>
                                     <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" HtmlAttributes="@WorkEmailAria()" />
                                     <ValidationMessage For="@(() => Model.WorkEmail)" id="emp-work-email-error" />
-                                    @if (_workEmailDomains.Count > 1)
-                                    {
-                                        <div class="mt-2">
-                                            <label class="form-label" for="emp-work-email-domain">Suggestion domain</label>
-                                            <SfDropDownList TValue="string" TItem="string"
-                                                            DataSource="@_workEmailDomains"
-                                                            Value="@_workEmailDomain"
-                                                            ValueChanged="@(EventCallback.Factory.Create<string>(this, OnWorkEmailDomainChangedAsync))"
-                                                            HtmlAttributes="@Aria("emp-work-email-domain", null, label: "Suggestion domain")">
-                                            </SfDropDownList>
-                                        </div>
-                                    }
                                     <div id="emp-work-email-suggestion-status" role="status" aria-live="polite" class="mt-1">
-                                        @if (ShowWorkEmailSuggestion)
-                                        {
-                                            <span class="me-2">@_workEmailSuggestion!.Suggestion</span>
-                                            <SfButton id="emp-work-email-use-suggestion" type="button"
-                                                      aria-label="@($"Use suggested work email {_workEmailSuggestion.Suggestion}")"
-                                                      aria-describedby="emp-work-email-suggestion-note"
-                                                      OnClick="UseWorkEmailSuggestion">Use suggestion</SfButton>
-                                        }
-                                        else if (ShowWorkEmailUnavailable)
+                                        @if (ShowWorkEmailUnavailable)
                                         {
                                             <span>@_workEmailSuggestion!.Suggestion is already in use. Enter a work email manually.</span>
                                         }
                                     </div>
-                                    @if (ShowWorkEmailSuggestion || ShowWorkEmailUnavailable)
-                                    {
-                                        <div id="emp-work-email-suggestion-note" class="form-text">Accepting a suggestion records the address in the HR system. It does not create the mailbox.</div>
-                                    }
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-personal-email">Personal Email</label>
@@ -313,16 +289,6 @@
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-md-4">
-                                    <label class="form-label" for="emp-salary-type">Salary Type <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <SfDropDownList TValue="string"
-                                                    TItem="AddCompensationDialog.SalaryTypeChoice"
-                                                    DataSource="@AddCompensationDialog.SalaryTypeOptions"
-                                                    @bind-Value="Model.SalaryType"
-                                                    HtmlAttributes="@Aria("emp-salary-type", "SalaryType", true, label: "Salary Type")">
-                                        <DropDownListFieldSettings Value="Value" Text="Label" />
-                                    </SfDropDownList>
-                                </div>
-                                <div class="col-md-4">
                                     <label class="form-label" for="emp-salary">Salary <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfNumericTextBox TValue="decimal?" @bind-Value="Model.Salary" Min="0" ShowSpinButton="false" Format="#,##0.##"
                                                       Placeholder="e.g. 45000" HtmlAttributes="@Aria("emp-salary", "Salary", true, label: "Salary")" />
@@ -332,6 +298,16 @@
                                     <label class="form-label" for="emp-currency">Currency <span class="text-danger" aria-hidden="true">*</span></label>
                                     <HrTextBox @bind-Value="Model.Currency" Placeholder="e.g. GBP" HtmlAttributes="@Aria("emp-currency", "Currency", true, label: "Currency")" />
                                     <ValidationMessage For="@(() => Model.Currency)" id="emp-currency-error" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="emp-salary-type">Salary Type <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <SfDropDownList TValue="string"
+                                                    TItem="AddCompensationDialog.SalaryTypeChoice"
+                                                    DataSource="@AddCompensationDialog.SalaryTypeOptions"
+                                                    @bind-Value="Model.SalaryType"
+                                                    HtmlAttributes="@Aria("emp-salary-type", "SalaryType", true, label: "Salary Type")">
+                                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                                    </SfDropDownList>
                                 </div>
                             </div>
                             <p class="text-muted small mt-2 mb-0">Effective from the employee's start date.</p>
@@ -854,17 +830,6 @@
 
             <CancelLeavingProcessDialog IsOpen="_showCancelLeavingProcessDialog"
                                          CompanyId="CompanyId"
-    private bool ActiveSectionHasEditableFields =>
-        _activeSection is EmployeeProfileSection.Details or EmployeeProfileSection.Employment;
-
-    private IReadOnlyList<string> EmployeeNameVariants => _employee is null
-        ? []
-        :
-        [
-            PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName),
-            PersonName.Legal(_employee.FirstName, _employee.LastName)
-        ];
-
                                          EmployeeId="Id!.Value"
                                          ShowOffboardingTab="_showOffboardingTab"
                                          OnCancelled="CloseCancelLeavingProcessDialog"
@@ -888,6 +853,17 @@
     private string PageTitle => IsNew ? "Add Employee" : PersonName.Display(Model.FirstName, Model.LastName, Model.PreferredName);
 
     private GetEmployeeResponse? _employee;
+
+    private bool ActiveSectionHasEditableFields =>
+        _activeSection is EmployeeProfileSection.Details or EmployeeProfileSection.Employment;
+
+    private IReadOnlyList<string> EmployeeNameVariants => _employee is null
+        ? []
+        :
+        [
+            PersonName.Display(_employee.FirstName, _employee.LastName, _employee.PreferredName),
+            PersonName.Legal(_employee.FirstName, _employee.LastName)
+        ];
 
     private string CurrentPositionProfileTitle =>
         _positionProfiles.FirstOrDefault(p => p.Id == _employee?.PositionProfileId)?.Title ?? "—";
@@ -1281,34 +1257,18 @@
         return attrs;
     }
 
-    private Dictionary<string, object> WorkEmailAria()
-    {
-        var attrs = Aria("emp-work-email", "WorkEmail", true, label: "Work Email");
-        var describedBy = attrs.TryGetValue("aria-describedby", out var existing) ? $"{existing} " : string.Empty;
-        attrs["aria-describedby"] = describedBy + "emp-work-email-suggestion-note";
-        return attrs;
-    }
+    private Dictionary<string, object> WorkEmailAria() =>
+        Aria("emp-work-email", "WorkEmail", true, label: "Work Email");
 
     private WorkEmailSuggestionResponse? _workEmailSuggestion;
-    private List<string> _workEmailDomains = [];
-    private string? _workEmailDomain;
+    private string? _workEmailAutoFilled;
     private int _workEmailRequestId;
     private CancellationTokenSource? _workEmailCts;
-
-    private bool ShowWorkEmailSuggestion =>
-        _workEmailSuggestion is { Status: WorkEmailSuggestionStatus.Available, Suggestion: { Length: > 0 } suggestion }
-        && !string.Equals(Model.WorkEmail?.Trim(), suggestion, StringComparison.OrdinalIgnoreCase);
 
     private bool ShowWorkEmailUnavailable =>
         _workEmailSuggestion is { Status: WorkEmailSuggestionStatus.Unavailable, Suggestion: { Length: > 0 } };
 
     private Task OnNameChangedAsync() => RefreshWorkEmailSuggestionAsync();
-
-    private async Task OnWorkEmailDomainChangedAsync(string? domain)
-    {
-        _workEmailDomain = domain;
-        await RefreshWorkEmailSuggestionAsync();
-    }
 
     private async Task RefreshWorkEmailSuggestionAsync()
     {
@@ -1320,7 +1280,7 @@
         if (string.IsNullOrWhiteSpace(Model.FirstName) || string.IsNullOrWhiteSpace(Model.LastName))
         {
             _workEmailSuggestion = null;
-            _workEmailDomains = [];
+            ClearAutoFilledWorkEmail();
             return;
         }
 
@@ -1330,7 +1290,7 @@
         {
             await Task.Delay(250, cts.Token);
             result = await EmployeeService.GetWorkEmailSuggestionAsync(
-                CompanyId, Model.FirstName, Model.LastName, _workEmailDomain, cts.Token);
+                CompanyId, Model.FirstName, Model.LastName, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -1340,18 +1300,36 @@
         if (requestId != _workEmailRequestId) return;
 
         _workEmailSuggestion = result;
-        _workEmailDomains = result?.Domains ?? [];
-        _workEmailDomain = result?.SelectedDomain ?? _workEmailDomain;
+
+        if (!IsWorkEmailAutoFillable()) return;
+
+        if (result is { Status: WorkEmailSuggestionStatus.Available, Suggestion: { Length: > 0 } suggestion })
+        {
+            Model.WorkEmail = suggestion;
+            _workEmailAutoFilled = suggestion;
+            EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.WorkEmail)));
+        }
+        else
+        {
+            ClearAutoFilledWorkEmail();
+        }
     }
 
-    private async Task UseWorkEmailSuggestion()
-    {
-        if (_workEmailSuggestion?.Suggestion is not { Length: > 0 } suggestion) return;
+    private bool IsWorkEmailAutoFillable() =>
+        string.IsNullOrWhiteSpace(Model.WorkEmail)
+        || (_workEmailAutoFilled is not null && string.Equals(Model.WorkEmail, _workEmailAutoFilled, StringComparison.Ordinal));
 
-        Model.WorkEmail = suggestion;
-        EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.WorkEmail)));
-        StateHasChanged();
-        await JS.InvokeVoidAsync("hrFocusById", "emp-work-email");
+    private void ClearAutoFilledWorkEmail()
+    {
+        if (_workEmailAutoFilled is null) return;
+
+        if (string.Equals(Model.WorkEmail, _workEmailAutoFilled, StringComparison.Ordinal))
+        {
+            Model.WorkEmail = string.Empty;
+            EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.WorkEmail)));
+        }
+
+        _workEmailAutoFilled = null;
     }
 
     public override void Dispose()
@@ -1406,6 +1384,8 @@
             {
                 Model.DepartmentId = _selectedProfileDefaults.DepartmentId;
                 Model.LocationId = _selectedProfileDefaults.LocationId;
+                EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.DepartmentId)));
+                EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.LocationId)));
 
                 if (_selectedProfileDefaults.DefaultLeavePolicyId is Guid leavePolicyId)
                 {
