@@ -90,6 +90,14 @@ internal sealed class CompanySettings
     public int? DocumentReminderOffsetDays2 { get; private set; }
     public int? DocumentReminderOffsetDays3 { get; private set; }
 
+    // The primary domain and naming convention are mandatory once set: UpdateWorkEmailSettings rejects a
+    // missing/invalid domain, so the domain can never be cleared. It is null only on a freshly
+    // created default row (before provisioning assigns one) and on legacy rows with no derivable domain.
+    public bool WorkEmailSuggestionsEnabled { get; private set; }
+    public string? WorkEmailPrimaryDomain { get; private set; }
+    public string[] WorkEmailAdditionalDomains { get; private set; } = [];
+    public WorkEmailNamingConvention WorkEmailNamingConvention { get; private set; } = WorkEmailNamingConvention.FirstNameDotLastName;
+
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
 
@@ -146,6 +154,10 @@ internal sealed class CompanySettings
             DocumentReminderOffsetDays1 = 90,
             DocumentReminderOffsetDays2 = 30,
             DocumentReminderOffsetDays3 = 7,
+            WorkEmailSuggestionsEnabled = true,
+            WorkEmailPrimaryDomain = null,
+            WorkEmailAdditionalDomains = [],
+            WorkEmailNamingConvention = WorkEmailNamingConvention.FirstNameDotLastName,
             CreatedAt = now,
             UpdatedAt = now,
             Version = 1,
@@ -275,6 +287,33 @@ internal sealed class CompanySettings
         DocumentReminderOffsetDays1 = offsetDays1;
         DocumentReminderOffsetDays2 = offsetDays2;
         DocumentReminderOffsetDays3 = offsetDays3;
+        UpdatedAt = now;
+        Version++;
+    }
+
+    public void UpdateWorkEmailSettings(
+        bool suggestionsEnabled,
+        string primaryDomain,
+        IEnumerable<string>? additionalDomains,
+        WorkEmailNamingConvention namingConvention,
+        DateTimeOffset now)
+    {
+        var primary = WorkEmailAddressBuilder.NormalizeDomain(primaryDomain);
+        if (!WorkEmailAddressBuilder.IsValidDomain(primary))
+            throw new ArgumentException("A valid primary work email domain is required.", nameof(primaryDomain));
+
+        if (!Enum.IsDefined(namingConvention))
+            throw new ArgumentOutOfRangeException(nameof(namingConvention));
+
+        WorkEmailSuggestionsEnabled = suggestionsEnabled;
+        WorkEmailPrimaryDomain = primary;
+        WorkEmailAdditionalDomains = (additionalDomains ?? [])
+            .Select(WorkEmailAddressBuilder.NormalizeDomain)
+            .OfType<string>()
+            .Where(domain => domain != primary)
+            .Distinct()
+            .ToArray();
+        WorkEmailNamingConvention = namingConvention;
         UpdatedAt = now;
         Version++;
     }

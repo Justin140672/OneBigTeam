@@ -247,6 +247,28 @@ internal sealed class CompanySettingsConfiguration : IEntityTypeConfiguration<Co
             .IsRequired()
             .HasDefaultValue(730);
 
+        builder.Property(settings => settings.WorkEmailSuggestionsEnabled)
+            .HasColumnName("work_email_suggestions_enabled")
+            .IsRequired()
+            .HasDefaultValue(false);
+
+        builder.Property(settings => settings.WorkEmailPrimaryDomain)
+            .HasColumnName("work_email_primary_domain")
+            .HasMaxLength(253);
+
+        builder.Property(settings => settings.WorkEmailAdditionalDomains)
+            .HasColumnName("work_email_additional_domains")
+            .HasColumnType("text[]")
+            .IsRequired()
+            .HasDefaultValueSql("'{}'::text[]");
+
+        builder.Property(settings => settings.WorkEmailNamingConvention)
+            .HasColumnName("work_email_naming_convention")
+            .HasConversion<string>()
+            .HasMaxLength(40)
+            .IsRequired()
+            .HasDefaultValue(WorkEmailNamingConvention.FirstNameDotLastName);
+
         builder.Property(settings => settings.EmailNotificationsEnabled)
             .HasColumnName("email_notifications_enabled")
             .IsRequired()

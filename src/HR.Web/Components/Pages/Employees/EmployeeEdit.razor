@@ -55,12 +55,12 @@
                             <div class="row g-3">
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-first-name">First Name <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <HrTextBox @bind-Value="Model.FirstName" Placeholder="First name" HtmlAttributes="@Aria("emp-first-name", "FirstName", true, label: "First Name")" />
+                                    <HrTextBox @bind-Value="Model.FirstName" @bind-Value:after="OnNameChangedAsync" Placeholder="First name" HtmlAttributes="@Aria("emp-first-name", "FirstName", true, label: "First Name")" />
                                     <ValidationMessage For="@(() => Model.FirstName)" id="emp-first-name-error" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-last-name">Last Name <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <HrTextBox @bind-Value="Model.LastName" Placeholder="Last name" HtmlAttributes="@Aria("emp-last-name", "LastName", true, label: "Last Name")" />
+                                    <HrTextBox @bind-Value="Model.LastName" @bind-Value:after="OnNameChangedAsync" Placeholder="Last name" HtmlAttributes="@Aria("emp-last-name", "LastName", true, label: "Last Name")" />
                                     <ValidationMessage For="@(() => Model.LastName)" id="emp-last-name-error" />
                                 </div>
                                 <div class="col-md-6">
@@ -103,8 +103,38 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-work-email">Work Email <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" HtmlAttributes="@Aria("emp-work-email", "WorkEmail", true, label: "Work Email")" />
+                                    <HrTextBox @bind-Value="Model.WorkEmail" Placeholder="work@company.com" HtmlAttributes="@WorkEmailAria()" />
                                     <ValidationMessage For="@(() => Model.WorkEmail)" id="emp-work-email-error" />
+                                    @if (_workEmailDomains.Count > 1)
+                                    {
+                                        <div class="mt-2">
+                                            <label class="form-label" for="emp-work-email-domain">Suggestion domain</label>
+                                            <SfDropDownList TValue="string" TItem="string"
+                                                            DataSource="@_workEmailDomains"
+                                                            Value="@_workEmailDomain"
+                                                            ValueChanged="@(EventCallback.Factory.Create<string>(this, OnWorkEmailDomainChangedAsync))"
+                                                            HtmlAttributes="@Aria("emp-work-email-domain", null, label: "Suggestion domain")">
+                                            </SfDropDownList>
+                                        </div>
+                                    }
+                                    <div id="emp-work-email-suggestion-status" role="status" aria-live="polite" class="mt-1">
+                                        @if (ShowWorkEmailSuggestion)
+                                        {
+                                            <span class="me-2">@_workEmailSuggestion!.Suggestion</span>
+                                            <SfButton id="emp-work-email-use-suggestion" type="button"
+                                                      aria-label="@($"Use suggested work email {_workEmailSuggestion.Suggestion}")"
+                                                      aria-describedby="emp-work-email-suggestion-note"
+                                                      OnClick="UseWorkEmailSuggestion">Use suggestion</SfButton>
+                                        }
+                                        else if (ShowWorkEmailUnavailable)
+                                        {
+                                            <span>@_workEmailSuggestion!.Suggestion is already in use. Enter a work email manually.</span>
+                                        }
+                                    </div>
+                                    @if (ShowWorkEmailSuggestion || ShowWorkEmailUnavailable)
+                                    {
+                                        <div id="emp-work-email-suggestion-note" class="form-text">Accepting a suggestion records the address in the HR system. It does not create the mailbox.</div>
+                                    }
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-personal-email">Personal Email</label>
@@ -185,17 +215,22 @@
                                     <ValidationMessage For="@(() => Model.LocationId)" id="emp-location-error" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="emp-manager">Manager</label>
+                                    <label class="form-label" for="emp-manager">Manager <span class="text-danger" aria-hidden="true">*</span></label>
                                     <SfDropDownList @ref="_managerDropdown"
                                                     TValue="Guid?"
                                                     TItem="ManagerOption"
                                                     DataSource="@_managerOptions"
                                                     @bind-Value="Model.ManagerId"
-                                                    Placeholder="None"
-                                                    AllowFiltering="true" HtmlAttributes="@Aria("emp-manager", "ManagerId", label: "Manager")">
+                                                    Placeholder="Select a manager"
+                                                    AllowFiltering="true" HtmlAttributes="@ManagerAria()">
                                         <DropDownListFieldSettings Value="Id" Text="Name" />
                                         <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
                                     </SfDropDownList>
+                                    <ValidationMessage For="@(() => Model.ManagerId)" id="emp-manager-error" role="alert" />
+                                    @if (Model.ManagerId == Guid.Empty)
+                                    {
+                                        <div id="emp-manager-no-manager-warning" class="alert alert-warning py-2 mt-2 mb-0" role="status">This employee won't appear in anyone's reporting line. Use this only for top-level roles.</div>
+                                    }
                                 </div>
                             </div>
                         </div>
@@ -1074,10 +1109,10 @@
                 .Where(e => e.Status != "FormerEmployee")
                 .Select(e => new ManagerOption(e.Id, e.FullName))
                 .OrderBy(e => e.Name)
-                .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
+                .Prepend(NoManagerOption())
                 .ToList();
 
-            Model.ManagerId = Guid.Empty;
+            Model.ManagerRequired = true;
         }
 
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
@@ -1224,6 +1259,97 @@
         Navigation.NavigateTo($"/companies/{CompanyId}/employees/{Id}", forceLoad: true);
     }
 
+    private ManagerOption NoManagerOption() =>
+        new(Guid.Empty, IsNew ? "No manager — top-level role" : "No Manager");
+
+    private Dictionary<string, object> ManagerAria()
+    {
+        var attrs = Aria("emp-manager", "ManagerId", true, label: "Manager");
+        if (Model.ManagerId == Guid.Empty)
+            attrs["aria-describedby"] = "emp-manager-no-manager-warning";
+        return attrs;
+    }
+
+    private Dictionary<string, object> WorkEmailAria()
+    {
+        var attrs = Aria("emp-work-email", "WorkEmail", true, label: "Work Email");
+        var describedBy = attrs.TryGetValue("aria-describedby", out var existing) ? $"{existing} " : string.Empty;
+        attrs["aria-describedby"] = describedBy + "emp-work-email-suggestion-note";
+        return attrs;
+    }
+
+    private WorkEmailSuggestionResponse? _workEmailSuggestion;
+    private List<string> _workEmailDomains = [];
+    private string? _workEmailDomain;
+    private int _workEmailRequestId;
+    private CancellationTokenSource? _workEmailCts;
+
+    private bool ShowWorkEmailSuggestion =>
+        _workEmailSuggestion is { Status: WorkEmailSuggestionStatus.Available, Suggestion: { Length: > 0 } suggestion }
+        && !string.Equals(Model.WorkEmail?.Trim(), suggestion, StringComparison.OrdinalIgnoreCase);
+
+    private bool ShowWorkEmailUnavailable =>
+        _workEmailSuggestion is { Status: WorkEmailSuggestionStatus.Unavailable, Suggestion: { Length: > 0 } };
+
+    private Task OnNameChangedAsync() => RefreshWorkEmailSuggestionAsync();
+
+    private async Task OnWorkEmailDomainChangedAsync(string? domain)
+    {
+        _workEmailDomain = domain;
+        await RefreshWorkEmailSuggestionAsync();
+    }
+
+    private async Task RefreshWorkEmailSuggestionAsync()
+    {
+        var requestId = ++_workEmailRequestId;
+        _workEmailCts?.Cancel();
+        _workEmailCts?.Dispose();
+        _workEmailCts = null;
+
+        if (string.IsNullOrWhiteSpace(Model.FirstName) || string.IsNullOrWhiteSpace(Model.LastName))
+        {
+            _workEmailSuggestion = null;
+            _workEmailDomains = [];
+            return;
+        }
+
+        var cts = _workEmailCts = new CancellationTokenSource();
+        WorkEmailSuggestionResponse? result;
+        try
+        {
+            await Task.Delay(250, cts.Token);
+            result = await EmployeeService.GetWorkEmailSuggestionAsync(
+                CompanyId, Model.FirstName, Model.LastName, _workEmailDomain, cts.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        if (requestId != _workEmailRequestId) return;
+
+        _workEmailSuggestion = result;
+        _workEmailDomains = result?.Domains ?? [];
+        _workEmailDomain = result?.SelectedDomain ?? _workEmailDomain;
+    }
+
+    private async Task UseWorkEmailSuggestion()
+    {
+        if (_workEmailSuggestion?.Suggestion is not { Length: > 0 } suggestion) return;
+
+        Model.WorkEmail = suggestion;
+        EditContext.NotifyFieldChanged(EditContext.Field(nameof(Model.WorkEmail)));
+        StateHasChanged();
+        await JS.InvokeVoidAsync("hrFocusById", "emp-work-email");
+    }
+
+    public override void Dispose()
+    {
+        _workEmailCts?.Cancel();
+        _workEmailCts?.Dispose();
+        base.Dispose();
+    }
+
     private int _managerFilterRequestId;
 
     private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
@@ -1236,7 +1362,7 @@
             .Where(e => e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
-            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
+            .Prepend(NoManagerOption())
             .ToList();
         await _managerDropdown.FilterAsync(_managerOptions, new Query());
     }

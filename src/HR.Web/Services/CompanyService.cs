@@ -109,6 +109,29 @@ public class CompanyService(HrApiHttpClientFactory httpClientFactory)
         return await response.Content.ReadFromJsonAsync<UpdateHrSettingsResponse>(HrApiJsonOptions.Default);
     }
 
+    public async Task<GetWorkEmailSettingsResponse?> GetWorkEmailSettingsAsync(Guid id)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<GetWorkEmailSettingsResponse>($"api/companies/{id}/work-email-settings", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(UpdateWorkEmailSettingsResponse? Response, ApiSaveResult Result)> UpdateWorkEmailSettingsAsync(
+        Guid id, UpdateWorkEmailSettingsRequest request)
+    {
+        var response = await Http.PutAsJsonAsync($"api/companies/{id}/work-email-settings", request, HrApiJsonOptions.Default);
+        var result = await HR.SharedKernel.Http.ApiResponseReader.ReadJsonAsync<UpdateWorkEmailSettingsResponse>(response, HrApiJsonOptions.Default);
+
+        return result.Success
+            ? (result.Value, ApiSaveResult.Ok(result.Value?.Version))
+            : (null, ApiSaveResult.Fail(result.DisplayMessage ?? "Failed to save work email settings.", result.IsConcurrencyConflict));
+    }
+
     public async Task<UploadCompanyLogoResponse?> UploadCompanyLogoAsync(
         Guid id, string assetType, Stream fileStream, string fileName, string contentType)
     {

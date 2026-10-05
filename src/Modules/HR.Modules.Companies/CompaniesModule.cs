@@ -53,6 +53,8 @@ using HR.Modules.Companies.Features.UpdateDocumentReminderSettings;
 using HR.Modules.Companies.Jobs;
 using HR.Modules.Companies.Features.UpdateNotificationSettings;
 using HR.Modules.Companies.Features.UpdateRecruitmentSettings;
+using HR.Modules.Companies.Features.UpdateWorkEmailSettings;
+using HR.Modules.Companies.Features.GetWorkEmailSettings;
 using HR.Modules.Companies.Features.UploadCompanyLogo;
 using HR.Modules.Companies.Features.GetSystemHealth;
 using HR.Modules.Companies.Features.GetApplicationMetrics;
@@ -145,6 +147,14 @@ public static class CompaniesModule
         await Services.StagingCompanySeeder.SeedAsync(db, options, DateTimeOffset.UtcNow);
     }
 
+    private static void EnsureWorkEmailDomain(CompanySettings settings, string domain, DateTimeOffset now)
+    {
+        if (settings.WorkEmailPrimaryDomain is null)
+        {
+            settings.UpdateWorkEmailSettings(true, domain, null, WorkEmailNamingConvention.FirstNameDotLastName, now);
+        }
+    }
+
     public static async Task SeedCompaniesAsync(this IServiceProvider services)
     {
         using var scope = services.CreateScope();
@@ -204,6 +214,10 @@ public static class CompaniesModule
         {
             gamma.SetSettings(CompanySettings.CreateDefault(gammaId, now), now);
         }
+
+        EnsureWorkEmailDomain(acme.Settings!, "acme.example", now);
+        EnsureWorkEmailDomain(betaCorp.Settings!, "betacorp.example", now);
+        EnsureWorkEmailDomain(gamma.Settings!, "gamma.example", now);
 
         await db.SaveChangesAsync();
 
@@ -287,6 +301,10 @@ public static class CompaniesModule
         services.AddScoped<ICompanyLeavingSettingsReader, CompanyLeavingSettingsReader>();
         services.AddScoped<ICompanySicknessSettingsReader, CompanySicknessSettingsReader>();
         services.AddScoped<ICompanyRecruitmentSettingsReader, CompanyRecruitmentSettingsReader>();
+        services.AddScoped<ICompanyWorkEmailSettingsReader, CompanyWorkEmailSettingsReader>();
+        services.AddScoped<GetWorkEmailSettingsHandler>();
+        services.AddScoped<UpdateWorkEmailSettingsHandler>();
+        services.AddScoped<IValidator<UpdateWorkEmailSettingsRequest>, UpdateWorkEmailSettingsValidator>();
         services.AddScoped<ICompanyNotificationSettingsReader, CompanyNotificationSettingsReader>();
         services.AddScoped<ICompanyDocumentReminderSettingsReader, CompanyDocumentReminderSettingsReader>();
         services.AddScoped<ICompanyAcknowledgementSettingsReader, CompanyAcknowledgementSettingsReader>();

@@ -1,8 +1,10 @@
 namespace HR.Modules.Companies.Contracts;
 
+public sealed record CompanyProvisioningAdmin(string Email, string FirstName, string LastName);
+
 public interface ICompanyProvisioner
 {
-    Task<Guid> ProvisionCompanyAsync(string companyName, CancellationToken cancellationToken);
+    Task<Guid> ProvisionCompanyAsync(string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken);
 
     Task DeactivateCompanyAsync(Guid companyId, CancellationToken cancellationToken);
 

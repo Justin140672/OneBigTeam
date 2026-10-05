@@ -227,6 +227,8 @@ public sealed class EmployeeProfileEditModel
     public Guid? LocationId { get; set; }
     [Required(ErrorMessage = "Position profile is required.")]
     public Guid? PositionProfileId { get; set; }
+    public bool ManagerRequired { get; set; }
+    [RequiredWhen(nameof(ManagerRequired), ErrorMessage = "Select a manager or choose 'No manager — top-level role'.")]
     public Guid? ManagerId { get; set; }
     public bool HasSystemAccess { get; set; } = true;
     public bool OverrideWorkingPattern { get; set; } = false;
@@ -765,3 +767,18 @@ public sealed record EmploymentTypeSplitItem(
     int EmployeeCount,
     double Percentage);
 
+
+public enum WorkEmailSuggestionStatus
+{
+    Disabled,
+    NotConfigured,
+    NameIncomplete,
+    Available,
+    Unavailable,
+}
+
+public record WorkEmailSuggestionResponse(
+    WorkEmailSuggestionStatus Status,
+    string? Suggestion,
+    string? SelectedDomain,
+    List<string> Domains);

@@ -157,3 +157,33 @@ public record UploadCompanyLogoResponse(
     string AssetType,
     string? LogoUrl,
     DateTime UpdatedAt);
+
+public record WorkEmailConventionExampleModel(WorkEmailNamingConvention Convention, string LocalPart);
+
+public record GetWorkEmailSettingsResponse(
+    Guid CompanyId,
+    bool SuggestionsEnabled,
+    string? PrimaryDomain,
+    List<string> AdditionalDomains,
+    WorkEmailNamingConvention NamingConvention,
+    string ExampleFirstName,
+    string ExampleLastName,
+    List<WorkEmailConventionExampleModel> Examples,
+    DateTimeOffset UpdatedAt,
+    int Version);
+
+public record UpdateWorkEmailSettingsRequest(
+    bool SuggestionsEnabled,
+    string? PrimaryDomain,
+    List<string> AdditionalDomains,
+    WorkEmailNamingConvention NamingConvention,
+    int Version);
+
+public record UpdateWorkEmailSettingsResponse(
+    Guid CompanyId,
+    bool SuggestionsEnabled,
+    string? PrimaryDomain,
+    List<string> AdditionalDomains,
+    WorkEmailNamingConvention NamingConvention,
+    DateTimeOffset UpdatedAt,
+    int Version);

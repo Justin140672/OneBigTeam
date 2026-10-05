@@ -401,6 +401,119 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
     }
 
     [Fact]
+    public async Task WorkEmailTab_IsTheSeventhTab_AndExposesAccessibleControls()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(HrAdminEmail);
+
+        await hrSettings.GoToWorkEmailTabAsync(AcmeId);
+
+        var tabs = _page.Locator(".content-area .e-tab-header").First.GetByRole(AriaRole.Tab);
+        await Assertions.Expect(tabs).ToHaveCountAsync(7, new() { Timeout = 15_000 });
+        await Assertions.Expect(tabs.Nth(6)).ToHaveTextAsync(new System.Text.RegularExpressions.Regex("Work Email"));
+        await Assertions.Expect(tabs.Nth(6)).ToHaveAttributeAsync("aria-selected", "true");
+
+        await Assertions.Expect(hrSettings.WorkEmailEnabledCheckbox).ToBeVisibleAsync();
+        await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainInput).ToBeVisibleAsync();
+        await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainLabel).ToContainTextAsync("*");
+        await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainInput).Not.ToHaveValueAsync("");
+        await Assertions.Expect(hrSettings.WorkEmailAdditionalDomainsInput).ToBeVisibleAsync();
+        await Assertions.Expect(hrSettings.WorkEmailExample).ToHaveAttributeAsync("aria-live", "polite");
+        await Assertions.Expect(hrSettings.WorkEmailSaveButton).ToBeVisibleAsync();
+    }
+
+    [Fact]
+    public async Task WorkEmailSettings_ClearedPrimaryDomain_ShowsRequiredError_AndDoesNotSave_WhetherEnabledOrNot()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(BetaHrAdminEmail);
+
+        await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
+        var initiallyEnabled = await hrSettings.IsWorkEmailSuggestionsEnabledAsync();
+        var initialPrimary = await hrSettings.GetWorkEmailPrimaryDomainAsync();
+
+        try
+        {
+            foreach (var enabled in new[] { true, false })
+            {
+                await hrSettings.SetWorkEmailSuggestionsEnabledAsync(enabled);
+                await hrSettings.SetWorkEmailPrimaryDomainAsync("");
+                await hrSettings.SaveWorkEmailSettingsAsync();
+
+                await Assertions.Expect(hrSettings.WorkEmailError).ToBeVisibleAsync();
+                await Assertions.Expect(hrSettings.WorkEmailError).ToHaveAttributeAsync("role", "alert");
+                await Assertions.Expect(hrSettings.WorkEmailError).ToContainTextAsync("Primary email domain is required");
+                await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainError).ToBeVisibleAsync();
+                await Assertions.Expect(hrSettings.WorkEmailPrimaryDomainError).ToContainTextAsync("Primary email domain is required");
+                await Assertions.Expect(hrSettings.WorkEmailSaved).ToHaveCountAsync(0);
+            }
+        }
+        finally
+        {
+            await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
+            Assert.Equal(initiallyEnabled, await hrSettings.IsWorkEmailSuggestionsEnabledAsync());
+            Assert.Equal(initialPrimary, await hrSettings.GetWorkEmailPrimaryDomainAsync());
+        }
+    }
+
+    [Fact]
+    public async Task WorkEmailSettings_ExampleUpdatesWithConvention_AndSavePersistsAfterReload()
+    {
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var hrSettings = new HrSettingsPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(BetaHrAdminEmail);
+
+        await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
+        var initialEnabled = await hrSettings.IsWorkEmailSuggestionsEnabledAsync();
+        var initialPrimary = await hrSettings.GetWorkEmailPrimaryDomainAsync();
+        var initialAdditional = await hrSettings.GetWorkEmailAdditionalDomainsAsync();
+        var initialConvention = await hrSettings.GetWorkEmailConventionAsync();
+
+        try
+        {
+            await hrSettings.SetWorkEmailSuggestionsEnabledAsync(true);
+            await hrSettings.SetWorkEmailPrimaryDomainAsync("@E2E-Beta.Example.com");
+            Assert.Equal("jane.smith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+
+            await hrSettings.SelectWorkEmailConventionAsync("firstinitial.lastname");
+            Assert.Equal("j.smith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+
+            await hrSettings.SelectWorkEmailConventionAsync("firstnamelastname");
+            Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+
+            await hrSettings.SetWorkEmailAdditionalDomainsAsync("Alt.E2E-Beta.Example.com, other.example.org");
+            await hrSettings.SaveWorkEmailSettingsAsync();
+
+            await Assertions.Expect(hrSettings.WorkEmailSaved).ToBeVisibleAsync();
+            await Assertions.Expect(hrSettings.WorkEmailSaved).ToHaveAttributeAsync("role", "status");
+            await Assertions.Expect(hrSettings.WorkEmailError).ToHaveCountAsync(0);
+
+            await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
+
+            Assert.True(await hrSettings.IsWorkEmailSuggestionsEnabledAsync());
+            Assert.Equal("e2e-beta.example.com", await hrSettings.GetWorkEmailPrimaryDomainAsync());
+            Assert.Equal(
+                "alt.e2e-beta.example.com\nother.example.org",
+                (await hrSettings.GetWorkEmailAdditionalDomainsAsync()).Replace("\r\n", "\n").Trim());
+            Assert.Equal("firstnamelastname", await hrSettings.GetWorkEmailConventionAsync());
+            Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+        }
+        finally
+        {
+            await hrSettings.GoToWorkEmailTabAsync(BetaCorpId);
+            await hrSettings.ConfigureWorkEmailAsync(initialEnabled, initialPrimary, initialAdditional, initialConvention);
+        }
+    }
+
+    [Fact]
     public async Task SwitchingManualToAutomatic_DoesNotShowRenumberDialog()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);

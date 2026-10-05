@@ -283,6 +283,36 @@ public class CreateEmployeeHandlerTests
     }
 
     [Fact]
+    public async Task HandleAsync_Returns_Conflict_When_WorkEmail_Differs_Only_By_Case_And_Whitespace()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
+
+        context.Employees.Add(Employee.Create(Guid.NewGuid(), companyId, "Existing", "User", "alice.smith@example.com", StartDate, hasSystemAccess: true, new DateOnly(1990, 1, 1), "British", "Prefer not to say", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now));
+        await context.SaveChangesAsync();
+
+        var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
+
+        var result = await handler.HandleAsync(
+            new CreateEmployeeRequest
+            {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
+                CompanyId = companyId,
+                FirstName = "Alice",
+                LastName = "Smith",
+                WorkEmail = "  Alice.Smith@EXAMPLE.com ",
+                StartDate = StartDate
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("conflict", result.Error.Code);
+    }
+
+    [Fact]
     public async Task HandleAsync_Allows_Same_WorkEmail_In_Different_Companies()
     {
         await using var context = BuildContext();

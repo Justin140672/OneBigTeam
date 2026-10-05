@@ -389,4 +389,24 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.Contains(deps.SupabaseAuthGateway.CreatedUsers, u => u.Email == request.AdminEmail);
         Assert.DoesNotContain(deps.AuditEventPublisher.PublishedEvents, e => e is AccountCreationEmailRejectedAuditEvent);
     }
+
+    [Fact]
+    public async Task HandleAsync_Passes_The_Trimmed_First_User_Details_To_The_Company_Provisioner()
+    {
+        var deps = BuildDependencies();
+        var request = ValidRequest() with
+        {
+            AdminFirstName = "  Ada ",
+            AdminLastName = " Lovelace  ",
+            AdminEmail = "  ada.lovelace@Analytical.example ",
+        };
+
+        var result = await BuildHandler(deps).HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var admin = Assert.Single(deps.Provisioner.ProvisionedAdmins);
+        Assert.Equal("ada.lovelace@Analytical.example", admin.Email);
+        Assert.Equal("Ada", admin.FirstName);
+        Assert.Equal("Lovelace", admin.LastName);
+    }
 }

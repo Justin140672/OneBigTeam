@@ -14,13 +14,24 @@ internal sealed class CompanyProvisioner(
     IClock clock,
     IConfiguration configuration) : ICompanyProvisioner
 {
-    public async Task<Guid> ProvisionCompanyAsync(string companyName, CancellationToken cancellationToken)
+    public async Task<Guid> ProvisionCompanyAsync(
+        string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken)
     {
         var now = clock.UtcNowOffset();
         var trialLengthDays = await GetTrialLengthDaysAsync(now, cancellationToken);
 
         var company = Company.Create(Guid.NewGuid(), companyName.Trim(), now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
+
+        var primaryDomain = WorkEmailAddressBuilder.ExtractDomain(admin.Email)
+            ?? throw new InvalidOperationException(
+                "The first user's email address does not have a valid domain to use as the company's primary work email domain.");
+        settings.UpdateWorkEmailSettings(
+            suggestionsEnabled: true,
+            primaryDomain,
+            additionalDomains: null,
+            WorkEmailAddressBuilder.InferNamingConvention(admin.Email, admin.FirstName, admin.LastName),
+            now);
         company.SetSettings(settings, now);
 
         var address = CompanyAddress.Create(

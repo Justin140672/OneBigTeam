@@ -68,6 +68,25 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<WorkEmailSuggestionResponse?> GetWorkEmailSuggestionAsync(
+        Guid companyId, string? firstName, string? lastName, string? domain, CancellationToken ct = default)
+    {
+        var query = HttpUtility.ParseQueryString(string.Empty);
+        query["firstName"] = firstName?.Trim() ?? string.Empty;
+        query["lastName"] = lastName?.Trim() ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(domain)) query["domain"] = domain.Trim();
+
+        try
+        {
+            return await Http.GetFromJsonAsync<WorkEmailSuggestionResponse>(
+                $"api/companies/{companyId}/employees/work-email-suggestion?{query}", HrApiJsonOptions.Default, ct);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or System.Text.Json.JsonException)
+        {
+            return null;
+        }
+    }
+
     public async Task<EmployeeDirectorySearchResponse?> SearchEmployeeDirectoryAsync(
         Guid companyId, string? term, bool includeLeavers, int limit = 20, CancellationToken ct = default)
     {

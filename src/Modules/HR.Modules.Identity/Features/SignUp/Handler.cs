@@ -86,6 +86,11 @@ internal sealed class SignUpHandler(
         if (emailPolicy.IsFailure)
             return Result.Failure<SignUpResponse>(emailPolicy.Error);
 
+        var adminAccount = new CompanyProvisioningAdmin(
+            request.AdminEmail.Trim(), request.AdminFirstName.Trim(), request.AdminLastName.Trim());
+        if (WorkEmailAddressBuilder.ExtractDomain(adminAccount.Email) is null)
+            return Result.Failure<SignUpResponse>(Error.Validation("Enter a valid work email address."));
+
         var normalizedEmail = request.AdminEmail.Trim().ToUpperInvariant();
 
         var emailInUse = await dbContext.UserProfiles.AnyAsync(p => p.Email.ToUpper() == normalizedEmail, cancellationToken);
@@ -94,7 +99,7 @@ internal sealed class SignUpHandler(
             return Result.Failure<SignUpResponse>(Error.Conflict("An account with this email already exists."));
         }
 
-        var companyId = await companyProvisioner.ProvisionCompanyAsync(request.CompanyName.Trim(), cancellationToken);
+        var companyId = await companyProvisioner.ProvisionCompanyAsync(request.CompanyName.Trim(), adminAccount, cancellationToken);
 
         try
         {

@@ -145,6 +145,45 @@ public class SignUpWorkEmailPolicyEndpointTests
     }
 
     [Fact]
+    public async Task Post_SignUp_Sets_The_Primary_Work_Email_Domain_And_Default_Convention_From_The_First_User()
+    {
+        using var client = _factory.CreateClient();
+        var companyName = $"Org-Co-{Guid.NewGuid():N}";
+        var email = $"ada-{Guid.NewGuid():N}@Brightsparks-Consulting.co.uk";
+
+        var response = await client.PostAsJsonAsync("/api/signup", SignUpRequest(companyName, email));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var company = await companiesDb.Companies.Include(c => c.Settings).SingleAsync(c => c.Name == companyName);
+        Assert.True(company.Settings!.WorkEmailSuggestionsEnabled);
+        Assert.Equal("brightsparks-consulting.co.uk", company.Settings.WorkEmailPrimaryDomain);
+        Assert.Equal(HR.Modules.Companies.Contracts.WorkEmailNamingConvention.FirstNameDotLastName, company.Settings.WorkEmailNamingConvention);
+    }
+
+    [Fact]
+    public async Task Post_SignUp_Infers_The_Naming_Convention_From_The_First_Users_Own_Email()
+    {
+        using var client = _factory.CreateClient();
+        var companyName = $"Org-Co-{Guid.NewGuid():N}";
+        var domain = $"inferred-{Guid.NewGuid():N}.example.com";
+
+        var response = await client.PostAsJsonAsync("/api/signup", SignUpRequest(companyName, $"a.lovelace@{domain}"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var companiesDb = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var company = await companiesDb.Companies.Include(c => c.Settings).SingleAsync(c => c.Name == companyName);
+        Assert.Equal(domain, company.Settings!.WorkEmailPrimaryDomain);
+        Assert.Equal(
+            HR.Modules.Companies.Contracts.WorkEmailNamingConvention.FirstInitialDotLastName,
+            company.Settings.WorkEmailNamingConvention);
+    }
+
+    [Fact]
     public async Task Post_SignUp_Existing_Account_Conflict_Is_Still_409_For_An_Organisation_Domain()
     {
         using var client = _factory.CreateClient();

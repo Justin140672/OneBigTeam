@@ -14,8 +14,18 @@ internal static class StagingCompanySeeder
     {
         var companyId = StagingSeedOptions.CompanyId;
 
-        if (await db.Companies.AnyAsync(c => c.Id == companyId))
+        var existing = await db.Companies
+            .Include(c => c.Settings)
+            .SingleOrDefaultAsync(c => c.Id == companyId);
+
+        if (existing is not null)
         {
+            if (existing.Settings is { WorkEmailPrimaryDomain: null } existingSettings)
+            {
+                ApplyWorkEmailSettings(existingSettings, options, now);
+                await db.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -43,6 +53,7 @@ internal static class StagingCompanySeeder
             StagingSeedOptions.NextEmployeeNumber,
             StagingSeedOptions.EmployeeNumberMinimumLength,
             now);
+        ApplyWorkEmailSettings(settings, options, now);
         company.SetSettings(settings, now);
 
         company.SetAddress(
@@ -59,4 +70,12 @@ internal static class StagingCompanySeeder
 
         await db.SaveChangesAsync();
     }
+
+    private static void ApplyWorkEmailSettings(CompanySettings settings, StagingSeedOptions options, DateTimeOffset now) =>
+        settings.UpdateWorkEmailSettings(
+            suggestionsEnabled: true,
+            options.ResolvedEmailDomain,
+            additionalDomains: null,
+            WorkEmailNamingConvention.FirstNameDotLastName,
+            now);
 }

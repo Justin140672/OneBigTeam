@@ -43,6 +43,7 @@ using HR.Modules.Employees.Features.GetMyPersonalDetails;
 using HR.Modules.Employees.Features.RequestPersonalDetailsChange;
 using HR.Modules.Employees.Features.ListDepartments;
 using HR.Modules.Employees.Features.ListEmployees;
+using HR.Modules.Employees.Features.SuggestWorkEmail;
 using HR.Modules.Employees.Features.ListDirectoryEmployees;
 using HR.Modules.Employees.Features.GetDirectoryEmployee;
 using HR.Modules.Employees.Features.GetOrganisationChart;
@@ -233,6 +234,8 @@ public static class EmployeesModule
         services.AddScoped<IValidator<ListDepartmentsRequest>, ListDepartmentsValidator>();
 
         services.AddScoped<ListEmployeesHandler>();
+        services.AddScoped<SuggestWorkEmailHandler>();
+        services.AddScoped<IValidator<SuggestWorkEmailRequest>, SuggestWorkEmailValidator>();
         services.AddScoped<IValidator<ListEmployeesRequest>, ListEmployeesValidator>();
 
         services.AddScoped<ListDirectoryEmployeesHandler>();

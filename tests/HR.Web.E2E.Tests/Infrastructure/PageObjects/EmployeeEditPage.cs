@@ -495,7 +495,7 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         // earlier combobox on this tab already had time to attach too.
         // A plain click + Escape, not DropDownSelector.SelectAsync — that method deliberately
         // no-ops when the combobox's current value already matches the target text (correct for
-        // real selections, wrong here: a brand-new employee's Manager already reads "No Manager",
+        // real selections, wrong here: an existing employee with no manager already reads "No Manager",
         // which is exactly the common case this warm-up most needs to cover, so skipping on
         // already-matching text would skip the warm-up for it entirely).
         var managerCombobox = page.Locator(".col-md-4, .col-12")
@@ -604,8 +604,57 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
     public Task ClickSaveButtonAsync() =>
         page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
 
-    public async Task SaveNewEmployeeAsync()
+    public const string NoManagerTopLevelOption = "No manager — top-level role";
+
+    private ILocator NewEmployeeManagerField =>
+        page.Locator(".col-md-4").Filter(new() { Has = page.Locator("label[for='emp-manager']") }).First;
+
+    public Task SelectNewEmployeeManagerAsync(string managerNameFragment) =>
+        DropDownSelector.SelectAsync(page, NewEmployeeManagerField, managerNameFragment);
+
+    public Task SelectNoManagerTopLevelAsync() =>
+        DropDownSelector.SelectAsync(page, NewEmployeeManagerField, NoManagerTopLevelOption);
+
+    public async Task<string> GetNewEmployeeManagerTextAsync() =>
+        (await NewEmployeeManagerField.Locator("span[role='combobox'] input").First.InputValueAsync()).Trim();
+
+    public async Task SelectNoManagerTopLevelIfUnsetAsync()
     {
+        if (string.IsNullOrEmpty(await GetNewEmployeeManagerTextAsync()))
+            await SelectNoManagerTopLevelAsync();
+    }
+
+    public ILocator ManagerError => page.Locator("#emp-manager-error").First;
+
+    public ILocator NoManagerWarning => page.Locator("#emp-manager-no-manager-warning");
+
+    public ILocator WorkEmailInput => page.GetByPlaceholder("work@company.com");
+
+    public ILocator WorkEmailSuggestionStatus => page.Locator("#emp-work-email-suggestion-status");
+
+    public ILocator UseWorkEmailSuggestionButton => page.Locator("#emp-work-email-use-suggestion");
+
+    public ILocator WorkEmailSuggestionNote => page.Locator("#emp-work-email-suggestion-note");
+
+    public ILocator WorkEmailDomainField =>
+        page.Locator("div.mt-2").Filter(new() { Has = page.Locator("label[for='emp-work-email-domain']") }).First;
+
+    public Task SelectWorkEmailSuggestionDomainAsync(string domain) =>
+        DropDownSelector.SelectAsync(page, WorkEmailDomainField, domain);
+
+    public Task<string> GetWorkEmailValueAsync() => WorkEmailInput.InputValueAsync();
+
+    public async Task TypeWorkEmailWithoutLeavingFieldAsync(string value)
+    {
+        await WorkEmailInput.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task SaveNewEmployeeAsync(bool selectNoManagerIfUnset = true)
+    {
+        if (selectNoManagerIfUnset)
+            await SelectNoManagerTopLevelIfUnsetAsync();
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
         try

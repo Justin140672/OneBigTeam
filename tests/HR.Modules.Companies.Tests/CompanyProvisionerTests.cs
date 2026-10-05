@@ -1,3 +1,4 @@
+using HR.Modules.Companies.Contracts;
 using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.Modules.Companies.Services;
@@ -20,7 +21,7 @@ public class CompanyProvisionerTests
             new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)),
             new ConfigurationBuilder().Build());
 
-        var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", CancellationToken.None);
+        var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", Admin("jane.smith@acme.example"), CancellationToken.None);
 
         var company = await companiesContext.Companies
             .Include(c => c.Addresses)
@@ -47,7 +48,7 @@ public class CompanyProvisionerTests
             new FakeClock(new DateTime(2026, 12, 25, 10, 0, 0, DateTimeKind.Utc)),
             new ConfigurationBuilder().Build());
 
-        var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", CancellationToken.None);
+        var companyId = await provisioner.ProvisionCompanyAsync("Acme Corporation", Admin("jane.smith@acme.example"), CancellationToken.None);
 
         var holidays = await companiesContext.PublicHolidays
             .Where(h => h.CompanyId == companyId)
@@ -79,6 +80,55 @@ public class CompanyProvisionerTests
         Assert.Equal(10, first);
         Assert.Equal(first, second);
     }
+
+    [Theory]
+    [InlineData("Jane.Smith@Acme.Example", "Jane", "Smith", "acme.example", WorkEmailNamingConvention.FirstNameDotLastName)]
+    [InlineData("j.smith@acme.co.uk", "Jane", "Smith", "acme.co.uk", WorkEmailNamingConvention.FirstInitialDotLastName)]
+    [InlineData("janesmith@acme.co.uk", "Jane", "Smith", "acme.co.uk", WorkEmailNamingConvention.FirstNameLastName)]
+    [InlineData("jane@acme.co.uk", "Jane", "Smith", "acme.co.uk", WorkEmailNamingConvention.FirstName)]
+    [InlineData("admin@acme.co.uk", "Jane", "Smith", "acme.co.uk", WorkEmailNamingConvention.FirstNameDotLastName)]
+    public async Task ProvisionCompanyAsync_Sets_Mandatory_WorkEmail_Settings_From_The_First_User(
+        string email, string firstName, string lastName, string expectedDomain, WorkEmailNamingConvention expectedConvention)
+    {
+        await using var companiesContext = BuildContext();
+        await using var platformContext = BuildPlatformContext();
+        var provisioner = new CompanyProvisioner(
+            companiesContext,
+            platformContext,
+            new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)),
+            new ConfigurationBuilder().Build());
+
+        var companyId = await provisioner.ProvisionCompanyAsync(
+            "Acme Corporation", new CompanyProvisioningAdmin(email, firstName, lastName), CancellationToken.None);
+
+        var settings = await companiesContext.CompanySettings.SingleAsync(s => s.CompanyId == companyId);
+        Assert.True(settings.WorkEmailSuggestionsEnabled);
+        Assert.Equal(expectedDomain, settings.WorkEmailPrimaryDomain);
+        Assert.Equal(expectedConvention, settings.WorkEmailNamingConvention);
+        Assert.Empty(settings.WorkEmailAdditionalDomains);
+    }
+
+    [Theory]
+    [InlineData("jane.smith")]
+    [InlineData("jane.smith@localhost")]
+    [InlineData("")]
+    public async Task ProvisionCompanyAsync_Throws_And_Persists_Nothing_When_Email_Has_No_Valid_Domain(string email)
+    {
+        await using var companiesContext = BuildContext();
+        await using var platformContext = BuildPlatformContext();
+        var provisioner = new CompanyProvisioner(
+            companiesContext,
+            platformContext,
+            new FakeClock(new DateTime(2026, 6, 5, 10, 0, 0, DateTimeKind.Utc)),
+            new ConfigurationBuilder().Build());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            provisioner.ProvisionCompanyAsync("Acme Corporation", Admin(email), CancellationToken.None));
+
+        Assert.Empty(await companiesContext.Companies.ToListAsync());
+    }
+
+    private static CompanyProvisioningAdmin Admin(string email) => new(email, "Jane", "Smith");
 
     private static CompaniesDbContext BuildContext()
     {

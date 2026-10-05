@@ -251,6 +251,79 @@
                             </div>
                         </ContentTemplate>
                     </TabItem>
+
+                    <TabItem>
+                        <ChildContent>
+                            <TabHeader Text="Work Email" IconCss="@ErrorIconCss(6)" />
+                        </ChildContent>
+                        <ContentTemplate>
+                            <div class="card mt-3">
+                                <div class="card-body">
+                                    <div class="row g-4">
+                                        <div class="col-12">
+                                            <HrCheckBoxField Id="hr-work-email-enabled" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
+                                                             Label="Suggest work emails when adding employees"
+                                                             Checked="@_weEnabled"
+                                                             CheckedChanged="@OnWeEnabledChanged" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <HrTextField Id="hr-work-email-primary-domain" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
+                                                         Label="Primary email domain" Required="true"
+                                                         Value="@_wePrimaryDomain"
+                                                         ValueChanged="@OnWePrimaryDomainChanged"
+                                                         Placeholder="onebigteam.co.uk"
+                                                         HelpText="Enter the domain without the @@ symbol. Required." />
+                                            @if (!string.IsNullOrEmpty(_wePrimaryDomainError))
+                                            {
+                                                <div id="hr-work-email-primary-domain-error" class="text-danger small mt-1" role="alert">@_wePrimaryDomainError</div>
+                                            }
+                                        </div>
+                                        <div class="col-md-6">
+                                            <HrTextField Id="hr-work-email-additional-domains" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
+                                                         Label="Additional email domains"
+                                                         Value="@_weAdditionalDomains"
+                                                         ValueChanged="@OnWeAdditionalDomainsChanged"
+                                                         Multiline="true" Rows="3"
+                                                         HelpText="Optional. Separate domains with commas or new lines." />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <HrDropDownField Id="hr-work-email-convention" Disabled="@(Session.IsReadOnly || _workEmailSaving)"
+                                                             TValue="WorkEmailNamingConvention" TItem="WorkEmailConventionOption"
+                                                             Label="Naming convention" Required="true" AllowFiltering="false"
+                                                             Value="@_weConvention"
+                                                             ValueChanged="@OnWeConventionChanged"
+                                                             DataSource="@WorkEmailConventionOptions" ValueField="Value" TextField="Label" />
+                                        </div>
+                                        <div class="col-md-6">
+                                            <span class="form-label d-block">Example</span>
+                                            <p id="hr-work-email-example" class="mb-0 fw-semibold" aria-live="polite">@WorkEmailExample</p>
+                                        </div>
+                                        @if (!string.IsNullOrEmpty(_workEmailError))
+                                        {
+                                            <div class="col-12">
+                                                <div id="hr-work-email-error" class="alert alert-danger mb-0" role="alert">@_workEmailError</div>
+                                                @if (_workEmailConflict)
+                                                {
+                                                    <SfButton id="hr-work-email-reload" CssClass="mt-2" OnClick="ReloadWorkEmailAsync">Reload latest values</SfButton>
+                                                }
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrEmpty(_workEmailSuccess))
+                                        {
+                                            <div class="col-12">
+                                                <div id="hr-work-email-saved" class="alert alert-success mb-0" role="status">@_workEmailSuccess</div>
+                                            </div>
+                                        }
+                                        <div class="col-12">
+                                            <SfButton id="hr-work-email-save" IsPrimary="true" Disabled="@(_workEmailSaving || Session.IsReadOnly)" OnClick="SaveWorkEmailAsync">
+                                                @(_workEmailSaving ? "Saving…" : "Save work email settings")
+                                            </SfButton>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </ContentTemplate>
+                    </TabItem>
                 </TabItems>
             </SfTab>
         </EditForm>
@@ -348,6 +421,144 @@
         $"{Model.AssetNumberPrefix}{Model.NextAssetNumber.ToString().PadLeft(Model.AssetNumberMinimumLength, '0')}";
 
 
+    private static readonly List<WorkEmailConventionOption> WorkEmailConventionOptions =
+    [
+        new(WorkEmailNamingConvention.FirstNameDotLastName, "firstname.lastname"),
+        new(WorkEmailNamingConvention.FirstInitialDotLastName, "firstinitial.lastname"),
+        new(WorkEmailNamingConvention.FirstNameLastName, "firstnamelastname"),
+        new(WorkEmailNamingConvention.FirstName, "firstname"),
+    ];
+
+    private bool _weEnabled;
+    private string _wePrimaryDomain = string.Empty;
+    private string _weAdditionalDomains = string.Empty;
+    private WorkEmailNamingConvention _weConvention = WorkEmailNamingConvention.FirstNameDotLastName;
+    private int _weVersion;
+    private List<WorkEmailConventionExampleModel> _weExamples = [];
+    private string _weBaseline = string.Empty;
+    private bool _workEmailSaving;
+    private bool _workEmailConflict;
+    private string? _workEmailError;
+    private string? _workEmailSuccess;
+
+    private string WorkEmailSnapshot() =>
+        string.Join('|', _weEnabled, _wePrimaryDomain.Trim(), string.Join(',', ParseAdditionalDomains()), _weConvention);
+
+    private bool WorkEmailDirty => WorkEmailSnapshot() != _weBaseline;
+
+    protected override bool HasUnsavedChanges => base.HasUnsavedChanges || WorkEmailDirty;
+
+    private List<string> ParseAdditionalDomains() =>
+        _weAdditionalDomains
+            .Split([',', ';', '\n', '\r', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+    private string WorkEmailExample
+    {
+        get
+        {
+            var localPart = _weExamples.FirstOrDefault(e => e.Convention == _weConvention)?.LocalPart
+                ?? _weConvention switch
+                {
+                    WorkEmailNamingConvention.FirstInitialDotLastName => "j.smith",
+                    WorkEmailNamingConvention.FirstNameLastName => "janesmith",
+                    WorkEmailNamingConvention.FirstName => "jane",
+                    _ => "jane.smith",
+                };
+            var domain = _wePrimaryDomain.Trim().TrimStart('@').ToLowerInvariant();
+            return $"{localPart}@{(domain.Length == 0 ? "your-domain" : domain)}";
+        }
+    }
+
+    private void OnWeEnabledChanged(bool v) { _weEnabled = v; ClearWorkEmailMessages(); }
+
+    private void OnWePrimaryDomainChanged(string? v) { _wePrimaryDomain = v ?? string.Empty; ClearWorkEmailMessages(); }
+
+    private string? _wePrimaryDomainError;
+
+    private const string PrimaryDomainRequiredMessage = "Primary email domain is required.";
+
+    private string? ValidateWorkEmail() =>
+        string.IsNullOrWhiteSpace(_wePrimaryDomain.Trim().TrimStart('@')) ? PrimaryDomainRequiredMessage : null;
+
+    private void OnWeAdditionalDomainsChanged(string? v) { _weAdditionalDomains = v ?? string.Empty; ClearWorkEmailMessages(); }
+
+    private void OnWeConventionChanged(WorkEmailNamingConvention v) { _weConvention = v; ClearWorkEmailMessages(); }
+
+    private void ClearWorkEmailMessages()
+    {
+        _workEmailError = null;
+        _workEmailConflict = false;
+        _workEmailSuccess = null;
+        _wePrimaryDomainError = null;
+    }
+
+    private void ApplyWorkEmailSettings(bool enabled, string? primary, IEnumerable<string> additional, WorkEmailNamingConvention convention, int version)
+    {
+        _weEnabled = enabled;
+        _wePrimaryDomain = primary ?? string.Empty;
+        _weAdditionalDomains = string.Join(Environment.NewLine, additional);
+        _weConvention = convention;
+        _weVersion = version;
+        _weBaseline = WorkEmailSnapshot();
+    }
+
+    private async Task LoadWorkEmailAsync()
+    {
+        var settings = await CompanyService.GetWorkEmailSettingsAsync(Id);
+        if (settings is null)
+            return;
+
+        _weExamples = settings.Examples;
+        ApplyWorkEmailSettings(settings.SuggestionsEnabled, settings.PrimaryDomain, settings.AdditionalDomains, settings.NamingConvention, settings.Version);
+    }
+
+    private async Task ReloadWorkEmailAsync()
+    {
+        ClearWorkEmailMessages();
+        await LoadWorkEmailAsync();
+    }
+
+    private async Task SaveWorkEmailAsync()
+    {
+        ClearWorkEmailMessages();
+        var error = await SaveWorkEmailCoreAsync();
+        if (error is null)
+            _workEmailSuccess = "Work email settings saved.";
+        else
+            _workEmailError = error;
+    }
+
+    private async Task<string?> SaveWorkEmailCoreAsync()
+    {
+        var validationError = ValidateWorkEmail();
+        if (validationError is not null)
+        {
+            _wePrimaryDomainError = validationError;
+            return validationError;
+        }
+
+        _workEmailSaving = true;
+        try
+        {
+            var request = new UpdateWorkEmailSettingsRequest(
+                _weEnabled, FormText.Optional(_wePrimaryDomain), ParseAdditionalDomains(), _weConvention, _weVersion);
+            var (response, result) = await CompanyService.UpdateWorkEmailSettingsAsync(Id, request);
+            if (!result.Success || response is null)
+            {
+                _workEmailConflict = result.IsConcurrencyConflict;
+                return result.ErrorMessage ?? "Failed to save work email settings.";
+            }
+
+            ApplyWorkEmailSettings(response.SuggestionsEnabled, response.PrimaryDomain, response.AdditionalDomains, response.NamingConvention, response.Version);
+            return null;
+        }
+        finally
+        {
+            _workEmailSaving = false;
+        }
+    }
+
     private int _activeTabIndex;
 
     private bool _initialised;
@@ -371,7 +582,7 @@
     private HashSet<int> _tabsWithErrors = [];
 
     private string? ErrorIconCss(int tabIndex) =>
-        _tabsWithErrors.Contains(tabIndex) ? "fa-solid fa-circle-exclamation hr-settings-tab-error-icon" : null;
+        (_tabsWithErrors.Contains(tabIndex) || (tabIndex == 6 && !string.IsNullOrEmpty(_workEmailError))) ? "fa-solid fa-circle-exclamation hr-settings-tab-error-icon" : null;
 
     protected override void OnInitialized()
     {
@@ -398,7 +609,7 @@
 
     private void SyncActiveTabFromQuery()
     {
-        if (Tab is >= 1 and <= 6)
+        if (Tab is >= 1 and <= 7)
             _activeTabIndex = Tab.Value - 1;
 
         _lastSyncedTabIndex = _activeTabIndex;
@@ -480,6 +691,8 @@
             return;
         }
 
+        await LoadWorkEmailAsync();
+
         var settings = await CompanyService.GetHrSettingsAsync(Id);
         if (settings is not null)
         {
@@ -527,6 +740,15 @@
 
     protected override async Task<string?> SaveCoreAsync()
     {
+        var workEmailValidationError = ValidateWorkEmail();
+        if (workEmailValidationError is not null)
+        {
+            _wePrimaryDomainError = workEmailValidationError;
+            _workEmailError = workEmailValidationError;
+            _activeTabIndex = 6;
+            return workEmailValidationError;
+        }
+
         var workingDays = Model.WorkingWeek
             .Aggregate(WorkingDays.None, (acc, day) =>
                 Enum.TryParse<WorkingDays>(day, out var wd) ? acc | wd : acc);
@@ -560,6 +782,18 @@
         Model.Version = result.Version;
         Model.NextEmployeeNumber = result.NextEmployeeNumber;
         Model.NextEmployeeNumberOriginal = result.NextEmployeeNumber;
+
+        if (WorkEmailDirty)
+        {
+            var workEmailError = await SaveWorkEmailCoreAsync();
+            if (workEmailError is not null)
+            {
+                _workEmailError = workEmailError;
+                _activeTabIndex = 6;
+                return workEmailError;
+            }
+        }
+
         return null;
     }
 
@@ -581,6 +815,8 @@
             Model.NoticePeriodLength = preset.Length.Value;
         }
     }
+
+    private sealed record WorkEmailConventionOption(WorkEmailNamingConvention Value, string Label);
 
     private sealed record MonthItem(int Number, string Name);
 

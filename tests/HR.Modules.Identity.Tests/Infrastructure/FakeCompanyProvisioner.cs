@@ -11,10 +11,13 @@ internal sealed class FakeCompanyProvisioner : ICompanyProvisioner
 
     public int CallCount { get; private set; }
 
-    public Task<Guid> ProvisionCompanyAsync(string companyName, CancellationToken cancellationToken)
+    public List<CompanyProvisioningAdmin> ProvisionedAdmins { get; } = [];
+
+    public Task<Guid> ProvisionCompanyAsync(string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken)
     {
         CallCount++;
         ProvisionedCompanyNames.Add(companyName);
+        ProvisionedAdmins.Add(admin);
         return Task.FromResult(CompanyIdToReturn ?? Guid.NewGuid());
     }
 

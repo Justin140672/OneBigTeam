@@ -345,6 +345,126 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
 
     private Task SwitchToEmployeeNumberingTabAsync() => SwitchToTabAsync("Employee Numbering");
 
+    public async Task GoToWorkEmailTabAsync(Guid companyId)
+    {
+        _companyId = companyId;
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/hr-settings?tab=7");
+        await page.WaitForSelectorAsync(".card", new() { Timeout = 20_000 });
+        await WorkEmailPrimaryDomainInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public Task OpenWorkEmailTabAsync() => SwitchToTabAsync("Work Email");
+
+    public ILocator WorkEmailEnabledCheckbox =>
+        page.GetByRole(AriaRole.Checkbox, new() { Name = "Suggest work emails when adding employees" });
+
+    public ILocator WorkEmailPrimaryDomainInput => page.Locator("#hr-work-email-primary-domain");
+
+    public ILocator WorkEmailPrimaryDomainLabel => page.Locator("label[for='hr-work-email-primary-domain']");
+
+    public ILocator WorkEmailPrimaryDomainError => page.Locator("#hr-work-email-primary-domain-error");
+
+    public ILocator WorkEmailAdditionalDomainsInput => page.Locator("#hr-work-email-additional-domains");
+
+    public ILocator WorkEmailExample => page.Locator("#hr-work-email-example");
+
+    public ILocator WorkEmailError => page.Locator("#hr-work-email-error");
+
+    public ILocator WorkEmailSaved => page.Locator("#hr-work-email-saved");
+
+    public ILocator WorkEmailReloadButton => page.Locator("#hr-work-email-reload");
+
+    public ILocator WorkEmailSaveButton => page.GetByRole(AriaRole.Button, new() { Name = "Save work email settings" });
+
+    private ILocator WorkEmailConventionField =>
+        page.Locator(".col-md-6").Filter(new() { Has = page.Locator("label[for='hr-work-email-convention']") }).First;
+
+    public async Task SetWorkEmailSuggestionsEnabledAsync(bool enabled)
+    {
+        await OpenWorkEmailTabAsync();
+        var checkbox = WorkEmailEnabledCheckbox;
+        await checkbox.WaitForAsync(new() { State = WaitForSelectorState.Attached, Timeout = 15_000 });
+        if (await checkbox.IsCheckedAsync() != enabled)
+        {
+            await page.Locator(".e-checkbox-wrapper")
+                .Filter(new() { HasText = "Suggest work emails when adding employees" })
+                .Locator("label").ClickAsync();
+            await Microsoft.Playwright.Assertions.Expect(checkbox).ToBeCheckedAsync(new() { Checked = enabled, Timeout = 10_000 });
+        }
+    }
+
+    public async Task<bool> IsWorkEmailSuggestionsEnabledAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        return await WorkEmailEnabledCheckbox.IsCheckedAsync();
+    }
+
+    public async Task SetWorkEmailPrimaryDomainAsync(string value)
+    {
+        await OpenWorkEmailTabAsync();
+        await WorkEmailPrimaryDomainInput.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task<string> GetWorkEmailPrimaryDomainAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        return await WorkEmailPrimaryDomainInput.InputValueAsync();
+    }
+
+    public async Task SetWorkEmailAdditionalDomainsAsync(string value)
+    {
+        await OpenWorkEmailTabAsync();
+        await WorkEmailAdditionalDomainsInput.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task<string> GetWorkEmailAdditionalDomainsAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        return await WorkEmailAdditionalDomainsInput.InputValueAsync();
+    }
+
+    public async Task SelectWorkEmailConventionAsync(string conventionLabel)
+    {
+        await OpenWorkEmailTabAsync();
+        await DropDownSelector.SelectAsync(page, WorkEmailConventionField, conventionLabel);
+    }
+
+    public async Task<string> GetWorkEmailConventionAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        return (await WorkEmailConventionField.Locator("span[role='combobox'] input").First.InputValueAsync()).Trim();
+    }
+
+    public async Task<string?> GetWorkEmailExampleAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        return (await WorkEmailExample.TextContentAsync())?.Trim();
+    }
+
+    public async Task SaveWorkEmailSettingsAsync()
+    {
+        await OpenWorkEmailTabAsync();
+        await WorkEmailSaveButton.ClickAsync();
+        await WorkEmailSaved.Or(WorkEmailError).First.WaitForAsync(
+            new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
+    }
+
+    public async Task ConfigureWorkEmailAsync(
+        bool enabled, string? primaryDomain = null, string? additionalDomains = null, string? conventionLabel = null)
+    {
+        await OpenWorkEmailTabAsync();
+        await SetWorkEmailSuggestionsEnabledAsync(enabled);
+        if (primaryDomain is not null)
+            await SetWorkEmailPrimaryDomainAsync(primaryDomain);
+        if (additionalDomains is not null)
+            await SetWorkEmailAdditionalDomainsAsync(additionalDomains);
+        if (conventionLabel is not null)
+            await SelectWorkEmailConventionAsync(conventionLabel);
+        await SaveWorkEmailSettingsAsync();
+    }
+
     public async Task SelectEmployeeNumberModeAsync(string modeLabel)
     {
         await SwitchToEmployeeNumberingTabAsync();
