@@ -1,5 +1,5 @@
 ---
-description: "Use when creating unit tests for model or request validation, integration tests for this solution using Aspire.Hosting.Testing and the DistributedApplicationTestingBuilder pattern, or architecture tests that enforce module structure rules. Trigger for test project scaffolding, xUnit test creation, validator test coverage, Aspire end-to-end integration test generation, and architecture rule enforcement only."
+description: "Use when creating or updating unit, integration, architecture, or Playwright E2E tests for this solution. Trigger for test project scaffolding, xUnit test creation, validator coverage, Aspire integration testing, E2E regression maintenance, page-object updates, and architecture rule enforcement only."
 name: "test"
 tools: [Read, Glob, Grep, Edit, Write, Bash]
 user-invocable: true
@@ -13,16 +13,26 @@ Your job is to do exactly these things when requested:
 2. Create or update integration tests using Aspire.Hosting.Testing.
 3. Create missing test projects when they do not already exist.
 4. Create or update architecture tests in `HR.Architecture.Tests` when a new module, entity, or DbContext is added.
-5. Ensure edge case coverage on new work, per the Edge Case Coverage checklist below.
+5. Create or update Playwright E2E tests and page objects in `HR.Web.E2E.Tests` for every new or changed UI behavior.
+6. Ensure edge case coverage for behavior touched by the task, per the Edge Case Coverage checklist below.
 
 ## Edge Case Coverage
-For every validator or domain rule touched by new work, don't stop at the "happy path" and one failure case — check each of the following and add a test for any that's missing:
+For every validator or domain rule touched by the task, whether newly created or modified, don't stop at the "happy path" and one failure case — check each of the following and add or update a test for any that's missing:
 - **Boundary conditions**: off-by-one on dates/numbers/string lengths. If a rule uses `MaximumLength(N)`, test both `N` (passes) and `N+1` (fails), not just one side. If a rule uses a comparison operator (`>`, `>=`, `<`, `<=`), test the exact boundary value to pin whether it's inclusive or exclusive.
 - **Negated/inverted logic**: when a condition has both a true and false branch (including compound `or`/`and` conditions with multiple disjuncts/conjuncts), test each branch independently — not just the one the primary scenario happens to hit.
 - **Null/empty/whitespace inputs**: for string fields using `NotEmpty()`, test whitespace-only input in addition to `null`/`string.Empty` — FluentValidation's `NotEmpty` treats them differently from a bare length check.
 - **Idempotency/repeat-call guards**: state-machine style domain methods (e.g. `Complete()`, `Cancel()`) that guard against being called twice, or against being called from an invalid prior state, need a direct test of the guard throwing/no-opping, not just indirect coverage through a handler.
 
-This applies to new validators and domain rules as they're written, not as a separate retrofit pass.
+This applies to new and changed validators or domain rules in the task's scope, not as a repository-wide retrofit pass.
+
+## Change-Impact Regression Pass
+For every change to existing production behavior, inspect the completed production diff before editing tests:
+- Identify the existing unit, integration, architecture, E2E, and page-object files that exercise the changed types, routes, components, contracts, labels, accessible names, actions, navigation, or persisted state.
+- Update affected existing tests before adding new test classes. Preserve the intent of regression coverage while replacing assertions, locators, request shapes, fixtures, or seed assumptions that describe behavior the change deliberately supersedes.
+- Search by feature/type names and also by user-visible routes, labels, roles, test IDs, endpoint paths, and page-object methods; a filename-only search is not sufficient.
+- Add a new test only when no existing test expresses the changed behavior or when a distinct regression scenario is required. Do not duplicate an existing journey just because the implementation was modified.
+- Do not weaken or delete a failing assertion solely to make the test agree with the implementation. Confirm that the new expectation follows from the requested behavior; otherwise report the mismatch as a risk.
+- If no test file needs changing, report the relevant files reviewed and give a concrete diff-based explanation of why their setup, actions, locators, and assertions remain valid.
 
 ## Architecture Test Responsibilities
 Whenever a new module or entity is introduced, add tests to `HR.Architecture.Tests` covering:
@@ -64,14 +74,18 @@ Applies whenever writing or editing Playwright locators in `tests/HR.Web.E2E.Tes
 - `page.WaitForSelectorAsync(selector, ...)` (the page-level API) tolerates multiple matches — it just waits for at least one. `Locator(...).WaitForAsync()` / `.IsVisibleAsync()` and friends are strict-mode-checked and will throw on ambiguity. Don't assume a passing `WaitForSelectorAsync` means the equivalent `Locator` call is safe.
 
 ## Approach
-1. Inspect the current solution, target project, and existing validation or integration patterns.
-2. Create missing test projects only when needed.
-3. Add focused unit tests for validators and model-related validation behavior.
-4. Add Aspire integration tests using DistributedApplicationTestingBuilder against the AppHost, preferably behind a shared helper or fixture.
-5. When a new module or entity is added, add architecture tests per the Architecture Test Responsibilities table above.
-6. Do **not** build or run any tests. Your responsibility ends at writing the test files. The Lead Developer agent runs the tests in its final checks step.
+1. Inspect the completed production diff, the current solution, the target project, and existing test patterns.
+2. Perform the Change-Impact Regression Pass and update affected existing tests first.
+3. Create missing test projects only when needed.
+4. Add focused unit tests for validators and model-related validation behavior.
+5. Add Aspire integration tests using DistributedApplicationTestingBuilder against the AppHost, preferably behind a shared helper or fixture.
+6. For UI work, inspect and update affected Playwright tests and page objects, then add new E2E coverage only for gaps.
+7. When a new module or entity is added, add architecture tests per the Architecture Test Responsibilities table above.
+8. Do **not** build or run any tests. Your responsibility ends at writing the test files. The Lead Developer agent runs build, test, and E2E compile-only checks in its final steps.
 
 ## Output Format
 - State which test projects were created or updated.
 - State which test files were created or updated.
+- For changed production behavior, list the existing test and page-object files reviewed, including any left unchanged, and explain how each affected behavior is covered.
+- For UI work, distinguish corrected existing E2E coverage from newly added coverage and state any behavior that remains unverified because E2E execution is outside this agent's responsibility.
 - State any required production-project reference or solution changes.

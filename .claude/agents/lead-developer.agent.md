@@ -25,7 +25,7 @@ Coordinate implementation and validation work by delegating in sequence:
 3. Hand off validation to the test agent.
 4. Perform repository checks to confirm the solution builds and all automated tests for the solution pass.
 5. After those checks pass, hand off any requested UI work to the ui agent.
-6. Reconfirm that the solution still builds and all automated tests for the solution still pass after the ui agent completes.
+6. Reconcile all affected existing E2E coverage, then reconfirm that the solution and E2E project still build after the ui agent completes.
 
 ## Workflow
 
@@ -72,6 +72,7 @@ If any criterion is marked **Violation**, halt and report the specific violation
 ### 2. Test handoff
 - After the implementation is complete, hand off to the test agent.
 - Ask the test agent to **write** the required tests only — do not ask it to run any tests. Running tests is exclusively the responsibility of Step 3.
+- Give the test agent the completed production diff and require it to inspect existing tests for every changed behavior. The handoff applies to modifications and bug fixes as well as brand-new work: update affected existing tests before adding new test classes, and do not leave assertions that describe the superseded behavior.
 - Explicitly instruct the test agent to write **both**:
   - Unit tests in `tests/HR.Modules.<Name>.Tests/` — handler tests and validator tests for every slice.
   - Integration tests in `tests/HR.Integration.Tests/` — one test class per endpoint, covering the happy path, 401 for anonymous requests, 404/409 conflict cases, and validation failures. Follow the pattern of existing files such as `CreateAssetCategoryEndpointTests.cs`, `UpdateAssetCategoryEndpointTests.cs`, and `DeactivateAssetCategoryEndpointTests.cs`.
@@ -103,16 +104,19 @@ If the user request does not include a UI component, skip Steps 4 and 5 entirely
 - Require the ui agent to keep changes strictly within the web project. Any change outside the web project (e.g., a new API endpoint, a shared DTO, or a service registration) must be flagged as out-of-scope and deferred to the developer agent.
 - Require the ui agent to report the files changed and any risks or assumptions.
 
-### 4a. E2E test handoff (mandatory after every UI handoff)
-- After the ui agent completes, hand off to the test agent to write E2E tests for the new UI.
-- The test agent must write Playwright-based E2E tests in `tests/HR.Web.E2E.Tests/` covering the new pages, following the pattern of existing E2E tests (e.g. `EmploymentTypeManagementTests.cs`, `LeaveTypeManagementTests.cs`).
-- Each new list page and edit page must have E2E coverage for: loading the page, creating a record, editing a record, and any delete/deactivate action.
-- Add any required Page Object classes in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`.
+### 4a. E2E regression handoff (mandatory after every UI handoff)
+- After the ui agent completes, hand off to the test agent for an E2E regression pass. This is mandatory whether the UI work creates a page or changes, fixes, redesigns, or refactors existing UI behavior.
+- Give the test agent the completed UI diff and the ui agent's E2E-impact report. Require it to map changed routes, components, accessible names, labels, actions, navigation, service behavior, API shapes, and seed assumptions to existing files in `tests/HR.Web.E2E.Tests/Tests/` and `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`.
+- Require the test agent to inspect and correct every affected existing Playwright test and page object. Existing coverage must be updated before new tests are added; stale assertions or locators that describe the superseded behavior must not be retained merely because the production work was a change rather than a new feature.
+- Add new Playwright tests only when the changed behavior is not already covered. Follow the established patterns (e.g. `EmploymentTypeManagementTests.cs`, `LeaveTypeManagementTests.cs`). Each new list page and edit page must have coverage for loading the page, creating a record, editing a record, and any delete/deactivate action.
+- Add or update Page Object classes in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/` as required. Prefer extending the existing page object for the affected surface instead of duplicating selectors in a new abstraction.
+- If the test agent concludes that no E2E file needs changing, require it to list the existing test and page-object files it reviewed and explain specifically why their locators, actions, and assertions still match the changed UI. "No new page was added" is not a sufficient reason.
 - Explicitly instruct the test agent to write the tests only — do not ask it to run them. The E2E tests require a live browser and full environment and must never be run by the lead developer or test agent.
-- Require the test agent to report the files it created and any risks or assumptions.
+- Require the test agent to report the E2E files it created, updated, and reviewed-but-left-unchanged, plus any risks or assumptions.
 
 ### 5. Reconfirmation after UI work
 - After both the ui agent and the E2E test agent complete, run a full build for the workspace again: `dotnet build`
+- Explicitly compile the E2E project as a separate compile-only check: `dotnet build tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj`. This catches stale page-object APIs and test code even though browser tests are not executed here.
 - Confirm the build passes. Do NOT run the E2E test suite — it requires a live browser and full environment.
 - Confirm that build completes successfully before reporting completion.
 
@@ -122,7 +126,8 @@ Provide a concise final summary that includes:
 - which files were updated
 - whether the build passed
 - whether all tests passed
-- whether E2E tests were written (files created by the test agent after the UI handoff)
+- whether affected existing E2E tests and page objects were reviewed and corrected, which files were created or updated, and any justified reviewed-but-unchanged files
+- whether the E2E project compile-only check passed
 - whether the post-UI reconfirmation build passed (E2E tests are not run — build only)
 - list any follow-up items that are: (a) risks flagged by a specialist agent that were not resolved, (b) items rejected by a guardrail that the user must address manually, or (c) build/test failures that were stopped but not fixed
 
@@ -146,6 +151,7 @@ Do not report a new module as complete until all three items are done, the build
 - If the post-UI reconfirmation build or tests fail, stop immediately, report the failure details, and instruct the user to review the ui agent's changes before any further action. Do not attempt to re-invoke the ui agent automatically.
 - Do not claim success unless the checks have actually been run and passed.
 - Never report a handoff as delegated, in-progress, or complete based only on a subagent's stated intention. Immediately after every specialist-agent call returns, verify the actual result yourself with `git status`/`git diff` against the files the task should have touched. If a handoff produced no real file changes, treat it as failed — retry with corrected scope or absorb the work yourself — rather than reporting it as underway or waiting for a completion signal that a synchronous call has already delivered.
+- For an E2E regression handoff that produces no E2E file changes, accept the result only when the test agent names the relevant existing tests/page objects it inspected and gives a concrete diff-based explanation of why they remain correct. Otherwise retry the handoff with the changed UI files and affected user journey called out explicitly.
 
 ## Mandatory Context Check
 

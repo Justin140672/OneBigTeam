@@ -55,17 +55,14 @@ Your job is to do exactly these things when requested:
 - When fixing a visual/layout bug (alignment, spacing, sizing), prefer adding or correcting a rule in the component's own `.razor.css` over reaching for Bootstrap utility classes in the markup, unless the existing surrounding markup already relies on utility classes for that exact concern.
 - If you find existing inline styles or embedded `<style>` blocks while touching a component for an unrelated change, do not do a drive-by refactor of them — leave a note in your Output Format summary that they exist, but only migrate them if the task at hand is specifically about styling.
 
-## Playwright E2E Tests
-When the lead developer requests Playwright tests alongside UI work, create them in `tests/HR.Web.E2E.Tests/`. Follow the existing patterns:
-- Page objects go in `tests/HR.Web.E2E.Tests/Infrastructure/PageObjects/`
-- Test classes go in `tests/HR.Web.E2E.Tests/Tests/`
-- All test classes must be decorated with `[Collection("E2E")]` and inherit `E2ETestBase`
-- Use seeded data (fixed GUIDs) rather than creating data dynamically in tests
-- Add methods to existing page objects (e.g. `TaskViewPage.cs`) rather than creating new ones for minor additions
-- Do **not** run the Playwright tests — only write them. Running E2E tests requires a live browser and full environment.
+## E2E Regression Handoff
+- The test agent owns Playwright E2E tests and page objects. Do not edit `tests/HR.Web.E2E.Tests` during the UI handoff unless the lead developer explicitly assigns that test work to this agent.
+- Before reporting completion, describe every user-observable change that the test agent must reconcile: routes, labels, accessible names/roles, test IDs, controls, actions, validation messages, navigation after actions, loading/error states, service behavior, and API request/response shapes.
+- Identify likely existing E2E test classes and page objects when they can be found from the feature names or routes. A change to an existing screen still requires this report even when no new page was added.
+- Preserve stable accessible names and `data-testid` hooks unless the requested behavior requires changing them. When a hook changes, call it out explicitly so the E2E regression handoff cannot miss it.
 
 ## Constraints
-- Work only in `src/HR.Web` and `tests/HR.Web.E2E.Tests` unless a minimal change to a shared model is required.
+- Work only in `src/HR.Web` unless a minimal change to a shared model is required. E2E files belong to the subsequent test-agent handoff unless explicitly assigned otherwise.
 - Do not create or modify API endpoints, DbContexts, EF models, validators, migrations, or non-E2E tests.
 - Do not introduce a different UI framework.
 - Prefer the repository's existing Blazor component structure, routing patterns, and service-registration style.
@@ -81,9 +78,11 @@ When the lead developer requests Playwright tests alongside UI work, create them
 4. Add or update the list screen using `HrGrid` and Syncfusion controls.
 5. Add or update the edit screen using `HrTextBox`, `SfDropDownList`, `SfDatePicker`, and `SfButton`, following the dual-route and navigation-after-save conventions above.
 6. Register the service in `Program.cs` and add a nav link if needed.
+7. Inspect the UI diff for user-observable changes and prepare the E2E Regression Handoff report, including likely affected existing test classes and page objects.
 
 ## Output Format
 - State which files were created or updated.
 - State which service was created or updated.
 - State which list and edit screens were created or updated.
+- State the E2E impact of the UI diff: changed routes, labels, accessible names/roles, test IDs, actions, validation, navigation, states, service behavior, and likely affected existing E2E/page-object files. Explicitly state when an item is unchanged rather than omitting the assessment.
 - If work cannot proceed, report the exact missing prerequisite.
