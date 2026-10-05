@@ -97,9 +97,31 @@ public class GetOnboardingOverviewEndpointTests
             Assert.False(string.IsNullOrWhiteSpace(t.AssignedToName));
         });
 
-        var workstation = Assert.Single(payload.Tasks, t => t.Title.Contains("Set up workstation"));
+        var workstation = Assert.Single(payload.Tasks, t => t.Title.Contains("Prepare workstation"));
         Assert.Null(workstation.AssignedEmployeeId);
         Assert.Equal("Unassigned", workstation.AssignedToName);
+
+        var rightToWork = Assert.Single(payload.Tasks, t => t.Title.Contains("right-to-work"));
+        Assert.Null(rightToWork.AssignedEmployeeId);
+        Assert.Equal("HR", rightToWork.AssignedToName);
+    }
+
+    [Fact]
+    public async Task Get_OnboardingOverview_Uses_Full_Default_Template_When_Profile_Has_No_Template()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await AuthenticatedClient(companyId);
+
+        var employeeId = await CreateEmployeeAsync(client, companyId);
+
+        var response = await client.GetAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/onboarding-overview");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var payload = await response.Content.ReadFromJsonAsync<OverviewPayload>();
+        Assert.NotNull(payload);
+        Assert.Equal(15, payload!.Tasks.Count);
+        Assert.DoesNotContain(payload.Tasks, t => t.Title.Contains("Schedule welcome and induction meeting"));
     }
 
     [Fact]
@@ -147,7 +169,7 @@ public class GetOnboardingOverviewEndpointTests
 
         var employeeId = await CreateEmployeeAsync(client, companyId, positionProfileId: null);
 
-        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
+        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Prepare workstation");
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/onboarding-overview");
@@ -156,7 +178,7 @@ public class GetOnboardingOverviewEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<OverviewPayload>();
         Assert.NotNull(payload);
 
-        var completedTask = Assert.Single(payload!.Tasks, t => t.Title.Contains("Set up workstation"));
+        var completedTask = Assert.Single(payload!.Tasks, t => t.Title.Contains("Prepare workstation"));
         Assert.Equal("Completed", completedTask.Status);
         Assert.NotNull(completedTask.CompletedAt);
         Assert.True(completedTask.CompletedAt >= completedTask.CreatedAt);

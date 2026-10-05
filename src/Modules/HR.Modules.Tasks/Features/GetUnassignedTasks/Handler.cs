@@ -44,7 +44,8 @@ internal sealed class GetUnassignedTasksHandler(TasksDbContext dbContext)
                 t.DueDate,
                 t.SourceEntityId,
                 t.CreatedBy,
-                t.CreatedAt))
+                t.CreatedAt,
+                t.AssignedToHr))
             .ToListAsync(cancellationToken);
 
         return new GetUnassignedTasksResponse(items);

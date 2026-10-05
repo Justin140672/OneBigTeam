@@ -43,7 +43,9 @@ public static class TasksModule
 
     private static void AddFeatureServices(IServiceCollection services)
     {
-        services.AddScoped<ITaskCreator, TaskCreator>();
+        services.AddScoped<TaskCreator>();
+        services.AddScoped<ITaskCreator>(sp => sp.GetRequiredService<TaskCreator>());
+        services.AddScoped<IHrTaskCreator>(sp => sp.GetRequiredService<TaskCreator>());
         services.AddScoped<TaskCompleter>();
         services.AddScoped<ITaskCompleter>(sp => sp.GetRequiredService<TaskCompleter>());
         services.AddScoped<TaskCanceller>();

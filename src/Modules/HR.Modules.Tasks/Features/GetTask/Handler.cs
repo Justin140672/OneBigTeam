@@ -49,6 +49,7 @@ internal sealed class GetTaskHandler(TasksDbContext dbContext, TasksResourceAuth
             task.CompletedBy,
             task.CompletedAt,
             task.CreatedAt,
-            task.UpdatedAt));
+            task.UpdatedAt,
+            task.AssignedToHr));
     }
 }

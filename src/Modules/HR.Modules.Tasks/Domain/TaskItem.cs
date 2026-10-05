@@ -19,6 +19,7 @@ internal sealed class TaskItem
     public TaskActionType ActionType { get; private set; }
     public Guid? AssignedEmployeeId { get; private set; }
     public Guid? AssignedUserId { get; private set; }
+    public bool AssignedToHr { get; private set; }
     public Guid? SourceEntityId { get; private set; }
 
     public string? IdempotencyKey { get; private set; }
@@ -43,7 +44,8 @@ internal sealed class TaskItem
         Guid? assignedUserId,
         DateTimeOffset now,
         Guid? sourceEntityId = null,
-        string? idempotencyKey = null)
+        string? idempotencyKey = null,
+        bool assignedToHr = false)
     {
         return new TaskItem
         {
@@ -58,6 +60,7 @@ internal sealed class TaskItem
             DueDate = dueDate,
             AssignedEmployeeId = assignedEmployeeId,
             AssignedUserId = assignedUserId,
+            AssignedToHr = assignedToHr && assignedEmployeeId is null && assignedUserId is null,
             SourceEntityId = sourceEntityId,
             IdempotencyKey = idempotencyKey,
             Status = TaskItemStatus.Open,
@@ -105,6 +108,8 @@ internal sealed class TaskItem
     {
         AssignedEmployeeId = assignedEmployeeId;
         AssignedUserId = assignedUserId;
+        if (assignedEmployeeId is not null || assignedUserId is not null)
+            AssignedToHr = false;
         UpdatedAt = now;
     }
 

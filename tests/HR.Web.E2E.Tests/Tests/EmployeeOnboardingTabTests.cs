@@ -21,13 +21,43 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         return (seeded.EmployeeId, seeded.LastName);
     }
 
+    private async Task<(string ProfileTitle, string TaskTitle)> CreateHrOwnedSingleTaskProfileAsync()
+    {
+        var unique       = Guid.NewGuid().ToString("N")[..8];
+        var templateName = $"E2E Onb HrOnly {unique}";
+        var taskTitle    = $"E2E HR Checklist {unique}";
+        var profileTitle = $"E2E Onb Role {unique}";
+
+        var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+        var ppList       = new PositionProfileListPage(_page, _fixture.WebBaseUrl);
+        var ppEdit       = new PositionProfileEditPage(_page, _fixture.WebBaseUrl);
+
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.ClickAddTaskAsync();
+        await templateEdit.FillTaskTitleAsync(taskTitle);
+        await templateEdit.SelectFirstTaskAssignToAsync("HR");
+        await templateEdit.SaveAsync();
+
+        await ppList.GoToAsync(AcmeId);
+        await ppList.ClickNewPositionProfileAsync();
+        await ppEdit.FillTitleAsync(profileTitle);
+        await ppEdit.SelectDepartmentAsync("Engineering");
+        await ppEdit.SelectLocationAsync("London Office");
+        await ppEdit.SelectDefaultLeavePolicyAsync("Standard");
+        await ppEdit.SelectOnboardingTemplateAsync(templateName);
+        await ppEdit.SaveAsync();
+
+        return (profileTitle, taskTitle);
+    }
+
     /// <summary>
     /// Creates a brand-new Acme employee through the "New Employee" UI. EmployeeCreatedHandler
-    /// then provisions an onboarding plan + the 3 default checklist tasks for it. Used by the
-    /// plan-completion test, which must not mutate a shared pool employee.
+    /// then provisions an onboarding plan from the template linked to the chosen position profile.
+    /// Used by tests that must not mutate a shared pool employee.
     /// </summary>
     private async Task<(Guid EmployeeId, string LastName)> CreateGenuinelyFreshEmployeeAsync(
-        EmployeeListPage empList, EmployeeEditPage empEdit)
+        EmployeeListPage empList, EmployeeEditPage empEdit, string positionProfile)
     {
         var unique   = Guid.NewGuid().ToString("N")[..8];
         var lastName = $"OnbFresh{unique}";
@@ -53,7 +83,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await empEdit.FillStartDateAsync("01/01/2026");
         await empEdit.FillEmployeeNumberAsync($"E2E-ONB-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
-        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+        await empEdit.SelectDropdownAsync("Position Profile", positionProfile);
         await empEdit.SaveNewEmployeeAsync();
 
         await empList.ClickEmployeeAsync(lastName);
@@ -146,7 +176,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         var (_, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenOnboardingTabAsync();
 
-        const string workstationTitle = "Set up workstation and system access";
+        const string workstationTitle = "Prepare workstation, equipment, accounts, and system access";
         var rowTitle = await empEdit.GetOnboardingChecklistRowTitleAsync(workstationTitle);
         Assert.NotNull(rowTitle);
         Assert.DoesNotContain(lastName, rowTitle!, StringComparison.OrdinalIgnoreCase);
@@ -171,7 +201,7 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         var (_, lastName) = await CreateEmployeeWithFreshOnboardingPlanAsync(empList, empEdit, slot: 0);
         await empEdit.OpenTasksTabAsync();
 
-        var workstationTask = _page.Locator(".e-row").Filter(new() { HasText = "Set up workstation and system access" }).First;
+        var workstationTask = _page.Locator(".e-row").Filter(new() { HasText = "Prepare workstation, equipment, accounts, and system access" }).First;
         await workstationTask.WaitForAsync(new() { Timeout = 15_000 });
         var title = (await workstationTask.Locator(".task-title").TextContentAsync())!;
         Assert.DoesNotContain(lastName, title, StringComparison.OrdinalIgnoreCase);
@@ -210,18 +240,14 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        var (employeeId, lastName) = await CreateGenuinelyFreshEmployeeAsync(empList, empEdit);
+        var (profileTitle, taskTitle) = await CreateHrOwnedSingleTaskProfileAsync();
+        var (employeeId, lastName) = await CreateGenuinelyFreshEmployeeAsync(empList, empEdit, profileTitle);
 
         Assert.True(
             await EmployeeEditPage.IsSectionTabPresentAsync(_page, "Onboarding"),
             "Expected the Onboarding tab to be visible while the plan is not yet completed");
 
-        string[] taskFragments =
-        [
-            "Set up workstation",
-            "Send welcome email",
-            "Schedule welcome and induction meeting",
-        ];
+        string[] taskFragments = [taskTitle];
 
         foreach (var fragment in taskFragments)
         {
@@ -250,6 +276,31 @@ public sealed class EmployeeOnboardingTabTests(HrAdminPersonaFixture fixture) : 
 
         await Assertions.Expect(empEdit.AuditHistoryRow("Onboarding completed").First)
             .ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
+    [Fact]
+    public async Task HrOwnedOnboardingTask_ForNewEmployee_AppearsInHrInbox_AsAssignedToHr_AndInChecklistAsHr()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        var inbox   = new HrInboxPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        var (profileTitle, taskTitle) = await CreateHrOwnedSingleTaskProfileAsync();
+        var (employeeId, lastName) = await CreateGenuinelyFreshEmployeeAsync(empList, empEdit, profileTitle);
+
+        await inbox.GoToAsync(AcmeId, lastName);
+        var inboxTitle = (await inbox.GetTaskTitlesAsync()).First(t =>
+            t.Contains(taskTitle, StringComparison.OrdinalIgnoreCase) &&
+            t.Contains(lastName, StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("Assigned to HR", await inbox.GetOwnerBadgeTextAsync(inboxTitle));
+
+        await empEdit.GoToAsync(AcmeId, employeeId);
+        await empEdit.OpenOnboardingTabAsync();
+        Assert.Equal("HR", await empEdit.GetOnboardingChecklistOwnerAsync(taskTitle));
     }
 
     [Fact]

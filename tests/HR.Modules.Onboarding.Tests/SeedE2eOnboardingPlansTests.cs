@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Onboarding.Domain;
 using HR.Modules.Onboarding.Persistence;
 using HR.Modules.Onboarding.Tests.Infrastructure;
@@ -10,12 +11,26 @@ namespace HR.Modules.Onboarding.Tests;
 public class SeedE2eOnboardingPlansTests
 {
     private readonly FakeTaskCreator _taskCreator = new();
+    private readonly FakeHrTaskCreator _hrTaskCreator = new();
 
-    private ServiceProvider BuildProvider(string dbName)
+    private static readonly Guid DefaultTemplateId = Guid.NewGuid();
+
+    private static readonly IReadOnlyList<OnboardingTemplateTaskItem> TemplateTasks =
+    [
+        new(Guid.NewGuid(), "Prepare workstation", "Desk.", TaskPriority.High, OnboardingTemplateTaskAssignTo.Manager, 0, 1),
+        new(Guid.NewGuid(), "Complete payroll details", "Payroll.", TaskPriority.High, OnboardingTemplateTaskAssignTo.NewHire, 3, 2),
+        new(Guid.NewGuid(), "Right-to-work checks", "Verify.", TaskPriority.Critical, OnboardingTemplateTaskAssignTo.Hr, 1, 3),
+    ];
+
+    private ServiceProvider BuildProvider(string dbName, bool withDefaultTemplate = true)
     {
         var services = new ServiceCollection();
         services.AddDbContext<OnboardingDbContext>(o => o.UseInMemoryDatabase(dbName));
         services.AddSingleton<ITaskCreator>(_taskCreator);
+        services.AddSingleton<IHrTaskCreator>(_hrTaskCreator);
+        services.AddSingleton<IOnboardingTemplateReader>(new FakeOnboardingTemplateReader(
+            defaultTemplateId: withDefaultTemplate ? DefaultTemplateId : null,
+            tasksByTemplate: new Dictionary<Guid, IReadOnlyList<OnboardingTemplateTaskItem>> { [DefaultTemplateId] = TemplateTasks }));
         return services.BuildServiceProvider();
     }
 
@@ -23,10 +38,9 @@ public class SeedE2eOnboardingPlansTests
         (Guid.NewGuid(), Guid.NewGuid(), new DateOnly(2026, 3, 1), name);
 
     [Fact]
-    public async Task Creates_NotStarted_Plan_With_Three_Default_Tasks_Per_Employee()
+    public async Task Creates_NotStarted_Plan_From_Default_Template_Per_Employee()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var provider = BuildProvider(dbName);
+        var provider = BuildProvider(Guid.NewGuid().ToString("N"));
         var a = Emp("E2E SeedOnboardTabA");
         var b = Emp("E2E SeedOnboardTabB");
 
@@ -41,26 +55,34 @@ public class SeedE2eOnboardingPlansTests
         var tasksA = await db.OnboardingTasks.Where(t => t.OnboardingPlanId == planA.Id).ToListAsync();
         Assert.Equal(3, tasksA.Count);
         Assert.All(tasksA, t => Assert.Equal(OnboardingTaskStatus.Pending, t.Status));
-        Assert.Contains(tasksA, t => t.Title == "Set up workstation and system access — E2E SeedOnboardTabA");
-        Assert.Contains(tasksA, t => t.Title == "Send welcome email and first-day details — E2E SeedOnboardTabA");
-        Assert.Contains(tasksA, t => t.Title == "Schedule welcome and induction meeting — E2E SeedOnboardTabA");
-        Assert.Contains(tasksA, t => t.DueDate == new DateOnly(2026, 3, 8));
+        Assert.Contains(tasksA, t => t.Title == "Prepare workstation — E2E SeedOnboardTabA" && t.DueDate == new DateOnly(2026, 3, 1));
+        Assert.Contains(tasksA, t => t.Title == "Complete payroll details — E2E SeedOnboardTabA" && t.DueDate == new DateOnly(2026, 3, 4));
+        Assert.Contains(tasksA, t => t.Title == "Right-to-work checks — E2E SeedOnboardTabA" && t.AssignTo == OnboardingTemplateTaskAssignTo.Hr);
 
         var createdForA = _taskCreator.Created.Where(t => t.Title.EndsWith("E2E SeedOnboardTabA")).ToList();
-        Assert.Equal(3, createdForA.Count);
-        Assert.All(createdForA, t =>
-        {
-            Assert.Equal(TaskSource.Onboarding, t.Source);
-            Assert.Null(t.AssignedEmployeeId);
-            Assert.Null(t.AssignedUserId);
-        });
+        Assert.Equal(2, createdForA.Count);
+        Assert.All(createdForA, t => Assert.Equal(TaskSource.Onboarding, t.Source));
+        Assert.Null(createdForA.Single(t => t.Title.StartsWith("Prepare workstation")).AssignedEmployeeId);
+        Assert.Equal(a.EmployeeId, createdForA.Single(t => t.Title.StartsWith("Complete payroll")).AssignedEmployeeId);
+        Assert.Single(_hrTaskCreator.Created, t => t.Title.EndsWith("E2E SeedOnboardTabA"));
+    }
+
+    [Fact]
+    public async Task Creates_Empty_Plan_When_No_Default_Template()
+    {
+        var provider = BuildProvider(Guid.NewGuid().ToString("N"), withDefaultTemplate: false);
+
+        await provider.SeedE2eOnboardingPlansAsync([Emp("E2E SeedOnboardTabA")]);
+
+        await using var db = provider.GetRequiredService<OnboardingDbContext>();
+        Assert.Equal(1, await db.OnboardingPlans.CountAsync());
+        Assert.Equal(0, await db.OnboardingTasks.CountAsync());
     }
 
     [Fact]
     public async Task Is_Idempotent_Per_Employee()
     {
-        var dbName = Guid.NewGuid().ToString("N");
-        var provider = BuildProvider(dbName);
+        var provider = BuildProvider(Guid.NewGuid().ToString("N"));
         var a = Emp("E2E SeedOnboardTabA");
 
         await provider.SeedE2eOnboardingPlansAsync([a]);
@@ -69,6 +91,7 @@ public class SeedE2eOnboardingPlansTests
         await using var db = provider.GetRequiredService<OnboardingDbContext>();
         Assert.Equal(1, await db.OnboardingPlans.CountAsync());
         Assert.Equal(3, await db.OnboardingTasks.CountAsync());
-        Assert.Equal(3, _taskCreator.Created.Count);
+        Assert.Equal(2, _taskCreator.Created.Count);
+        Assert.Single(_hrTaskCreator.Created);
     }
 }

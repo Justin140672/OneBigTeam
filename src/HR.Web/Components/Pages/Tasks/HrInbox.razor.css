@@ -167,3 +167,12 @@
 .due-badge--today   { background: #ffedd5; color: #ea580c; }
 .due-badge--soon    { background: #fef3c7; color: #ca8a04; }
 .due-badge--normal  { background: #f3f4f6; color: #6b7280; }
+
+.inbox-owner-badge {
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: #e0e7ff;
+    color: #3730a3;
+}

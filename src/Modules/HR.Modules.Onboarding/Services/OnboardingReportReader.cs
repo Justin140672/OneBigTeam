@@ -54,7 +54,7 @@ internal sealed class OnboardingReportReader(OnboardingDbContext dbContext) : IO
                 .Select(t => new OnboardingReportTaskItem(
                     t.Title,
                     t.DueDate,
-                    t.AssignTo.ToString(),
+                    t.AssignTo == OnboardingTemplateTaskAssignTo.Hr ? "HR" : t.AssignTo.ToString(),
                     t.DueDate is not null && t.DueDate < today,
                     t.Id))
                 .ToList();

@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using HR.Web.E2E.Tests.Infrastructure;
 
 namespace HR.Web.E2E.Tests.Infrastructure.PageObjects;
 
@@ -104,6 +105,20 @@ public sealed class OnboardingTemplateEditPage(IPage page, string baseUrl)
         await EnsureFirstTaskExpandedAsync();
         await page.GetByPlaceholder("Task title").First.FillAsync(title);
         await page.Keyboard.PressAsync("Tab");
+    }
+
+    public async Task SelectFirstTaskAssignToAsync(string optionLabel)
+    {
+        await EnsureFirstTaskExpandedAsync();
+        await DropDownSelector.SelectAsync(
+            page, page.Locator(".hr-field", new PageLocatorOptions { HasText = "Assign To" }).First, optionLabel);
+    }
+
+    public async Task<string> GetFirstTaskAssignToAsync()
+    {
+        await EnsureFirstTaskExpandedAsync();
+        var field = page.Locator(".hr-field", new PageLocatorOptions { HasText = "Assign To" }).First;
+        return (await field.Locator("span[role='combobox'] input").First.InputValueAsync()).Trim();
     }
 
     public async Task<string> GetTaskTitleAsync()

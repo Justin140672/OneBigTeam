@@ -17,4 +17,5 @@ internal sealed record GetTaskResponse(
     Guid? CompletedBy,
     DateTimeOffset? CompletedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool AssignedToHr = false);

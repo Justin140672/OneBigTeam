@@ -11,11 +11,11 @@ internal sealed class TaskCreator(
     TasksDbContext dbContext,
     INotificationWriter notificationWriter,
     IClock clock,
-    IAuditEventPublisher auditPublisher) : ITaskCreator
+    IAuditEventPublisher auditPublisher) : ITaskCreator, IHrTaskCreator
 {
     private const string IdempotencyIndexName = "ix_task_items_company_id_idempotency_key";
 
-    public async Task<Guid> CreateAsync(
+    public Task<Guid> CreateAsync(
         Guid companyId,
         Guid createdBy,
         string title,
@@ -30,6 +30,43 @@ internal sealed class TaskCreator(
         CancellationToken cancellationToken,
         bool notifyAssignee = true,
         string? idempotencyKey = null)
+        => CreateCoreAsync(
+            companyId, createdBy, title, description, priority, source, actionType, dueDate,
+            assignedEmployeeId, assignedUserId, sourceEntityId, assignedToHr: false,
+            cancellationToken, notifyAssignee, idempotencyKey);
+
+    public Task<Guid> CreateForHrAsync(
+        Guid companyId,
+        Guid createdBy,
+        string title,
+        string? description,
+        TaskPriority priority,
+        TaskSource source,
+        TaskActionType actionType,
+        DateOnly? dueDate,
+        Guid? sourceEntityId,
+        CancellationToken cancellationToken)
+        => CreateCoreAsync(
+            companyId, createdBy, title, description, priority, source, actionType, dueDate,
+            assignedEmployeeId: null, assignedUserId: null, sourceEntityId, assignedToHr: true,
+            cancellationToken, notifyAssignee: false, idempotencyKey: null);
+
+    private async Task<Guid> CreateCoreAsync(
+        Guid companyId,
+        Guid createdBy,
+        string title,
+        string? description,
+        TaskPriority priority,
+        TaskSource source,
+        TaskActionType actionType,
+        DateOnly? dueDate,
+        Guid? assignedEmployeeId,
+        Guid? assignedUserId,
+        Guid? sourceEntityId,
+        bool assignedToHr,
+        CancellationToken cancellationToken,
+        bool notifyAssignee,
+        string? idempotencyKey)
     {
         // OBT-REM-13: read-before-create optimisation only — cheaply avoids the round trip to build
         // and attempt-insert a task (plus its notification/audit side effects) in the common case
@@ -52,7 +89,7 @@ internal sealed class TaskCreator(
             title.Trim(),
             string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
             priority, source, actionType, dueDate, assignedEmployeeId, assignedUserId,
-            clock.UtcNowOffset(), sourceEntityId, idempotencyKey);
+            clock.UtcNowOffset(), sourceEntityId, idempotencyKey, assignedToHr);
 
         dbContext.TaskItems.Add(task);
 

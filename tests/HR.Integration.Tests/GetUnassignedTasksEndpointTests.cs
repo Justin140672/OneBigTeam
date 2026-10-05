@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using HR.Integration.Tests.Infrastructure;
 using HR.Modules.Identity.Domain;
+using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace HR.Integration.Tests;
 
@@ -91,6 +93,49 @@ public class GetUnassignedTasksEndpointTests
         Assert.Contains(payload.Items, t => t.Title == unassignedTitle);
     }
 
+    [Fact]
+    public async Task Returns_HR_Owned_Tasks_Flagged_As_Assigned_To_HR_And_Plain_Unassigned_Tasks_Unflagged()
+    {
+        using var client = await AdminClient();
+        var hrTitle      = $"HrOwned-{Guid.NewGuid():N}";
+        var plainTitle   = $"Plain-{Guid.NewGuid():N}";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var hrTaskCreator = scope.ServiceProvider.GetRequiredService<IHrTaskCreator>();
+            await hrTaskCreator.CreateForHrAsync(
+                SeededCompanyId, Guid.NewGuid(), hrTitle, null, TaskPriority.High, TaskSource.Onboarding,
+                TaskActionType.Complete, null, Guid.NewGuid(), CancellationToken.None);
+        }
+        await TaskSeeder.SeedAsync(_factory, SeededCompanyId, plainTitle);
+
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/unassigned");
+        var payload  = await response.Content.ReadFromJsonAsync<UnassignedPayload>();
+
+        Assert.True(Assert.Single(payload!.Items, t => t.Title == hrTitle).AssignedToHr);
+        Assert.False(Assert.Single(payload.Items, t => t.Title == plainTitle).AssignedToHr);
+    }
+
+    [Fact]
+    public async Task HR_Owned_Task_Is_Not_Visible_To_Another_Company()
+    {
+        using var client = await AdminClient();
+        var hrTitle      = $"HrOwnedOtherCompany-{Guid.NewGuid():N}";
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var hrTaskCreator = scope.ServiceProvider.GetRequiredService<IHrTaskCreator>();
+            await hrTaskCreator.CreateForHrAsync(
+                Guid.NewGuid(), Guid.NewGuid(), hrTitle, null, TaskPriority.High, TaskSource.Onboarding,
+                TaskActionType.Complete, null, Guid.NewGuid(), CancellationToken.None);
+        }
+
+        var response = await client.GetAsync($"/api/companies/{SeededCompanyId}/tasks/unassigned");
+        var payload  = await response.Content.ReadFromJsonAsync<UnassignedPayload>();
+
+        Assert.DoesNotContain(payload!.Items, t => t.Title == hrTitle);
+    }
+
 
     private async Task<HttpClient> AdminClient()
     {
@@ -102,5 +147,5 @@ public class GetUnassignedTasksEndpointTests
     }
 
     private sealed record UnassignedPayload(IReadOnlyList<UnassignedItem> Items);
-    private sealed record UnassignedItem(Guid Id, string Title, string? Source, Guid? SourceEntityId);
+    private sealed record UnassignedItem(Guid Id, string Title, string? Source, Guid? SourceEntityId, bool AssignedToHr = false);
 }

@@ -62,8 +62,8 @@ internal sealed class OutstandingOnboardingTasksWorkloadActionProvider(
 
         // Manager workspace: a report's outstanding onboarding task is not necessarily one the
         // manager may open. GetTask only authorizes the assignee, a manager anywhere in the
-        // ASSIGNEE's reporting line, or an HR Administrator — and unassigned tasks (e.g. the
-        // default "Set up workstation and system access" task, which sits in the HR Inbox) are
+        // ASSIGNEE's reporting line, or an HR Administrator — and unassigned tasks (e.g.
+        // HR-owned and manager-less template tasks, which sit in the HR Inbox) are
         // HR-only. Previously every such row carried its TaskId and rendered as "Open task", and
         // activating it opened a Task View dialog that GetTask then rejected ("This task could not
         // be found..."). Keep the row visible for oversight but mark it non-actionable unless the

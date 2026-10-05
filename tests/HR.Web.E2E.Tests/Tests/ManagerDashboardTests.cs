@@ -162,7 +162,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         _ = empList;
         var (employeeId, lastName) = CreateEmployeeReportingToDavidAsync();
 
-        await inbox.GoToAsync(AcmeId);
+        await inbox.GoToAsync(AcmeId, lastName);
         var inboxTitles  = await inbox.GetTaskTitlesAsync();
         var claimedTitle = inboxTitles.First(t => t.Contains(lastName, StringComparison.OrdinalIgnoreCase));
         await inbox.ClaimAsync(claimedTitle);
@@ -188,7 +188,7 @@ public sealed class ManagerDashboardTests(ManagerPersonaFixture fixture) : RoleE
         var percent = await empEdit.GetOnboardingProgressPercentAsync();
         Assert.True(percent > 0,
             $"Expected onboarding progress to be greater than 0% after completing one of the " +
-            $"three default checklist tasks, got {percent}%");
+            $"default checklist tasks, got {percent}%");
 
         var taskStatus = await empEdit.GetOnboardingChecklistTaskStatusAsync(claimedTitle.Split(" — ")[0]);
         Assert.Equal("Completed", taskStatus);

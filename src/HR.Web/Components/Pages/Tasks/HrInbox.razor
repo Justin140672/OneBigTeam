@@ -11,7 +11,7 @@
     <div class="inbox-header mb-4">
         <div>
             <h1 class="mb-0">HR Inbox</h1>
-            <p class="text-muted small mb-0">View unassigned tasks waiting to be picked up.</p>
+            <p class="text-muted small mb-0">View HR-owned and unassigned tasks waiting to be picked up.</p>
         </div>
         @if (!_loading && _items.Count > 0)
         {
@@ -34,7 +34,7 @@
         <div class="inbox-empty">
             <i class="fa-solid fa-inbox fa-2x mb-3 inbox-empty-icon"></i>
             <p class="mb-0 fw-semibold">Inbox clear</p>
-            <p class="text-muted small mb-0">No unassigned tasks right now.</p>
+            <p class="text-muted small mb-0">No HR or unassigned tasks right now.</p>
         </div>
     }
     else
@@ -50,6 +50,7 @@
                         <div class="inbox-card-top">
                             <span class="inbox-card-title">@t.Title</span>
                             <span class="inbox-source-badge inbox-source-badge--@t.Source.ToLowerInvariant()">@EnumDisplay.Humanize(t.Source)</span>
+                            <span class="inbox-owner-badge" data-testid="@($"inbox-owner-{t.Id}")">@(t.AssignedToHr ? "Assigned to HR" : "Unassigned")</span>
                         </div>
                         @if (t.Description is not null)
                         {

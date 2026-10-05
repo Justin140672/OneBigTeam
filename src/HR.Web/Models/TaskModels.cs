@@ -37,7 +37,8 @@ public sealed record UnassignedTaskItem(
     DateOnly? DueDate,
     Guid? SourceEntityId,
     Guid CreatedBy,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool AssignedToHr = false);
 
 public sealed record TaskDetailModel(
     Guid Id,

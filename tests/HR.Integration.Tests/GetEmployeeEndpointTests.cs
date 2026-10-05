@@ -413,28 +413,19 @@ public class GetEmployeeEndpointTests
         Assert.True(afterOffboardingStarted.ShowProbationTab);
         Assert.True(afterOffboardingStarted.ShowOffboardingTab);
 
-        // Complete every generated onboarding task — the plan should transition to Completed and
-        // ShowOnboardingTab should flip to false, independently of the still-active probation and
-        // offboarding plans. Jamie has a manager, so of the 3 default checklist tasks, only "Set
-        // up workstation" is unassigned — "Send welcome email" and "Schedule induction meeting"
-        // are assigned directly to the manager (CreateOnboardingPlanOnEmployeeCreated's default
-        // fallback checklist). Task titles are suffixed with the employee's display name, so
-        // filter on "Jamie" to avoid also sweeping up the Manager employee's own onboarding tasks
-        // (onboarding auto-creates for every employee regardless of whether they have a manager).
-        var unassignedResponse = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
-        unassignedResponse.EnsureSuccessStatusCode();
-        var jamieUnassignedOnboardingTask = (await unassignedResponse.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
-            .Single(t => t.Source == "Onboarding" && t.Title.Contains("Jamie"));
-
-        var managerOnboardingTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks");
-        managerOnboardingTasksResponse.EnsureSuccessStatusCode();
-        var jamieManagerAssignedOnboardingTasks = (await managerOnboardingTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
+        // Complete every generated onboarding task so the plan transitions to Completed and
+        // ShowOnboardingTab flips to false, independently of the still-active probation and
+        // offboarding plans. Jamie's plan comes from the company's default Standard Onboarding
+        // template, so the employee's task list carries all 15 generated tasks regardless of owner
+        // (HR, Manager or New Hire). Filter on "Jamie" to avoid sweeping up the manager's own tasks.
+        var jamieTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks?pageSize=100");
+        jamieTasksResponse.EnsureSuccessStatusCode();
+        var jamieOnboardingTasks = (await jamieTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
             .Where(t => t.Source == "Onboarding" && t.Title.Contains("Jamie"))
             .ToList();
-        Assert.Equal(2, jamieManagerAssignedOnboardingTasks.Count);
+        Assert.Equal(15, jamieOnboardingTasks.Count);
 
-        var onboardingTaskIds = new[] { jamieUnassignedOnboardingTask.Id }
-            .Concat(jamieManagerAssignedOnboardingTasks.Select(t => t.Id));
+        var onboardingTaskIds = jamieOnboardingTasks.Select(t => t.Id);
 
         foreach (var taskId in onboardingTaskIds)
         {
@@ -490,7 +481,7 @@ public class GetEmployeeEndpointTests
             .ToList();
         Assert.Single(unassignedOffboardingTasks);
 
-        var managerTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks");
+        var managerTasksResponse = await client.GetAsync($"/api/companies/{companyId}/employees/{managerId}/tasks?pageSize=100");
         managerTasksResponse.EnsureSuccessStatusCode();
         var managerOffboardingTasks = (await managerTasksResponse.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
             .Where(t => t.Source == "Offboarding")

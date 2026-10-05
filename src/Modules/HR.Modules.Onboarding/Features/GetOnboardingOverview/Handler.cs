@@ -76,7 +76,8 @@ internal sealed class GetOnboardingOverviewHandler(
                 var ownerName = ownerId is { } id && ownerNames.TryGetValue(id, out var name) ? name : null;
                 return new OnboardingTaskOverviewItem(
                     t.Id, t.Title, t.Status.ToString(), t.DueDate, t.CreatedAt, t.CompletedAt, t.UpdatedAt,
-                    link?.TaskId, ownerId, ownerName ?? (ownerId is null ? "Unassigned" : "Unknown"));
+                    link?.TaskId, ownerId,
+                    ownerName ?? (ownerId is not null ? "Unknown" : t.AssignTo == OnboardingTemplateTaskAssignTo.Hr ? "HR" : "Unassigned"));
             })
             .ToList();
 

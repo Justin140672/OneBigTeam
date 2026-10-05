@@ -14,4 +14,5 @@ internal sealed record UnassignedTaskItem(
     DateOnly? DueDate,
     Guid? SourceEntityId,
     Guid CreatedBy,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    bool AssignedToHr = false);

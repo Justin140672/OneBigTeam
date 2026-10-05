@@ -28,6 +28,21 @@ public class UpdateOnboardingTemplateValidatorTests
         Assert.True(result.IsValid);
     }
 
+    [Theory]
+    [InlineData(OnboardingTemplateTaskAssignTo.Hr)]
+    [InlineData(OnboardingTemplateTaskAssignTo.Manager)]
+    [InlineData(OnboardingTemplateTaskAssignTo.NewHire)]
+    [InlineData(OnboardingTemplateTaskAssignTo.Unassigned)]
+    public void Validate_Succeeds_For_Every_Task_Owner_Including_Hr(OnboardingTemplateTaskAssignTo assignTo)
+    {
+        var request = ValidRequest() with
+        {
+            Tasks = [new UpdateOnboardingTemplateTaskItem(null, "Task", null, TaskPriority.Medium, assignTo, 0, 0)],
+        };
+
+        Assert.True(_validator.Validate(request).IsValid);
+    }
+
     [Fact]
     public void Validate_Fails_When_ExpectedVersion_Is_Null()
     {

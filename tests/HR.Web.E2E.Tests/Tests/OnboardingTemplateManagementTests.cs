@@ -61,6 +61,37 @@ public sealed class OnboardingTemplateManagementTests(HrAdminPersonaFixture fixt
     }
 
     [Fact]
+    public async Task OnboardingTemplateTask_CanBeAssignedToHr_AndPersistsAcrossReload()
+    {
+        var templateName = $"E2E Onboarding HrOwner {Guid.NewGuid().ToString("N")[..8]}";
+        var taskTitle = $"E2E HR Task {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login = new LoginPage(_page, _fixture.WebBaseUrl);
+        var templateEdit = new OnboardingTemplateEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await templateEdit.GoToNewAsync(AcmeId);
+        await templateEdit.FillNameAsync(templateName);
+        await templateEdit.ClickAddTaskAsync();
+        await templateEdit.FillTaskTitleAsync(taskTitle);
+        await templateEdit.SelectFirstTaskAssignToAsync("HR");
+        Assert.Equal("HR", await templateEdit.GetFirstTaskAssignToAsync());
+        await templateEdit.SaveAsync();
+
+        await _page.WaitForSelectorAsync(".e-grid .e-row, .e-grid .e-emptyrow", new() { Timeout = 15_000 });
+        await _page.RevealGridRowAsync(templateName);
+        var href = await _page.Locator(".e-rowcell a").Filter(new() { HasText = templateName }).First.GetAttributeAsync("href");
+        Assert.NotNull(href);
+        await _page.GotoAsync($"{_fixture.WebBaseUrl}{href}");
+        await _page.WaitForSelectorAsync("button:has-text('Save')", new() { Timeout = 20_000 });
+
+        Assert.Equal(taskTitle, await templateEdit.GetTaskTitleAsync());
+        Assert.Equal("HR", await templateEdit.GetFirstTaskAssignToAsync());
+    }
+
+    [Fact]
     public async Task DeactivateOnboardingTemplate_HiddenFromActiveList_VisibleWhenShowingInactive()
     {
         var templateName = $"E2E Onboarding Deact {Guid.NewGuid().ToString("N")[..8]}";

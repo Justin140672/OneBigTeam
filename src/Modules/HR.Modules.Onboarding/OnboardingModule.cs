@@ -62,6 +62,8 @@ public static class OnboardingModule
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OnboardingDbContext>();
         var taskCreator = scope.ServiceProvider.GetRequiredService<ITaskCreator>();
+        var hrTaskCreator = scope.ServiceProvider.GetRequiredService<IHrTaskCreator>();
+        var templateReader = scope.ServiceProvider.GetRequiredService<IOnboardingTemplateReader>();
         var now = DateTimeOffset.UtcNow;
 
         foreach (var (companyId, employeeId, startDate, employeeName) in employees)
@@ -72,36 +74,44 @@ public static class OnboardingModule
             var plan = Domain.OnboardingPlan.Create(Guid.NewGuid(), companyId, employeeId, startDate, notes: null, now);
             db.OnboardingPlans.Add(plan);
 
-            (string Title, string Description, OnboardingTemplateTaskAssignTo AssignTo, DateOnly Due, TaskPriority Priority)[] defaults =
-            {
-                ($"Set up workstation and system access — {employeeName}",
-                 $"Provision equipment, accounts and system access ahead of {employeeName}'s start date.",
-                 OnboardingTemplateTaskAssignTo.Unassigned, startDate, TaskPriority.High),
-                ($"Send welcome email and first-day details — {employeeName}",
-                 $"Send {employeeName} their first-day joining instructions and welcome pack.",
-                 OnboardingTemplateTaskAssignTo.Manager, startDate, TaskPriority.Medium),
-                ($"Schedule welcome and induction meeting — {employeeName}",
-                 $"Book an induction meeting with {employeeName} during their first week.",
-                 OnboardingTemplateTaskAssignTo.Manager, startDate.AddDays(7), TaskPriority.Medium),
-            };
+            var defaultTemplateId = await templateReader.GetDefaultOnboardingTemplateIdAsync(companyId, CancellationToken.None);
+            var templateTasks = defaultTemplateId is { } templateId
+                ? await templateReader.GetActiveTasksAsync(companyId, templateId, CancellationToken.None)
+                : [];
 
-            foreach (var d in defaults)
+            foreach (var task in templateTasks)
             {
+                var title = $"{task.Title} — {employeeName}";
+                var dueDate = startDate.AddDays(task.DueDaysAfterStart);
+
                 var onboardingTask = Domain.OnboardingTask.Create(
-                    Guid.NewGuid(), companyId, plan.Id, d.Title, d.Description, d.AssignTo, d.Due, now);
+                    Guid.NewGuid(), companyId, plan.Id, title, task.Description, task.AssignTo, dueDate, now);
                 db.OnboardingTasks.Add(onboardingTask);
+
+                if (task.AssignTo == OnboardingTemplateTaskAssignTo.Hr)
+                {
+                    await hrTaskCreator.CreateForHrAsync(
+                        companyId, employeeId, title, task.Description, task.Priority,
+                        TaskSource.Onboarding, TaskActionType.Complete, dueDate, onboardingTask.Id,
+                        CancellationToken.None);
+                    continue;
+                }
+
+                var assignedEmployeeId = task.AssignTo == OnboardingTemplateTaskAssignTo.NewHire
+                    ? employeeId
+                    : (Guid?)null;
 
                 await taskCreator.CreateAsync(
                     companyId,
                     createdBy:          employeeId,
-                    title:              d.Title,
-                    description:        d.Description,
-                    priority:           d.Priority,
+                    title:              title,
+                    description:        task.Description,
+                    priority:           task.Priority,
                     source:             TaskSource.Onboarding,
                     actionType:         TaskActionType.Complete,
-                    dueDate:            d.Due,
-                    assignedEmployeeId: null,
-                    assignedUserId:     null,
+                    dueDate:            dueDate,
+                    assignedEmployeeId: assignedEmployeeId,
+                    assignedUserId:     assignedEmployeeId,
                     sourceEntityId:     onboardingTask.Id,
                     CancellationToken.None);
             }

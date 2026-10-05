@@ -36,6 +36,13 @@ public sealed class HrInboxPage(IPage page, string baseUrl)
         await cardHandle.WaitForElementStateAsync(ElementState.Hidden, new() { Timeout = 15_000 });
     }
 
+    public async Task<string?> GetOwnerBadgeTextAsync(string titleFragment) =>
+        (await page.Locator(".inbox-card")
+            .Filter(new() { HasText = titleFragment })
+            .First
+            .Locator("[data-testid^='inbox-owner-']")
+            .TextContentAsync())?.Trim();
+
     public async Task<bool> HasTaskAsync(string titleFragment) =>
         await page.Locator(".inbox-card")
             .Filter(new() { HasText = titleFragment })

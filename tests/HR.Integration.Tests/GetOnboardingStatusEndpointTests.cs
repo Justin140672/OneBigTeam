@@ -74,7 +74,7 @@ public class GetOnboardingStatusEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
-        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
+        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Prepare workstation");
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/onboarding-status");
@@ -93,9 +93,7 @@ public class GetOnboardingStatusEndpointTests
         using var client = await AuthenticatedClient(companyId);
 
         var employeeId = await CreateEmployeeAsync(client, companyId);
-        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Set up workstation");
-        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Send welcome email");
-        await CompleteUnassignedOnboardingTaskAsync(client, companyId, "Schedule welcome and induction meeting");
+        await CompleteAllOnboardingTasksAsync(client, companyId, employeeId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/employees/{employeeId}/onboarding-status");
@@ -202,6 +200,34 @@ public class GetOnboardingStatusEndpointTests
             new StringContent("{}", Encoding.UTF8, "application/json"));
         completeResp.EnsureSuccessStatusCode();
     }
+
+    private async Task CompleteAllOnboardingTasksAsync(HttpClient client, Guid companyId, Guid employeeId)
+    {
+        var unassignedResp = await client.GetAsync($"/api/companies/{companyId}/tasks/unassigned");
+        unassignedResp.EnsureSuccessStatusCode();
+        var unassigned = (await unassignedResp.Content.ReadFromJsonAsync<UnassignedTasksPayload>())!.Items
+            .Where(t => t.Source == "Onboarding");
+
+        var employeeTasksResp = await client.GetAsync($"/api/companies/{companyId}/employees/{employeeId}/tasks?pageSize=100");
+        employeeTasksResp.EnsureSuccessStatusCode();
+        var assigned = (await employeeTasksResp.Content.ReadFromJsonAsync<EmployeeTasksPayload>())!.Items
+            .Where(t => t.Source == "Onboarding");
+
+        var taskIds = unassigned.Select(t => t.Id).Concat(assigned.Select(t => t.Id)).Distinct().ToList();
+        Assert.Equal(15, taskIds.Count);
+
+        foreach (var taskId in taskIds)
+        {
+            var completeResp = await client.PostAsync(
+                $"/api/companies/{companyId}/tasks/{taskId}/complete",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
+            completeResp.EnsureSuccessStatusCode();
+        }
+    }
+
+    private sealed record EmployeeTasksPayload(IReadOnlyList<EmployeeTaskPayload> Items);
+
+    private sealed record EmployeeTaskPayload(Guid Id, string Title, string? Source);
 
     private sealed record IdPayload(Guid Id);
 
