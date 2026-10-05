@@ -329,6 +329,15 @@ await migrationRunner.RunAsync("tasks", app.Services, async sp =>
 await migrationRunner.RunAsync("onboarding", app.Services, async sp =>
 {
 	await sp.MigrateOnboardingAsync();
+	if (seedDevCompanies)
+	{
+		await sp.SeedE2eOnboardingPlansAsync(
+		[(
+			Guid.Parse("00000000-0000-0000-0000-000000000001"),
+			HR.Modules.Employees.EmployeesModule.DevNewHireId,
+			DateOnly.FromDateTime(DateTime.UtcNow),
+			"Ben Carter")]);
+	}
 	if (string.Equals(Environment.GetEnvironmentVariable("E2E_TESTING"), "true", StringComparison.OrdinalIgnoreCase))
 	{
 		var acmeCompanyId = Guid.Parse("00000000-0000-0000-0000-000000000001");

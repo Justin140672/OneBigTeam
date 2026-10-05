@@ -552,6 +552,8 @@ public static class EmployeesModule
         await StagingEmployeesSeeder.SeedAsync(scope.ServiceProvider, options);
     }
 
+    public static readonly Guid DevNewHireId = Guid.Parse("30000000-0000-0000-0000-000000000020");
+
     public static async Task SeedEmployeesAsync(
         this IServiceProvider services, bool includeE2eTestPool = false, bool includeDevCompanies = true)
     {
@@ -865,6 +867,38 @@ public static class EmployeesModule
 
                 await db.SaveChangesAsync();
             }
+        }
+
+        var newHireId = DevNewHireId;
+        if (!await db.Employees.AnyAsync(e => e.Id == newHireId))
+        {
+            var newHireStart = DateOnly.FromDateTime(DateTime.UtcNow);
+            var newHireDob = new DateOnly(2001, 2, 9);
+            var newHireDeptId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+            var newHireLocationId = Guid.Parse("70000000-0000-0000-0000-000000000001");
+            var newHirePositionId = Guid.Parse("20000000-0000-0000-0000-000000000003");
+            var newHireEmploymentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001");
+            var newHireManagerId = Guid.Parse("30000000-0000-0000-0000-000000000002");
+            var hrManagerId = Guid.Parse("30000000-0000-0000-0000-000000000005");
+
+            var newHire = Employee.Create(
+                newHireId, acmeId, "Ben", "Carter", "ben.carter@acme.example", newHireStart, hasSystemAccess: true,
+                newHireDob, "British", "Male", "ACME-020", newHireEmploymentTypeId,
+                newHireDeptId, newHireLocationId, newHirePositionId, now);
+            newHire.Assign(newHireDeptId, newHirePositionId, newHireLocationId, newHireManagerId, now);
+            newHire.UpdatePersonalDetails("Ben", newHireDob, "British", "Male", null, now);
+            newHire.UpdateContactDetails(
+                "ben.carter@gmail.com", "07700 900020", null,
+                "9 Camden Road", null, "London", "Greater London", "NW1 9LH", "United Kingdom", now);
+            newHire.UpdateEmploymentDetails("ACME-020", newHireEmploymentTypeId, newHireStart, null, null, null, null, now);
+            newHire.Activate(now);
+            db.Employees.Add(newHire);
+
+            db.Compensations.Add(Compensation.Create(
+                Guid.NewGuid(), acmeId, newHireId, newHireStart, SalaryType.Annual, 42000m, "GBP", 37.5m, 1m,
+                "Starting salary", CompensationChangeReason.NewHire, hrManagerId, now));
+
+            await db.SaveChangesAsync();
         }
 
         await SeedAcmeEqualityDataAsync(db, acmeId, now);

@@ -427,6 +427,7 @@ public static class IdentityModule
             (Id: new Guid("30000000-0000-0000-0000-000000000018"), First: "Charlie", Last: "Wilson", Email: "charlie.wilson@betacorp.example", Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
             (Id: new Guid("30000000-0000-0000-0000-000000000016"), First: "Olivia", Last: "Reyes",   Email: "olivia.reyes@acme.example",        Roles: new[] { SystemRoles.Employee, SystemRoles.HrAdministrator }),
             (Id: new Guid("30000000-0000-0000-0000-000000000017"), First: "Nina",   Last: "Patel",   Email: "nina.patel@acme.example",          Roles: new[] { SystemRoles.Employee, SystemRoles.Manager }),
+            (Id: new Guid("30000000-0000-0000-0000-000000000020"), First: "Ben",    Last: "Carter",   Email: "ben.carter@acme.example",          Roles: new[] { SystemRoles.Employee }),
             (Id: new Guid("30000000-0000-0000-0000-000000000019"), First: "Diana",  Last: "Chen",    Email: "diana.chen@gamma.example",         Roles: new[] { SystemRoles.Employee, SystemRoles.CompanyAdministrator }),
         };
 

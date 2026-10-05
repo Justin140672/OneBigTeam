@@ -25,7 +25,8 @@ public sealed class DevPersonaStore
         new("30000000-0000-0000-0000-000000000018", BetaCorp, "Charlie Wilson", "Company Administrator", "charlie.wilson@betacorp.example"),
         new("30000000-0000-0000-0000-000000000016", Acme,     "Olivia Reyes",  "HR Administrator",    "olivia.reyes@acme.example"),
         new("30000000-0000-0000-0000-000000000017", Acme,     "Nina Patel",    "Team Lead",           "nina.patel@acme.example"),
-        new("30000000-0000-0000-0000-000000000019", Gamma,    "Diana Chen",    "Company Administrator", "diana.chen@gamma.example"),
+        new("30000000-0000-0000-0000-000000000020", Acme,     "Ben Carter",    "Developer (Onboarding)", "ben.carter@acme.example"),
+        new("30000000-0000-0000-0000-000000000019", Gamma,   "Diana Chen",    "Company Administrator", "diana.chen@gamma.example"),
     ];
 
     private readonly List<DevPersona> _registeredPersonas = [];
