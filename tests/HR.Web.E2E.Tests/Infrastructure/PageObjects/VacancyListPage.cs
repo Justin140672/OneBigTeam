@@ -77,18 +77,6 @@ public sealed class VacancyListPage(IPage page, string baseUrl)
     public Task<string> GetApplicationsColumnTextAsync(string titleFragment) =>
         GetRowCellAsync(titleFragment, columnIndex: 3);
 
-    public async Task<bool> HasTitleColumnPositionProfileFallbackIndicatorAsync(string titleFragment)
-    {
-        await SearchAsync(titleFragment);
-
-        var row = page.Locator(".e-row")
-            .Filter(new() { Has = page.Locator(".e-rowcell:first-child", new() { HasText = titleFragment }) })
-            .First;
-        var titleCell = row.Locator(".e-rowcell").Nth(0);
-        await row.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-        return await titleCell.Locator("span.fst-italic", new() { HasText = "(from Position Profile)" }).IsVisibleAsync();
-    }
-
     // NOTE: the Location column (VacancyList.razor's EffectiveLocation GridColumn) has no
     // override-vs-fallback distinction to indicate anymore — Vacancy.Location was removed
     // entirely as part of the "Vacancy - Position Profile relationship" epic's location

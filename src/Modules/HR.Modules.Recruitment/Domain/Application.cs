@@ -227,6 +227,9 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
 
     public void RecordRejection(Guid rejectedStageId, string? rejectionReason, DateTimeOffset now)
     {
+        if (InterviewOutcome == Domain.InterviewOutcome.Pending)
+            InterviewOutcome = Domain.InterviewOutcome.Cancelled;
+
         CurrentStageId  = rejectedStageId;
         RejectionReason = string.IsNullOrWhiteSpace(rejectionReason) ? null : rejectionReason.Trim();
         UpdatedAt       = now;

@@ -7,6 +7,7 @@ using HR.Modules.Recruitment.Features.OfferCandidate;
 using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -42,6 +43,8 @@ public class ApplicationConcurrencyHandlerTests
         seed.Vacancies.Add(vacancy);
         seed.Candidates.Add(candidate);
         seed.Applications.Add(application);
+        if (application.CurrentStageId == stages.Interview.Id)
+            seed.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         await seed.SaveChangesAsync();
         return new Seed(dbName, companyId, vacancy.Id, candidate.Id, application.Id, stages);
     }
@@ -205,7 +208,7 @@ public class ApplicationConcurrencyHandlerTests
         await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
         {
             // A concurrent RejectCandidate wins the race first, taking the application to Rejected.
-            var rejectWinner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+            var rejectWinner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxB, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
                 .HandleAsync(
                     new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId },
                     Guid.NewGuid(), CancellationToken.None);
@@ -284,7 +287,7 @@ public class ApplicationConcurrencyHandlerTests
 
         await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
         {
-            var rejectWinner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+            var rejectWinner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxB, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
                 .HandleAsync(
                     new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId },
                     Guid.NewGuid(), CancellationToken.None);
@@ -319,14 +322,14 @@ public class ApplicationConcurrencyHandlerTests
 
         await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
         {
-            var winner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+            var winner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxB, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
                 .HandleAsync(
                     new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Winner" },
                     Guid.NewGuid(), CancellationToken.None);
             Assert.True(winner.IsSuccess);
         }
 
-        var loser = await new RejectCandidateHandler(ctxA, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxA, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+        var loser = await new RejectCandidateHandler(ctxA, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxA, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxA, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
             .HandleAsync(
                 new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Loser" },
                 Guid.NewGuid(), CancellationToken.None);
@@ -350,7 +353,7 @@ public class ApplicationConcurrencyHandlerTests
 
         await using (var ctxB = new RecruitmentDbContext(Options(seed.DbName)))
         {
-            var winner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+            var winner = await new RejectCandidateHandler(ctxB, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxB, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxB, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
                 .HandleAsync(
                     new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Winner" },
                     Guid.NewGuid(), CancellationToken.None);
@@ -358,7 +361,7 @@ public class ApplicationConcurrencyHandlerTests
         }
 
         const string idempotencyKey = "reject-key-1";
-        var loser = await new RejectCandidateHandler(ctxA, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxA, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()))
+        var loser = await new RejectCandidateHandler(ctxA, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(ctxA, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()), new InterviewTaskCleanupService(ctxA, new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance))
             .HandleAsync(
                 new RejectCandidateRequest { CompanyId = seed.CompanyId, VacancyId = seed.VacancyId, ApplicationId = seed.ApplicationId, RejectionReason = "Loser", IdempotencyKey = idempotencyKey },
                 Guid.NewGuid(), CancellationToken.None);

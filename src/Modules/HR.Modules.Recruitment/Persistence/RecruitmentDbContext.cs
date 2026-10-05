@@ -22,6 +22,9 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<CandidateDocumentDeletionOperation> CandidateDocumentDeletionOperations => Set<CandidateDocumentDeletionOperation>();
     public DbSet<CandidatePurgeAuditDelivery> CandidatePurgeAuditDeliveries => Set<CandidatePurgeAuditDelivery>();
+    public DbSet<InterviewTaskCleanup> InterviewTaskCleanups => Set<InterviewTaskCleanup>();
+    public DbSet<InterviewTaskEffect> InterviewTaskEffects => Set<InterviewTaskEffect>();
+    public DbSet<InterviewOutcomeTaskReconciliation> InterviewOutcomeTaskReconciliations => Set<InterviewOutcomeTaskReconciliation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

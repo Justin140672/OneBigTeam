@@ -31,6 +31,8 @@ public class CompleteTaskHandlerTests
     private static readonly Guid HrAdministratorRoleId = new("00000000-0000-0000-0000-000000000004");
     private static readonly Guid CompanyAdministratorRoleId = new("00000000-0000-0000-0000-000000000006");
 
+    private static TaskCompletionAuditDelivery AuditDelivery(FakeAuditPublisher audit) => new(audit, audit);
+
     private static CompleteTaskHandler BuildHandler(
         TasksDbContext context,
         FakeAuditPublisher? audit = null,
@@ -39,7 +41,7 @@ public class CompleteTaskHandlerTests
         FakeDirectReportsReader? directReportsReader = null,
         TaskCompletionDispatcher? dispatcher = null,
         RecordingBackgroundJobClient? backgroundJobClient = null) =>
-        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(), dispatcher ?? NoOpDispatcher,
+        new(context, notif ?? new FakeNotificationWriter(), Clock, AuditDelivery(audit ?? new FakeAuditPublisher()), dispatcher ?? NoOpDispatcher,
             new TasksResourceAuthorizer(
                 authorizationService ?? new FakeRoleAuthorizationService(HrAdministratorRoleId),
                 directReportsReader ?? new FakeDirectReportsReader()),
@@ -929,6 +931,58 @@ public class CompleteTaskHandlerTests
         Assert.Equal(nameof(TaskCompletionEffectsJob.ProcessAsync), enqueued.Method.Name);
         Assert.Equal(operation.Id, enqueued.Args[0]);
         Assert.Equal(companyId, enqueued.Args[1]);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_Operation_DispatchApplied_And_Schedules_Retry_When_Publisher_Returns_Normally_But_Audit_Is_Absent()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Open);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher { SwallowPersistenceFailure = true };
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await BuildHandler(context, audit, backgroundJobClient: jobClient).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, audit.PublishCalls);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, operation.Status);
+        Assert.Null(operation.ProcessedAt);
+
+        var enqueued = Assert.Single(jobClient.CreatedJobs);
+        Assert.Equal(typeof(TaskCompletionEffectsJob), enqueued.Type);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Marks_Operation_Processed_Without_Republishing_When_Audit_Event_Already_Exists()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var task = MakeTask(companyId, TaskItemStatus.Open);
+        context.TaskItems.Add(task);
+        await context.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        audit.Seed(new TaskCompletedAuditEvent(companyId, task.Id, Guid.NewGuid(), "Open", null, DateTimeOffset.UtcNow));
+        var jobClient = new RecordingBackgroundJobClient();
+
+        var result = await BuildHandler(context, audit, backgroundJobClient: jobClient).HandleAsync(
+            new CompleteTaskRequest { CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid() },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(0, audit.PublishCalls);
+
+        var operation = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.TaskId == task.Id);
+        Assert.Equal(TaskCompletionOperation.StatusProcessed, operation.Status);
+        Assert.Empty(jobClient.CreatedJobs);
     }
 
     [Fact]

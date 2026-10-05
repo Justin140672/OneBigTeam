@@ -33,6 +33,8 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
     // factory instance.
     internal FaultInjectingPostCommitFaultInjector PostCommitFaultInjector { get; } = new();
 
+    internal AuditFaultInjector AuditFaultInjector { get; } = new();
+
     async Task IAsyncLifetime.InitializeAsync()
     {
         await _postgres.StartAsync();
@@ -105,6 +107,15 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
             // for a specific handler + idempotency key without any production code depending on
             // test infrastructure.
             services.AddSingleton<HR.SharedKernel.Idempotency.IPostCommitFaultInjector>(PostCommitFaultInjector);
+
+            var auditPublisherDescriptor = services.Single(d => d.ServiceType == typeof(IAuditEventPublisher));
+            services.Remove(auditPublisherDescriptor);
+            services.Add(ServiceDescriptor.Describe(
+                typeof(IAuditEventPublisher),
+                sp => new FaultInjectingAuditPublisher(
+                    (IAuditEventPublisher)ActivatorUtilities.CreateInstance(sp, auditPublisherDescriptor.ImplementationType!),
+                    AuditFaultInjector),
+                auditPublisherDescriptor.Lifetime));
         });
     }
 }

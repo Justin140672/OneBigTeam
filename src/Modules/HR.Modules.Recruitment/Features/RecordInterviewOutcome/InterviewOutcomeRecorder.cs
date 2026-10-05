@@ -4,6 +4,7 @@ using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 
@@ -21,7 +22,8 @@ namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 internal sealed class InterviewOutcomeRecorder(
     RecruitmentDbContext db,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    InterviewOutcomeAuditDelivery auditDelivery,
+    ILogger<InterviewOutcomeRecorder> logger)
 {
     public async Task<Result<RecordInterviewOutcomeResponse>> RecordAsync(
         RecordInterviewOutcomeRequest request,
@@ -56,22 +58,45 @@ internal sealed class InterviewOutcomeRecorder(
 
         var now = clock.UtcNowOffset();
 
+        if (interview.StageId is null)
+        {
+            var currentStageId = await db.RecruitmentStages
+                .AsNoTracking()
+                .Where(s => s.Id == application.CurrentStageId && s.Purpose == Domain.RecruitmentStagePurpose.Interview)
+                .Select(s => (Guid?)s.Id)
+                .SingleOrDefaultAsync(cancellationToken);
+
+            if (currentStageId is { } legacyStageId)
+                interview.AssignStage(legacyStageId);
+        }
+
         interview.RecordOutcome(request.Outcome, request.Notes, now);
-        application.SetInterviewOutcome(request.Outcome, now);
+
+        var otherPendingExists = await db.Interviews
+            .AnyAsync(
+                i => i.ApplicationId == application.Id &&
+                     i.CompanyId == request.CompanyId &&
+                     i.Id != interview.Id &&
+                     i.Outcome == Domain.InterviewOutcome.Pending,
+                cancellationToken);
+
+        application.SetInterviewOutcome(
+            otherPendingExists ? Domain.InterviewOutcome.Pending : request.Outcome, now);
+        var reconciliation = Domain.InterviewOutcomeTaskReconciliation.Create(
+            Guid.NewGuid(), request.CompanyId, application.Id, interview.Id, recordedBy, now);
+        db.InterviewOutcomeTaskReconciliations.Add(reconciliation);
         await db.SaveChangesAsync(cancellationToken);
 
-        await auditPublisher.PublishAsync(
-            new InterviewOutcomeRecordedAuditEvent(
-                interview.CompanyId,
-                interview.Id,
-                application.Id,
-                application.VacancyId,
-                application.CandidateId,
-                interview.Outcome,
-                interview.Notes,
-                recordedBy,
-                now),
-            cancellationToken);
+        try
+        {
+            await auditDelivery.DeliverAsync(reconciliation, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogWarning(ex,
+                "Interview outcome audit delivery is unconfirmed and remains outstanding; it will be retried by reconciliation. ReconciliationId={ReconciliationId} CompanyId={CompanyId} InterviewId={InterviewId} ApplicationId={ApplicationId}",
+                reconciliation.Id, reconciliation.CompanyId, reconciliation.InterviewId, reconciliation.ApplicationId);
+        }
 
         return Result.Success(new RecordInterviewOutcomeResponse(
             interview.Id,

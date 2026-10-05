@@ -21,4 +21,11 @@ internal sealed record ApplicationSearchItem(
     string? CurrentStageName = null,
     bool IsWithdrawn = false,
     bool IsInternal = false,
-    Guid? EmployeeId = null);
+    Guid? EmployeeId = null,
+    bool CurrentStageHasPendingInterview = false,
+    Guid? PendingInterviewId = null,
+    string? CurrentStageInterviewOutcome = null,
+    bool HasNextInterviewStage = false,
+    Guid? NextInterviewStageId = null,
+    string? NextInterviewStageName = null,
+    bool AllRequiredInterviewStagesPassed = true);

@@ -1,9 +1,12 @@
+@using HR.SharedKernel
 @inject AppSession Session
 @using Syncfusion.Blazor.Inputs
 @inject RecruitmentKanbanService KanbanService
 @inject RecruitmentStageService RecruitmentStageService
 @inject CandidateService CandidateService
 @inject NavigationManager Navigation
+@inject UserService UserService
+@inject ApplicationService ApplicationService
 
 @* Plain HTML5 drag-and-drop board — replaces an earlier SfKanban-based implementation. SfKanban's
    own JS drag engine couldn't be made to reliably complete a drop under Blazor Server's re-render
@@ -79,9 +82,23 @@
                                                          RecruiterName="@RecruiterName(app)"
                                                          TerminalOutcome="@StageOutcome(app.StageId)"
                                                          OnOpen="OpenCandidate"
-                                                         AvailableStages="@VisibleColumns.Where(c => c.StageId != app.StageId).ToList()"
+                                                         AvailableStages="@VisibleColumns.Where(c => !c.IsTerminal && c.StageId != app.StageId).ToList()"
                                                          OnMoveToStage="(stageId) => MoveApplicationAsync(app, stageId)"
-                                                         OnReviewCv="ReviewCv" />
+                                                         OnReviewCv="ReviewCv"
+                                                         OnScheduleInterview="ScheduleInterviewAsync"
+                                                         OnRecordOutcome="RecordOutcomeAsync"
+                                                         OnMakeOffer="MakeOfferAsync"
+                                                         OnRecordOfferResponse="RecordOfferResponseAsync"
+                                                         OnHire="HireAsync"
+                                                         OnAppoint="AppointAsync"
+                                                         OnReject="RejectAsync"
+                                                         OnWithdraw="WithdrawAsync"
+                                                         CanAppointInternal="_canAppoint"
+                                                         CanManageStages="_canAppoint"
+                                                         AddInterviewStageUrl="@($"/companies/{CompanyId}/recruitment-stages/add-interview")"
+                                                         IsTerminalStage="@col.IsTerminal"
+                                                         IsOfferStage="@IsOfferStage(app.StageId)"
+                                                         IsInterviewStage="@IsInterviewStage(app.StageId)" />
                                 </div>
                             }
                         }
@@ -91,6 +108,17 @@
         </div>
     }
 </div>
+
+<ScheduleInterviewDialog @ref="_scheduleDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnScheduled="OnInterviewScheduledAsync" />
+<RecordOfferResponseDialog @ref="_offerResponseDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnRecorded="OnInterviewScheduledAsyncArg" />
+<HireCandidateDialog @ref="_hireDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnHired="OnHiredAsync" />
+<OfferCandidateDialog @ref="_offerDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnOffered="OnInterviewScheduledAsync" />
+<RecordInterviewOutcomeDialog @ref="_outcomeDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnRecorded="OnInterviewScheduledAsync" />
+<RejectCandidateDialog @ref="_rejectDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnRejected="OnInterviewScheduledAsync" />
+<AppointInternalCandidateDialog @ref="_appointDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnAppointed="OnAppointedAsync" />
+<HrDestructiveConfirmDialog Visible="_withdrawTarget is not null" Title="Withdraw application"
+                            Message="@WithdrawMessage" ConfirmText="Withdraw" Busy="_withdrawing"
+                            OnConfirmed="ConfirmWithdrawAsync" OnCancelled="CancelWithdraw" />
 
 @code {
     [Parameter, EditorRequired] public Guid CompanyId { get; set; }
@@ -271,6 +299,111 @@
             $"?returnUrl={Uri.EscapeDataString(returnUrl)}");
     }
 
+    private ScheduleInterviewDialog? _scheduleDialog;
+    private RecordInterviewOutcomeDialog? _outcomeDialog;
+    private OfferCandidateDialog? _offerDialog;
+    private RecordOfferResponseDialog? _offerResponseDialog;
+    private HireCandidateDialog? _hireDialog;
+
+    private bool IsOfferStage(Guid stageId) =>
+        _columns.Any(c => c.StageId == stageId && c.Purpose == RecruitmentStagePurpose.Offer);
+
+    private void RecordOfferResponseAsync(KanbanCandidateModel candidate) =>
+        _offerResponseDialog?.Open(candidate.ApplicationId);
+
+    private async Task HireAsync(KanbanCandidateModel candidate)
+    {
+        if (_hireDialog is not null)
+            await _hireDialog.OpenAsync(candidate.ApplicationId, candidate.OfferResponseStatus, candidate.OfferedSalary, candidate.OfferedStartDate);
+    }
+
+    private Task OnInterviewScheduledAsyncArg(string _) => ReloadKanbanOnlyAsync();
+
+    private Task OnHiredAsync(Guid employeeId) => ReloadKanbanOnlyAsync();
+
+    private async Task MakeOfferAsync(KanbanCandidateModel candidate)
+    {
+        if (_offerDialog is not null) await _offerDialog.OpenAsync(candidate.ApplicationId);
+    }
+
+    private Task RecordOutcomeAsync(KanbanCandidateModel candidate)
+    {
+        if (candidate.PendingInterviewId is not { } interviewId)
+        {
+            _error = "No pending interview was found for this stage.";
+            return Task.CompletedTask;
+        }
+
+        _outcomeDialog?.Open(candidate.ApplicationId, interviewId);
+        return Task.CompletedTask;
+    }
+
+    private RejectCandidateDialog? _rejectDialog;
+    private AppointInternalCandidateDialog? _appointDialog;
+    private bool _canAppoint;
+    private KanbanCandidateModel? _withdrawTarget;
+    private bool _withdrawing;
+
+    private string WithdrawMessage =>
+        $"Withdraw {_withdrawTarget?.CandidateFullName}'s application? They will be removed from the pipeline.";
+
+    protected override async Task OnInitializedAsync() =>
+        _canAppoint = await UserService.HasPermissionAsync(SystemPermissions.RecruitmentManage);
+
+    private Task RejectAsync(KanbanCandidateModel candidate)
+    {
+        _rejectDialog?.Open(candidate.ApplicationId);
+        return Task.CompletedTask;
+    }
+
+    private Task WithdrawAsync(KanbanCandidateModel candidate)
+    {
+        _withdrawTarget = candidate;
+        return Task.CompletedTask;
+    }
+
+    private void CancelWithdraw() => _withdrawTarget = null;
+
+    private async Task ConfirmWithdrawAsync()
+    {
+        if (_withdrawTarget is null || _withdrawing)
+            return;
+
+        _withdrawing = true;
+        try
+        {
+            var (result, error) = await ApplicationService.WithdrawApplicationAsync(CompanyId, VacancyId, _withdrawTarget.ApplicationId);
+            _withdrawTarget = null;
+            _error = result is null ? error ?? "Failed to withdraw the application." : null;
+        }
+        finally
+        {
+            _withdrawing = false;
+        }
+
+        await ReloadKanbanOnlyAsync();
+    }
+
+    private async Task AppointAsync(KanbanCandidateModel candidate)
+    {
+        if (_appointDialog is not null)
+            await _appointDialog.OpenAsync(
+                candidate.ApplicationId, candidate.CandidateFullName, candidate.EmployeeId,
+                candidate.InternalAppointmentStatus, candidate.OfferedStartDate, candidate.OfferedSalary);
+    }
+
+    private Task OnAppointedAsync(AppointInternalCandidateDialog.AppointedInfo info) => ReloadKanbanOnlyAsync();
+
+    private bool IsInterviewStage(Guid stageId) =>
+        _columns.Any(c => c.StageId == stageId && c.Purpose == RecruitmentStagePurpose.Interview);
+
+    private async Task ScheduleInterviewAsync(KanbanCandidateModel candidate)
+    {
+        if (_scheduleDialog is not null) await _scheduleDialog.OpenAsync(candidate.ApplicationId);
+    }
+
+    private Task OnInterviewScheduledAsync() => ReloadKanbanOnlyAsync();
+
     private void OnDragStart(KanbanCandidateModel candidate) => _draggedCard = candidate;
 
     private void OnDragEnd() => _draggedCard = null;
@@ -289,6 +422,15 @@
     private async Task MoveApplicationAsync(KanbanCandidateModel candidate, Guid targetStageId)
     {
         if (candidate.StageId == targetStageId)
+            return;
+
+        if (_columns.Any(c => c.StageId == targetStageId && c.IsTerminal))
+        {
+            _error = "Use the Hire, Appoint, Reject or Withdraw action to complete this candidate.";
+            return;
+        }
+
+        if (_columns.Any(c => c.StageId == candidate.StageId && c.IsTerminal))
             return;
 
         var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, candidate.ApplicationId, targetStageId);

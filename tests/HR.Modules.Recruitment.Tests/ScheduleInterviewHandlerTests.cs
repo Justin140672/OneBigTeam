@@ -4,6 +4,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.ScheduleInterview;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -15,7 +16,7 @@ public class ScheduleInterviewHandlerTests
     private static readonly DateTimeOffset Now = new(2026, 7, 6, 10, 0, 0, TimeSpan.Zero);
 
     [Fact]
-    public async Task HandleAsync_Creates_Interview_And_Defaults_InterviewOutcome_To_Pending_Without_Changing_Stage()
+    public async Task HandleAsync_Creates_Interview_And_Defaults_InterviewOutcome_To_Pending_When_Already_On_Interview_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -89,7 +90,7 @@ public class ScheduleInterviewHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Does_Not_Publish_StageHistory_Since_Scheduling_Never_Changes_Stage()
+    public async Task HandleAsync_Does_Not_Record_StageHistory_When_Already_On_Interview_Stage()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -118,6 +119,7 @@ public class ScheduleInterviewHandlerTests
         Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
     }
 
+[Fact]    public async Task HandleAsync_Moves_Application_To_Interview_Stage_And_Records_History()    {        await using var db = BuildContext();        var companyId = Guid.NewGuid();        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.CvReview.Id, null, Now);        db.Vacancies.Add(vacancy);        db.Candidates.Add(candidate);        db.Applications.Add(application);        await db.SaveChangesAsync();        var result = await handler(db).HandleAsync(            new ScheduleInterviewRequest            {                CompanyId             = companyId,                VacancyId             = vacancy.Id,                ApplicationId         = application.Id,                InterviewerEmployeeId = Guid.NewGuid(),                ScheduledAt           = Now.AddDays(3),            },            Guid.NewGuid(),            CancellationToken.None);        Assert.True(result.IsSuccess);        Assert.Equal(stages.Interview.Id, (await db.Applications.SingleAsync()).CurrentStageId);        var history = Assert.Single(await db.ApplicationStageHistoryEntries.ToListAsync());        Assert.Equal(stages.CvReview.Id, history.PreviousStageId);    }
     [Fact]
     public async Task HandleAsync_Returns_NotFound_When_Application_Missing()
     {
@@ -479,7 +481,9 @@ public class ScheduleInterviewHandlerTests
         FakeTaskCreator? taskCreator = null,
         FakeNotificationWriter? notificationWriter = null,
         IPositionProfileReader? positionProfileReader = null) =>
-        new(db, taskCreator ?? new FakeTaskCreator(), notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader());
+        new(db, notificationWriter ?? new FakeNotificationWriter(), new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(),
+            new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()),
+            new InterviewTaskEffectsService(db, taskCreator ?? new FakeTaskCreator(), new FakeTaskCanceller(), new FakeTaskCompleter(), new FakeClock(FixedUtcNow), Microsoft.Extensions.Logging.Abstractions.NullLogger<InterviewTaskEffectsService>.Instance));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

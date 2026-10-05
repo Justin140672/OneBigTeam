@@ -4,6 +4,7 @@
 @using Syncfusion.Blazor.Data
 @using Syncfusion.Blazor.Navigations
 @inject ApplicationService ApplicationService
+@inject RecruitmentKanbanService KanbanService
 @inject CandidateService CandidateService
 @inject EmployeeService EmployeeService
 @inject VacancyService VacancyService
@@ -151,10 +152,11 @@
                     <Template>
                         @{
                             var row = (ApplicationListItemModel)context;
+                            var stageOutcome = row.CurrentStageHasPendingInterview ? "Pending" : row.CurrentStageInterviewOutcome;
                         }
-                        @if (row.InterviewOutcome is not null)
+                        @if (stageOutcome is not null)
                         {
-                            <StatusBadge Variant="@InterviewOutcomeVariant(row.InterviewOutcome)">@row.InterviewOutcome</StatusBadge>
+                            <StatusBadge Variant="@InterviewOutcomeVariant(stageOutcome)">@stageOutcome</StatusBadge>
                         }
                         else
                         {
@@ -398,57 +400,8 @@
     </DialogTemplates>
 </SfDialog>
 
-<SfDialog Width="480px" IsModal="true" @bind-Visible="_showScheduleDialog" Header="Schedule Interview" CssClass="schedule-interview-dialog">
-    <DialogTemplates>
-        <Content>
-            <EditForm EditContext="_scheduleEditContext">
-                <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label id="schedule-interviewer-label" for="schedule-interviewer" class="form-label">Interviewer <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
-                                    DataSource="@_employees" @bind-Value="_scheduleModel.InterviewerId"
-                                    Placeholder="Select interviewer" AllowFiltering="true"
-                                    HtmlAttributes="@Aria(_scheduleEditContext, _scheduleModel, "schedule-interviewer", nameof(ScheduleInterviewFormModel.InterviewerId), "Interviewer", required: true)">
-                        <DropDownListFieldSettings Value="Id" Text="FullName" />
-                        <DropDownListTemplates TItem="EmployeeListItemModel">
-                            <ItemTemplate Context="employeeItem">
-                                @{ var e = (EmployeeListItemModel)employeeItem; }
-                                <span>@e.FirstName @e.LastName</span>
-                            </ItemTemplate>
-                        </DropDownListTemplates>
-                    </SfDropDownList>
-                    <div id="schedule-interviewer-error" role="alert">
-                        <ValidationMessage For="@(() => _scheduleModel.InterviewerId)" />
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <label id="schedule-scheduled-at-label" for="schedule-scheduled-at" class="form-label">Scheduled At <span class="text-danger">*</span></label>
-                    <SfDateTimePicker TValue="DateTime?" @bind-Value="_scheduleModel.ScheduledAt" Format="dd/MM/yyyy HH:mm"
-                                      HtmlAttributes="@Aria(_scheduleEditContext, _scheduleModel, "schedule-scheduled-at", nameof(ScheduleInterviewFormModel.ScheduledAt), "Scheduled at", required: true)" />
-                    <div id="schedule-scheduled-at-error" role="alert">
-                        <ValidationMessage For="@(() => _scheduleModel.ScheduledAt)" />
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <HrNumericField TValue="int?" Label="Duration (minutes)" Id="schedule-duration"
-                                    @bind-Value="_scheduleModel.DurationMinutes" />
-                </div>
-                <div class="mb-3">
-                    <HrTextField Label="Location" Id="schedule-location"
-                                 @bind-Value="_scheduleModel.Location" Placeholder="e.g. Remote" />
-                </div>
-            </EditForm>
-            @if (_dialogError is not null)
-            {
-                <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
-            }
-        </Content>
-    </DialogTemplates>
-    <DialogButtons>
-        <DialogButton Content="Schedule" IsPrimary="true" OnClick="ConfirmScheduleAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _showScheduleDialog = false" />
-    </DialogButtons>
-</SfDialog>
+<ScheduleInterviewDialog @ref="_scheduleDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnScheduled="OnInterviewScheduledAsync" />
+<RecordInterviewOutcomeDialog @ref="_recordOutcomeDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnRecorded="OnOutcomeRecordedAsync" />
 
 <SfDialog Width="420px" IsModal="true" @bind-Visible="_showRejectDialog" Header="Reject Candidate" CssClass="reject-candidate-dialog">
     <DialogTemplates>
@@ -469,351 +422,13 @@
     </DialogButtons>
 </SfDialog>
 
-<SfDialog Width="520px" IsModal="true" @bind-Visible="_showHireDialog" Header="Hire Candidate" CssClass="hire-candidate-dialog">
-    <DialogTemplates>
-        <Content>
-            <EditForm EditContext="_hireEditContext">
-                <DataAnnotationsValidator />
-                @if (_hireOfferAccepted)
-                {
-                    <div class="alert alert-info py-2" role="status" data-testid="hire-offer-accepted-context">
-                        Offer accepted: @FormatOfferedSalary(_hireOfferedSalary, _hireOfferedSalaryFrequency) – will seed first compensation record.
-                    </div>
-                }
-                @if (_hireOfferBlockedMessage is not null)
-                {
-                    <div class="alert alert-warning py-2" role="alert" data-testid="hire-offer-blocked">@_hireOfferBlockedMessage</div>
-                }
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Start Date" Required="@(!_hireStartDateOptional)" Id="hire-start-date"
-                                     @bind-Value="_hireModel.StartDate"
-                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "hire-start-date" })"
-                                     HelpText="@(_hireStartDateOptional ? "Leave blank to use the accepted offer's proposed start date." : null)" />
-                    </div>
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Date of Birth" Required="true" Id="hire-date-of-birth"
-                                     @bind-Value="_hireModel.DateOfBirth" Format="dd/MM/yyyy" />
-                    </div>
-                    <div class="col-md-6">
-                        <HrDropDownField TValue="string" TItem="NationalityListItem" Label="Nationality" Required="true" Id="hire-nationality"
-                                         DataSource="@_nationalities" @bind-Value="_hireModel.Nationality"
-                                         ValueField="Name" TextField="Name" Placeholder="Select nationality" />
-                    </div>
-                    <div class="col-md-6">
-                        <label id="hire-gender-label" for="hire-gender" class="form-label">Gender <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_hireModel.Gender" Placeholder="Select gender"
-                                        HtmlAttributes="@Aria(_hireEditContext, _hireModel, "hire-gender", nameof(HireCandidateFormModel.Gender), "Gender", required: true)" />
-                        <div id="hire-gender-error" role="alert">
-                            <ValidationMessage For="@(() => _hireModel.Gender)" />
-                        </div>
-                        @if (_hireModel.Gender == "Other")
-                        {
-                            <div class="mt-2">
-                                <HrTextField Label="Please specify gender" Id="hire-gender-other"
-                                             @bind-Value="_hireModel.GenderOther" Placeholder="Please specify" />
-                            </div>
-                        }
-                    </div>
-                    @if (_hireEmployeeNumberMode == EmployeeNumberMode.Automatic)
-                    {
-                        <div class="col-md-6">
-                            <span class="form-label d-block">Employee Number</span>
-                            <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="col-md-6">
-                            <HrTextField Label="Employee Number" Required="true" Id="hire-employee-number"
-                                         @bind-Value="_hireModel.EmployeeNumber" Placeholder="e.g. EMP-001" />
-                        </div>
-                    }
-                    <div class="col-md-6">
-                        <HrDropDownField TValue="Guid?" TItem="EmploymentTypeListItemModel" Label="Employment Type" Required="true" Id="hire-employment-type"
-                                         DataSource="@_employmentTypes" @bind-Value="_hireModel.EmploymentTypeId"
-                                         ValueField="Id" TextField="Name" Placeholder="Select type" AllowFiltering="false" />
-                    </div>
-                    <div class="col-md-6">
-                        <span id="hire-derived-position-profile-label" class="form-label d-block">Position Profile</span>
-                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-position-profile-label" aria-describedby="hire-derived-position-profile-help" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
-                        <div id="hire-derived-position-profile-help" class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <span id="hire-derived-location-label" class="form-label d-block">Location</span>
-                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-location-label" aria-describedby="hire-derived-location-help" data-testid="hire-derived-location">@_derivedLocationName</div>
-                        <div id="hire-derived-location-help" class="form-text">Derived from the vacancy's position profile.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label id="hire-manager-label" for="hire-manager" class="form-label">Manager</label>
-                        <SfDropDownList @ref="_hireManagerDropdown"
-                                        TValue="Guid?"
-                                        TItem="ManagerOption"
-                                        DataSource="@_hireManagerOptions"
-                                        @bind-Value="_hireModel.ManagerId"
-                                        Placeholder="None"
-                                        AllowFiltering="true"
-                                        HtmlAttributes="@Aria(_hireEditContext, _hireModel, "hire-manager", nameof(HireCandidateFormModel.ManagerId), "Manager")">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                            <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
-                        </SfDropDownList>
-                    </div>
-                    <div class="col-12">
-                        <HrTextField Label="Address Line 1" Id="hire-address-line-1" Autocomplete="address-line1"
-                                     @bind-Value="_hireModel.AddressLine1" Placeholder="Street address" />
-                    </div>
-                    <div class="col-12">
-                        <HrTextField Label="Address Line 2" Id="hire-address-line-2" Autocomplete="address-line2"
-                                     @bind-Value="_hireModel.AddressLine2" Placeholder="Apartment, suite, etc." />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="City" Id="hire-city" Autocomplete="address-level2"
-                                     @bind-Value="_hireModel.City" Placeholder="e.g. London" />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="County / State" Id="hire-county" Autocomplete="address-level1"
-                                     @bind-Value="_hireModel.County" Placeholder="e.g. Greater London" />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="Post Code" Id="hire-post-code" Autocomplete="postal-code"
-                                     @bind-Value="_hireModel.PostCode" Placeholder="e.g. SW1A 1AA" />
-                    </div>
-                </div>
-                @if (_dialogError is not null)
-                {
-                    <div class="alert alert-danger py-2 mt-3" role="alert">@_dialogError</div>
-                }
-            </EditForm>
-        </Content>
-    </DialogTemplates>
-    <DialogButtons>
-        <DialogButton Content="Hire" IsPrimary="true" OnClick="ConfirmHireAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _showHireDialog = false" />
-    </DialogButtons>
-</SfDialog>
+<HireCandidateDialog @ref="_hireDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnHired="OnHiredAsync" />
 
-@* Internal recruitment Ticket 7: an INTERNAL application is completed by appointing the existing
-   employee (the backend rejects Hire for internal applications). Position profile, department and
-   location are derived server-side from the vacancy and only shown here for confirmation. *@
-<SfDialog Width="560px" IsModal="true" @bind-Visible="_showAppointDialog" Header="Complete internal appointment" CssClass="appoint-candidate-dialog">
-    <DialogTemplates>
-        <Content>
-            <div data-testid="appoint-candidate-dialog">
-                <EditForm EditContext="_appointEditContext">
-                    <DataAnnotationsValidator />
-                    <div class="alert alert-info py-2" data-testid="appoint-existing-employee-notice">
-                        @_appointCandidateName is an existing employee. Their existing employee record will be updated — no new employee will be created. Employee number, start date, continuous service and system access stay the same.
-                    </div>
-                    @if (_appointPending)
-                    {
-                        <div class="alert alert-warning py-2" data-testid="appoint-pending-notice">
-                            Appointment in progress — a previous attempt did not finish. Appointing again will complete it.
-                        </div>
-                    }
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <span id="appoint-derived-position-profile-label" class="form-label d-block">Position Profile</span>
-                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-position-profile-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-position-profile">@_derivedPositionProfileName</div>
-                        </div>
-                        <div class="col-md-6">
-                            <span id="appoint-derived-department-label" class="form-label d-block">Department</span>
-                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-department-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-department">@_derivedDepartmentName</div>
-                        </div>
-                        <div class="col-md-6">
-                            <span id="appoint-derived-location-label" class="form-label d-block">Location</span>
-                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-location-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-location">@_derivedLocationName</div>
-                        </div>
-                        <div class="col-12">
-                            <div id="appoint-derived-help" class="form-text mt-0">Derived from the vacancy's position profile — the employee is moved to this profile, department and location.</div>
-                        </div>
-                        <div class="col-md-6">
-                            <HrDateField TValue="DateOnly?" Label="Effective Date" Required="true" Id="appoint-effective-date"
-                                         @bind-Value="_appointModel.EffectiveDate" Format="dd/MM/yyyy"
-                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-effective-date" })" />
-                            @if (_appointModel.IsFutureDated)
-                            {
-                                <div class="form-text" role="status" data-testid="appoint-future-date-hint">The change will be applied automatically on this date.</div>
-                            }
-                        </div>
-                        <div class="col-md-6">
-                            <label id="appoint-manager-label" for="appoint-manager" class="form-label">Manager <span class="text-danger">*</span></label>
-                            <SfDropDownList @ref="_appointManagerDropdown"
-                                            TValue="Guid?"
-                                            TItem="ManagerOption"
-                                            DataSource="@_appointManagerOptions"
-                                            @bind-Value="_appointModel.ManagerId"
-                                            Placeholder="Select a manager"
-                                            AllowFiltering="true"
-                                            HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-manager", nameof(AppointFormModel.ManagerId), "Manager", required: true, testId: "appoint-manager")">
-                                <DropDownListFieldSettings Value="Id" Text="Name" />
-                                <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnAppointManagerFilteringAsync" />
-                            </SfDropDownList>
-                            <div id="appoint-manager-error" role="alert">
-                                <ValidationMessage For="@(() => _appointModel.ManagerId)" />
-                            </div>
-                        </div>
-                        @if (_appointModel.IsBackdated)
-                        {
-                            <div class="col-12" data-testid="appoint-confirm-backdated">
-                                <HrCheckBoxField Label="I confirm this backdated appointment should apply immediately" Id="appoint-confirm-backdated-input"
-                                                 Value="_appointModel.ConfirmBackdated"
-                                                 ValueChanged="@(v => _appointModel.ConfirmBackdated = v)"
-                                                 ValueExpression="@(() => _appointModel.ConfirmBackdated)" />
-                            </div>
-                        }
-                        <div class="col-12" data-testid="appoint-change-compensation">
-                            <HrCheckBoxField Label="Change compensation" Id="appoint-change-compensation-input"
-                                             @bind-Checked="_appointModel.ChangeCompensation" />
-                        </div>
-                        @if (_appointModel.ChangeCompensation)
-                        {
-                            <div class="col-md-4">
-                                <label id="appoint-salary-type-label" for="appoint-salary-type" class="form-label">Salary Type <span class="text-danger">*</span></label>
-                                <SfDropDownList TValue="string" TItem="string" DataSource="@_appointSalaryTypeOptions"
-                                                @bind-Value="_appointModel.SalaryType"
-                                                HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-salary-type", nameof(AppointFormModel.SalaryType), "Salary type", required: true, testId: "appoint-salary-type")" />
-                                <div id="appoint-salary-type-error" role="alert">
-                                    <ValidationMessage For="@(() => _appointModel.SalaryType)" />
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
-                                                @bind-Value="_appointModel.Salary" Format="n2" Min="0"
-                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-salary" })" />
-                            </div>
-                            <div class="col-md-4">
-                                <HrTextField Label="Currency" Required="true" Id="appoint-currency"
-                                             @bind-Value="_appointModel.Currency" Placeholder="e.g. GBP"
-                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-currency" })" />
-                            </div>
-                            <div class="col-md-6">
-                                <HrNumericField TValue="decimal?" Label="Hours per Week" Id="appoint-hours-per-week"
-                                                @bind-Value="_appointModel.HoursPerWeek" Format="n2" Min="0"
-                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-hours-per-week" })" />
-                            </div>
-                            <div class="col-md-6">
-                                <HrNumericField TValue="decimal?" Label="FTE" Id="appoint-fte"
-                                                @bind-Value="_appointModel.Fte" Format="n2" Min="0" Max="1" Step="0.1"
-                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-fte" })" />
-                            </div>
-                            <div class="col-12">
-                                <HrTextField Label="Compensation Notes" Id="appoint-compensation-notes"
-                                             @bind-Value="_appointModel.CompensationNotes" Multiline="true" Rows="2"
-                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-compensation-notes" })" />
-                            </div>
-                        }
-                    </div>
-                    @if (_dialogError is not null)
-                    {
-                        <div class="alert alert-danger py-2 mt-3" role="alert" data-testid="appoint-error">@_dialogError</div>
-                    }
-                </EditForm>
-            </div>
-        </Content>
-        <FooterTemplate>
-            @* Disabled while in flight so a double click can't submit twice. *@
-            <SfButton IsPrimary="true" Disabled="@(_appointing || Session.IsReadOnly)" OnClick="ConfirmAppointAsync" data-testid="appoint-confirm">
-                @if (_appointing)
-                {
-                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
-                }
-                Appoint
-            </SfButton>
-            <SfButton Disabled="_appointing" OnClick="() => _showAppointDialog = false" data-testid="appoint-cancel">Cancel</SfButton>
-        </FooterTemplate>
-    </DialogTemplates>
-</SfDialog>
+<AppointInternalCandidateDialog @ref="_appointDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnAppointed="OnAppointedAsync" />
 
-<SfDialog Width="520px" IsModal="true" @bind-Visible="_showOfferDialog" Header="Make an Offer" CssClass="offer-candidate-dialog">
-    <DialogTemplates>
-        <Content>
-            <EditForm EditContext="_offerEditContext">
-                <DataAnnotationsValidator />
-                <div class="alert alert-light border py-2" data-testid="offer-position-profile-context">
-                    <div class="fw-semibold">@(_offerProfileTitle ?? "Position Profile")</div>
-                    <div class="text-muted small">
-                        Salary range:
-                        @if (_offerSalaryMin is not null || _offerSalaryMax is not null)
-                        {
-                            <span>@FormatMoney(_offerSalaryMin) – @FormatMoney(_offerSalaryMax)</span>
-                            <span> (@(_offerSalaryType ?? "—"))</span>
-                        }
-                        else
-                        {
-                            <span>Not specified</span>
-                        }
-                    </div>
-                </div>
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <HrNumericField TValue="decimal?" Label="Offered Salary" Id="offer-salary"
-                                        @bind-Value="_offerModel.OfferedSalary" Format="c0" Min="0"
-                                        HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-salary" })" />
-                    </div>
-                    <div class="col-md-6">
-                        <label id="offer-salary-frequency-label" for="offer-salary-frequency" class="form-label">Salary Frequency</label>
-                        <SfDropDownList TValue="string" TItem="string" DataSource="@_salaryFrequencyOptions"
-                                        @bind-Value="_offerModel.OfferedSalaryFrequency"
-                                        HtmlAttributes="@Aria(_offerEditContext, _offerModel, "offer-salary-frequency", nameof(OfferFormModel.OfferedSalaryFrequency), "Salary frequency", testId: "offer-salary-frequency")" />
-                        <div id="offer-salary-frequency-error" role="alert">
-                            <ValidationMessage For="@(() => _offerModel.OfferedSalaryFrequency)" />
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Proposed Start Date" Id="offer-proposed-start-date"
-                                     @bind-Value="_offerModel.ProposedStartDate"
-                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-proposed-start-date" })" />
-                    </div>
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Offer Date" Id="offer-date"
-                                     @bind-Value="_offerModel.OfferDate"
-                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-date" })" />
-                    </div>
-                    <div class="col-12">
-                        <HrTextField Label="Offer Notes" Id="offer-notes"
-                                     @bind-Value="_offerModel.OfferNotes" Multiline="true" Rows="3"
-                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-notes" })" />
-                    </div>
-                </div>
-                @if (_dialogError is not null)
-                {
-                    <div class="alert alert-danger py-2 mt-3" role="alert">@_dialogError</div>
-                }
-            </EditForm>
-        </Content>
-    </DialogTemplates>
-    <DialogButtons>
-        <DialogButton Content="Make Offer" IsPrimary="true" OnClick="ConfirmOfferAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _showOfferDialog = false" />
-    </DialogButtons>
-</SfDialog>
+<OfferCandidateDialog @ref="_offerDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnOffered="OnOfferedAsync" />
 
-<SfDialog Width="420px" IsModal="true" @bind-Visible="_showOfferResponseDialog" Header="Record Offer Response" CssClass="offer-response-dialog">
-    <DialogTemplates>
-        <Content>
-            <EditForm EditContext="_offerResponseEditContext">
-                <DataAnnotationsValidator />
-                <div class="mb-3">
-                    <label id="offer-response-status-label" for="offer-response-status" class="form-label">Response <span class="text-danger">*</span></label>
-                    <SfDropDownList TValue="string" TItem="string" DataSource="@_offerResponseOptions"
-                                    @bind-Value="_offerResponseModel.Status" Placeholder="Select a response"
-                                    HtmlAttributes="@Aria(_offerResponseEditContext, _offerResponseModel, "offer-response-status", nameof(OfferResponseFormModel.Status), "Offer response", required: true, testId: "offer-response-status")" />
-                    <div id="offer-response-status-error" role="alert">
-                        <ValidationMessage For="@(() => _offerResponseModel.Status)" />
-                    </div>
-                </div>
-                @if (_dialogError is not null)
-                {
-                    <div class="alert alert-danger py-2" role="alert">@_dialogError</div>
-                }
-            </EditForm>
-        </Content>
-    </DialogTemplates>
-    <DialogButtons>
-        <DialogButton Content="Record Response" IsPrimary="true" OnClick="ConfirmOfferResponseAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _showOfferResponseDialog = false" />
-    </DialogButtons>
-</SfDialog>
+<RecordOfferResponseDialog @ref="_offerResponseDialog" CompanyId="CompanyId" VacancyId="VacancyId" OnRecorded="OnOfferResponseRecordedAsync" />
 
 @code {
     [Parameter] public Guid CompanyId { get; set; }
@@ -902,72 +517,20 @@
     private static string SourceLabel(string? source) =>
         _sourceOptions.FirstOrDefault(o => o.Value == source)?.Label ?? source ?? "Unspecified";
 
-    private bool _showScheduleDialog;
+    private ScheduleInterviewDialog? _scheduleDialog;
+    private RecordInterviewOutcomeDialog? _recordOutcomeDialog;
     private List<EmployeeListItemModel> _employees = [];
     private ApplicationListItemModel? _activeApplication;
-    private readonly ScheduleInterviewFormModel _scheduleModel = new();
-    private EditContext _scheduleEditContext = default!;
 
     protected override void OnInitialized()
     {
-        _scheduleEditContext = new EditContext(_scheduleModel);
         _addEditContext = new EditContext(_addModel);
-        _hireEditContext = new EditContext(_hireModel);
-        _appointEditContext = new EditContext(_appointModel);
-        _offerEditContext = new EditContext(_offerModel);
-        _offerResponseEditContext = new EditContext(_offerResponseModel);
     }
 
-    private bool _showOfferDialog;
-    private readonly OfferFormModel _offerModel = new();
-    private EditContext _offerEditContext = default!;
-    private string? _offerProfileTitle;
-    private decimal? _offerSalaryMin;
-    private decimal? _offerSalaryMax;
-    private string? _offerSalaryType;
-    private static readonly string[] _salaryFrequencyOptions = ["None", "Annual", "Hourly", "Daily"];
+    private OfferCandidateDialog? _offerDialog;
 
-    private bool _showOfferResponseDialog;
-    private readonly OfferResponseFormModel _offerResponseModel = new();
-    private EditContext _offerResponseEditContext = default!;
-    private static readonly string[] _offerResponseOptions = ["Accepted", "Declined", "Withdrawn"];
 
-    private bool _hireOfferAccepted;
-    private bool _hireStartDateOptional;
-    private string? _hireOfferBlockedMessage;
-    private decimal? _hireOfferedSalary;
-    private string? _hireOfferedSalaryFrequency;
 
-    public sealed class OfferFormModel
-    {
-        public decimal? OfferedSalary { get; set; }
-        public string? OfferedSalaryFrequency { get; set; } = "None";
-        public DateOnly? ProposedStartDate { get; set; }
-        public DateOnly? OfferDate { get; set; }
-        [MaxLength(2000, ErrorMessage = "Offer notes cannot exceed 2000 characters.")]
-        public string? OfferNotes { get; set; }
-    }
-
-    public sealed class OfferResponseFormModel
-    {
-        [Required(ErrorMessage = "Please select a response.")]
-        public string? Status { get; set; }
-    }
-
-    private static string FormatMoney(decimal? value) => value is null ? "—" : value.Value.ToString("C0");
-
-    private static string FormatOfferedSalary(decimal? salary, string? frequency)
-    {
-        if (salary is null) return "salary not recorded";
-        var suffix = frequency switch
-        {
-            "Annual" => " /year",
-            "Hourly" => " /hour",
-            "Daily" => " /day",
-            _ => "",
-        };
-        return salary.Value.ToString("C0") + suffix;
-    }
 
     private static StatusBadgeVariant OfferResponseVariant(string? status) => status switch
     {
@@ -985,81 +548,21 @@
 
     private async Task OpenOfferDialog(ApplicationListItemModel row)
     {
-        _dialogError = null;
-        _activeApplication = row;
-        _offerModel.OfferedSalary = null;
-        _offerModel.OfferedSalaryFrequency = "None";
-        _offerModel.ProposedStartDate = null;
-        _offerModel.OfferDate = DateOnly.FromDateTime(DateTime.Today);
-        _offerModel.OfferNotes = null;
-        _offerProfileTitle = null;
-        _offerSalaryMin = _offerSalaryMax = null;
-        _offerSalaryType = null;
-
-        var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
-        _offerProfileTitle = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle;
-        if (vacancy is not null)
-        {
-            var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, vacancy.PositionProfileId);
-            _offerSalaryMin = profile?.SalaryMin;
-            _offerSalaryMax = profile?.SalaryMax;
-            _offerSalaryType = profile?.SalaryType;
-        }
-
-        _offerModel.OfferedSalary = _offerSalaryMin;
-
-        _offerEditContext = new EditContext(_offerModel);
-        _showOfferDialog = true;
+        if (_offerDialog is not null) await _offerDialog.OpenAsync(row.Id);
     }
 
-    private async Task ConfirmOfferAsync()
+    private async Task OnOfferedAsync()
     {
-        if (_activeApplication is null || !_offerEditContext.Validate())
-            return;
-
-        var freq = _offerModel.OfferedSalaryFrequency is null or "None" ? null : _offerModel.OfferedSalaryFrequency;
-        var request = new OfferCandidateRequest(
-            CompanyId, VacancyId, _activeApplication.Id,
-            _offerModel.OfferedSalary, freq, _offerModel.ProposedStartDate, _offerModel.OfferDate,
-            FormText.Optional(_offerModel.OfferNotes));
-
-        var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
-        if (result is null)
-        {
-            _dialogError = error;
-            return;
-        }
-
-        _showOfferDialog = false;
         _actionSuccess = "Offer made to candidate.";
         _actionError = null;
         await LoadAsync();
     }
 
-    private void OpenOfferResponseDialog(ApplicationListItemModel row)
+    private void OpenOfferResponseDialog(ApplicationListItemModel row) => _offerResponseDialog?.Open(row.Id);
+
+    private async Task OnOfferResponseRecordedAsync(string response)
     {
-        _dialogError = null;
-        _activeApplication = row;
-        _offerResponseModel.Status = null;
-        _offerResponseEditContext = new EditContext(_offerResponseModel);
-        _showOfferResponseDialog = true;
-    }
-
-    private async Task ConfirmOfferResponseAsync()
-    {
-        if (_activeApplication is null || !_offerResponseEditContext.Validate())
-            return;
-
-        var (result, error) = await ApplicationService.RespondToOfferAsync(
-            CompanyId, VacancyId, _activeApplication.Id, _offerResponseModel.Status!);
-        if (result is null)
-        {
-            _dialogError = error;
-            return;
-        }
-
-        _showOfferResponseDialog = false;
-        _actionSuccess = $"Offer response recorded: {EnumDisplay.Humanize(result.OfferResponseStatus)}.";
+        _actionSuccess = $"Offer response recorded: {response}.";
         _actionError = null;
         await LoadAsync();
     }
@@ -1122,69 +625,8 @@
         }
     }
 
-    public sealed class HireCandidateFormModel : IValidatableObject
-    {
-        public DateOnly? StartDate { get; set; }
-
-        public bool StartDateRequired { get; set; } = true;
-
-        [Required(ErrorMessage = "Please select a date of birth.")]
-        public DateOnly? DateOfBirth { get; set; }
-
-        [Required(ErrorMessage = "Please select a nationality.")]
-        public string? Nationality { get; set; }
-
-        [Required(ErrorMessage = "Please select a gender.")]
-        public string? Gender { get; set; }
-
-        [MaxLength(100)]
-        public string? GenderOther { get; set; }
-
-        [MaxLength(50)]
-        public string? EmployeeNumber { get; set; }
-
-        [Required(ErrorMessage = "Please select an employment type.")]
-        public Guid? EmploymentTypeId { get; set; }
-
-        public Guid? ManagerId { get; set; }
-
-        [MaxLength(200)] public string? AddressLine1 { get; set; }
-        [MaxLength(200)] public string? AddressLine2 { get; set; }
-        [MaxLength(100)] public string? City { get; set; }
-        [MaxLength(100)] public string? County { get; set; }
-        [MaxLength(20)] public string? PostCode { get; set; }
-
-        public bool EmployeeNumberRequired { get; set; }
-
-        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-        {
-            if (EmployeeNumberRequired && string.IsNullOrWhiteSpace(EmployeeNumber))
-                yield return new ValidationResult(
-                    "Please enter an employee number.",
-                    [nameof(EmployeeNumber)]);
-
-            if (StartDateRequired && StartDate is null)
-                yield return new ValidationResult(
-                    "Please select a start date.",
-                    [nameof(StartDate)]);
-        }
-    }
-
-    // ── Internal recruitment Ticket 7: Appoint internal candidate ─────────────
-    private bool _showAppointDialog;
-    private bool _appointing;
-    private bool _appointPending;
-    private string _appointCandidateName = string.Empty;
-    private string _derivedDepartmentName = string.Empty;
-    private readonly AppointFormModel _appointModel = new();
-    private EditContext _appointEditContext = default!;
-    private SfDropDownList<Guid?, ManagerOption> _appointManagerDropdown = default!;
-    private List<ManagerOption> _appointManagerOptions = [];
-    private Guid? _appointEmployeeId;
+    private AppointInternalCandidateDialog? _appointDialog;
     private AppointSuccessInfo? _appointSuccess;
-    private static readonly string[] _appointSalaryTypeOptions = ["Annual", "Hourly", "Daily"];
-
-    private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
 
     private sealed record AppointSuccessInfo(Guid EmployeeId, string EmployeeName, bool IsApplied, DateOnly EffectiveDate);
 
@@ -1194,82 +636,11 @@
     private static string FormatUkDate(DateOnly date) =>
         date.ToString("dd/MM/yyyy", System.Globalization.CultureInfo.InvariantCulture);
 
-    public sealed class AppointFormModel : IValidatableObject
-    {
-        [Required(ErrorMessage = "Please select an effective date.")]
-        public DateOnly? EffectiveDate { get; set; }
-
-        public bool ConfirmBackdated { get; set; }
-
-        [Required(ErrorMessage = "Please select a manager, or choose \"No manager\".")]
-        public Guid? ManagerId { get; set; }
-
-        public bool ChangeCompensation { get; set; }
-        public string? SalaryType { get; set; } = "Annual";
-        public decimal? Salary { get; set; }
-        public string? Currency { get; set; } = "GBP";
-        public decimal? HoursPerWeek { get; set; }
-        public decimal? Fte { get; set; }
-        [MaxLength(4000, ErrorMessage = "Compensation notes cannot exceed 4000 characters.")]
-        public string? CompensationNotes { get; set; }
-
-        public bool IsBackdated => EffectiveDate is { } d && d < DateOnly.FromDateTime(DateTime.Today);
-        public bool IsFutureDated => EffectiveDate is { } d && d > DateOnly.FromDateTime(DateTime.Today);
-
-        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-        {
-            if (IsBackdated && !ConfirmBackdated)
-                yield return new ValidationResult(
-                    "The effective date is in the past — confirm the backdated appointment to continue.",
-                    [nameof(ConfirmBackdated)]);
-
-            if (!ChangeCompensation)
-                yield break;
-
-            if (SalaryType is not ("Annual" or "Hourly" or "Daily"))
-                yield return new ValidationResult("Please select a salary type.", [nameof(SalaryType)]);
-
-            if (Salary is null or <= 0)
-                yield return new ValidationResult("Please enter a salary greater than zero.", [nameof(Salary)]);
-
-            if (string.IsNullOrWhiteSpace(Currency) || Currency.Trim().Length != 3)
-                yield return new ValidationResult("Please enter a 3-letter currency code, e.g. GBP.", [nameof(Currency)]);
-
-            if (HoursPerWeek is <= 0)
-                yield return new ValidationResult("Hours per week must be greater than zero.", [nameof(HoursPerWeek)]);
-
-            if (Fte is < 0 or > 1)
-                yield return new ValidationResult("FTE must be between 0 and 1.", [nameof(Fte)]);
-        }
-    }
-
-    public sealed class ScheduleInterviewFormModel
-    {
-        [Required(ErrorMessage = "Please select an interviewer.")]
-        public Guid? InterviewerId { get; set; }
-
-        [Required(ErrorMessage = "Please select a scheduled time.")]
-        public DateTime? ScheduledAt { get; set; }
-
-        public int? DurationMinutes { get; set; }
-        public string? Location { get; set; }
-    }
-
     private bool _showRejectDialog;
     private string? _rejectionReason;
 
-    private bool _showHireDialog;
-    private List<NationalityListItem> _nationalities = [];
-    private List<EmploymentTypeListItemModel> _employmentTypes = [];
-    private readonly HireCandidateFormModel _hireModel = new();
-    private EditContext _hireEditContext = default!;
-    private EmployeeNumberMode _hireEmployeeNumberMode = EmployeeNumberMode.Manual;
-    private string _derivedLocationName = string.Empty;
-    private string _derivedPositionProfileName = string.Empty;
-    private SfDropDownList<Guid?, ManagerOption> _hireManagerDropdown = default!;
-    private List<ManagerOption> _hireManagerOptions = [];
-
-    private static readonly string[] _genderOptions = ["Male", "Female", "Non-binary", "Prefer not to say", "Other"];
+    private HireCandidateDialog? _hireDialog;
+    private RecordOfferResponseDialog? _offerResponseDialog;
 
     protected override async Task OnInitializedAsync()
     {
@@ -1386,8 +757,6 @@
     // interview or move a candidate on/off the pipeline while one is still awaiting a result.
     // Withdraw is deliberately left enabled — a candidate can withdraw at any point regardless of
     // where their interview stands.
-    private static bool HasPendingInterview(ApplicationListItemModel row) =>
-        row.InterviewOutcome == "Pending";
 
     // "Offer" stage = the same stage OfferCandidateHandler moves an application TO — stages are
     // fully data-driven per company, so there's no fixed enum/name to compare against. Mirrors the
@@ -1630,53 +999,63 @@
 
     private async Task OpenScheduleDialog(ApplicationListItemModel row)
     {
-        _dialogError = null;
-        _activeApplication = row;
-        _scheduleModel.InterviewerId = null;
-        _scheduleModel.ScheduledAt = DateTime.Today.AddDays(3).AddHours(10);
-        _scheduleModel.DurationMinutes = 30;
-        _scheduleModel.Location = null;
-        _scheduleEditContext = new EditContext(_scheduleModel);
-
-        if (_employees.Count == 0)
-        {
-            var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
-            _employees = result?.Items.ToList() ?? [];
-        }
-
-        _showScheduleDialog = true;
+        if (_scheduleDialog is not null) await _scheduleDialog.OpenAsync(row.Id);
     }
 
-    private async Task ConfirmScheduleAsync()
+    private KanbanCardAction ActionFor(ApplicationListItemModel? row)
     {
-        if (_activeApplication is null || !_scheduleEditContext.Validate())
-        {
-            return;
-        }
+        if (row is null || !IsActive(row)) return KanbanCardAction.None;
 
-        var (result, error) = await InterviewServiceScheduleAsync();
+        return KanbanCardActionResolver.Resolve(
+            row, Stage(row.CurrentStageId) is { Purpose: RecruitmentStagePurpose.Interview }, IsOnOfferStage(row), _canAppoint);
+    }
 
+    private bool CanSchedule(ApplicationListItemModel? row) =>
+        row is not null && KanbanCardActionResolver.CanScheduleInterview(row, ActionFor(row));
+
+    private bool CanRecordOutcome(ApplicationListItemModel? row) => ActionFor(row) == KanbanCardAction.RecordOutcome;
+
+    private async Task MoveToNextInterviewStageAsync(ApplicationListItemModel row)
+    {
+        if (row.NextInterviewStageId is not { } stageId) return;
+
+        _actionError = null;
+        var (result, error) = await KanbanService.MoveApplicationStageAsync(CompanyId, VacancyId, row.Id, stageId);
         if (result is null)
         {
-            _dialogError = error;
+            _actionError = error;
             return;
         }
 
-        _showScheduleDialog = false;
-        _actionSuccess = "Interview scheduled.";
+        _actionSuccess = $"Moved to {row.NextInterviewStageName}.";
+        await LoadAsync();
+    }
+
+    private Task OpenRecordOutcomeDialogAsync(ApplicationListItemModel row)
+    {
+        if (row.PendingInterviewId is not { } interviewId)
+        {
+            _actionError = "No pending interview was found for this application.";
+            return Task.CompletedTask;
+        }
+
+        _recordOutcomeDialog?.Open(row.Id, interviewId);
+        return Task.CompletedTask;
+    }
+
+    private async Task OnOutcomeRecordedAsync()
+    {
+        _actionSuccess = "Interview outcome recorded.";
         _actionError = null;
         await LoadAsync();
     }
 
-    [Inject] private InterviewService InterviewService { get; set; } = default!;
-
-    private Task<(ScheduleInterviewResponse? Result, string? Error)> InterviewServiceScheduleAsync() =>
-        InterviewService.ScheduleInterviewAsync(
-            CompanyId, VacancyId, _activeApplication!.Id,
-            new ScheduleInterviewRequest(
-                CompanyId, VacancyId, _activeApplication.Id, _scheduleModel.InterviewerId!.Value,
-                new DateTimeOffset(_scheduleModel.ScheduledAt!.Value).ToUniversalTime(), _scheduleModel.DurationMinutes,
-                FormText.Optional(_scheduleModel.Location)));
+    private async Task OnInterviewScheduledAsync()
+    {
+        _actionSuccess = "Interview scheduled.";
+        _actionError = null;
+        await LoadAsync();
+    }
 
     private void OpenRejectDialog(ApplicationListItemModel row)
     {
@@ -1719,251 +1098,67 @@
 
     private async Task OpenHireDialog(ApplicationListItemModel row)
     {
-        _dialogError = null;
-        _activeApplication = row;
-
-        _hireOfferAccepted = row.OfferResponseStatus == "Accepted";
-        _hireOfferedSalary = row.OfferedSalary;
-        _hireOfferedSalaryFrequency = "Annual";
-        _hireOfferBlockedMessage = row.OfferResponseStatus switch
-        {
-            "Declined" => "The candidate declined the offer — record a new offer before hiring.",
-            "Withdrawn" => "The offer was withdrawn — record a new offer before hiring.",
-            _ => null,
-        };
-        _hireStartDateOptional = _hireOfferAccepted && row.OfferedStartDate is not null;
-        _hireModel.StartDateRequired = !_hireStartDateOptional;
-
-        _hireModel.StartDate = row.OfferedStartDate ?? DateOnly.FromDateTime(DateTime.Today);
-        _hireModel.DateOfBirth = null;
-        _hireModel.Nationality = null;
-        _hireModel.Gender = null;
-        _hireModel.GenderOther = null;
-        _hireModel.EmployeeNumber = null;
-        _hireModel.EmploymentTypeId = null;
-        _hireModel.ManagerId = Guid.Empty;
-        _hireModel.AddressLine1 = null;
-        _hireModel.AddressLine2 = null;
-        _hireModel.City = null;
-        _hireModel.County = null;
-        _hireModel.PostCode = null;
-        _derivedLocationName = string.Empty;
-        _derivedPositionProfileName = string.Empty;
-
-        if (_nationalities.Count == 0)
-        {
-            var result = await EmployeeService.ListNationalitiesAsync();
-            _nationalities = result?.Items.ToList() ?? [];
-        }
-
-        var hrSettings = await CompanyService.GetHrSettingsAsync(CompanyId);
-        _hireEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
-        _hireModel.EmployeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
-        _hireEditContext = new EditContext(_hireModel);
-
-        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
-        var employmentTypeTask = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
-        var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
-
-        await Task.WhenAll(vacancyTask, employmentTypeTask, managerTask);
-
-        var vacancy = await vacancyTask;
-        _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
-        _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
-
-        _employmentTypes = (await employmentTypeTask)?.Items ?? [];
-        _hireManagerOptions = ((await managerTask)?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, e.FullName))
-            .OrderBy(e => e.Name)
-            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
-            .ToList();
-
-        _showHireDialog = true;
+        if (_hireDialog is not null)
+            await _hireDialog.OpenAsync(row.Id, row.OfferResponseStatus, row.OfferedSalary, row.OfferedStartDate);
     }
 
-    // Internal recruitment Ticket 7: internal applications are completed by appointing the existing
-    // employee. Mirrors OpenHireDialog's vacancy-derived display fields and manager option source.
-    private async Task OpenAppointDialog(ApplicationListItemModel row)
+    private async Task OnHiredAsync(Guid employeeId)
     {
-        _dialogError = null;
-        _appointing = false;
-        _activeApplication = row;
-        _appointEmployeeId = row.EmployeeId;
-        _appointPending = row.InternalAppointmentStatus == "Pending";
-        _appointCandidateName = $"{row.CandidateFirstName} {row.CandidateLastName}".Trim();
-
-        _appointModel.EffectiveDate = row.OfferedStartDate ?? DateOnly.FromDateTime(DateTime.Today);
-        _appointModel.ConfirmBackdated = false;
-        _appointModel.ManagerId = null;
-        _appointModel.ChangeCompensation = false;
-        _appointModel.SalaryType = "Annual";
-        _appointModel.Salary = row.OfferedSalary;
-        _appointModel.Currency = "GBP";
-        _appointModel.HoursPerWeek = null;
-        _appointModel.Fte = null;
-        _appointModel.CompensationNotes = null;
-        _appointEditContext = new EditContext(_appointModel);
-
-        _derivedPositionProfileName = string.Empty;
-        _derivedDepartmentName = string.Empty;
-        _derivedLocationName = string.Empty;
-
-        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
-        var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
-        await Task.WhenAll(vacancyTask, managerTask);
-
-        var vacancy = await vacancyTask;
-        _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
-        _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
-        _derivedDepartmentName = "(none set)";
-        if (vacancy?.PositionProfileDepartmentId is Guid departmentId)
-        {
-            var department = await DepartmentService.GetDepartmentAsync(CompanyId, departmentId);
-            _derivedDepartmentName = department?.Name ?? "(unknown)";
-        }
-
-        _appointManagerOptions = BuildAppointManagerOptions((await managerTask)?.Items);
-
-        _appointModel.ManagerId = NoManagerOption.Id;
-        if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
-        {
-            if (_appointManagerOptions.Any(o => o.Id == vacancy.HiringManagerId))
-            {
-                _appointModel.ManagerId = vacancy.HiringManagerId;
-            }
-            else
-            {
-                var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
-                if (hiringManager is not null)
-                {
-                    _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, hiringManager.DisplayName));
-                    _appointModel.ManagerId = hiringManager.Id;
-                }
-            }
-        }
-
-        _showAppointDialog = true;
-    }
-
-    private List<ManagerOption> BuildAppointManagerOptions(IEnumerable<EmployeeListItemModel>? employees) =>
-        (employees ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Where(e => e.Id != _appointEmployeeId)
-            .Select(e => new ManagerOption(e.Id, e.FullName))
-            .OrderBy(e => e.Name)
-            .Prepend(NoManagerOption)
-            .ToList();
-
-    private async Task OnAppointManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
-    {
-        args.PreventDefaultAction = true;
-        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
-        _appointManagerOptions = BuildAppointManagerOptions(result?.Items);
-        await _appointManagerDropdown.FilterAsync(_appointManagerOptions, new Query());
-    }
-
-    private async Task ConfirmAppointAsync()
-    {
-        if (_activeApplication is null || _appointing)
-            return;
-
-        _dialogError = null;
-        if (!_appointEditContext.Validate())
-        {
-            _dialogError = _appointEditContext.GetValidationMessages().FirstOrDefault()
-                ?? "Please correct the highlighted fields below.";
-            return;
-        }
-
-        var noManager = _appointModel.ManagerId == NoManagerOption.Id;
-        var changeComp = _appointModel.ChangeCompensation;
-        var request = new AppointInternalCandidateRequest(
-            EffectiveDate: _appointModel.EffectiveDate,
-            ConfirmBackdatedEffectiveDate: _appointModel.IsBackdated && _appointModel.ConfirmBackdated,
-            ManagerId: noManager ? null : _appointModel.ManagerId,
-            NoManager: noManager,
-            CreateCompensationChange: changeComp,
-            CompensationSalaryType: changeComp ? _appointModel.SalaryType : null,
-            CompensationSalary: changeComp ? _appointModel.Salary : null,
-            CompensationCurrency: changeComp ? _appointModel.Currency?.Trim().ToUpperInvariant() : null,
-            CompensationHoursPerWeek: changeComp ? _appointModel.HoursPerWeek : null,
-            CompensationFte: changeComp ? _appointModel.Fte : null,
-            CompensationNotes: changeComp ? FormText.Optional(_appointModel.CompensationNotes) : null);
-
-        _appointing = true;
-        try
-        {
-            var (result, error) = await ApplicationService.AppointInternalCandidateAsync(
-                CompanyId, VacancyId, _activeApplication.Id, request);
-
-            if (result is null)
-            {
-                _dialogError = error;
-                return;
-            }
-
-            _showAppointDialog = false;
-            _actionSuccess = null;
-            _actionError = null;
-            _appointSuccess = new AppointSuccessInfo(result.EmployeeId, _appointCandidateName, result.IsApplied, result.EffectiveDate);
-        }
-        finally
-        {
-            _appointing = false;
-        }
-
+        _actionSuccess = $"Candidate hired as employee {employeeId}.";
+        _actionError = null;
         await LoadAsync();
     }
 
-    // Row-level actions (Schedule Interview/Offer/Hire/Reject/Withdraw) moved into the grid toolbar
-    // rather than a dedicated Actions column, matching the toolbar pattern used elsewhere in the app
-    // (see SearchPageBase's selection-dependent toolbar buttons). Enabled state tracks the current
-    // row selection and that row's eligibility (IsActive/HasPendingInterview), same rules as before.
+    private async Task OpenAppointDialog(ApplicationListItemModel row)
+    {
+        if (_appointDialog is not null)
+            await _appointDialog.OpenAsync(
+                row.Id, $"{row.CandidateFirstName} {row.CandidateLastName}".Trim(), row.EmployeeId,
+                row.InternalAppointmentStatus, row.OfferedStartDate, row.OfferedSalary);
+    }
+
+    private async Task OnAppointedAsync(AppointInternalCandidateDialog.AppointedInfo info)
+    {
+        _actionSuccess = null;
+        _actionError = null;
+        _appointSuccess = new AppointSuccessInfo(info.EmployeeId, info.EmployeeName, info.IsApplied, info.EffectiveDate);
+        await LoadAsync();
+    }
+
+    // Toolbar enablement comes from KanbanCardActionResolver (the same resolver as the Kanban card)
+    // fed with the stage-specific interview state returned by the applications list API.
     private IEnumerable<object> GridToolbar
     {
         get
         {
+            var action = ActionFor(_selectedRow);
             var active = _selectedRow is not null && IsActive(_selectedRow);
-            var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
-            var onOfferStage = _selectedRow is not null && IsOnOfferStage(_selectedRow);
-            var enabled = active && !pendingInterview;
-
-            // An offer's already been made once on the Offer stage — Schedule Interview/Offer/
-            // Reject stop making sense there (Hire and Withdraw remain valid).
-            var enabledPreOffer = enabled && !onOfferStage;
-            var canRecordOfferResponse = _selectedRow?.OfferResponseStatus == "AwaitingResponse";
 
             var items = new List<object>
             {
-                new ItemModel { Id = "app-review-cv", Text = "Review CV", PrefixIcon = "fa-solid fa-file-lines", Disabled = !enabledPreOffer, TooltipText = "Review the CV for the selected application" },
-                new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !enabledPreOffer, TooltipText = "Schedule an interview for the selected application" },
-                new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = !enabledPreOffer, TooltipText = "Make an offer to the selected candidate" },
-                new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = !canRecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
-                new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = !CanHire(_selectedRow), TooltipText = "Hire the selected candidate" },
-                new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !enabledPreOffer, TooltipText = "Reject the selected candidate" },
-                new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = _selectedRow is null, TooltipText = "Withdraw the selected application" },
+                new ItemModel { Id = "app-review-cv", Text = "Review CV", PrefixIcon = "fa-solid fa-file-lines", Disabled = action != KanbanCardAction.ReviewCv, TooltipText = "Review the CV for the selected application" },
+                new ItemModel { Id = "app-schedule", Text = "Schedule Interview", PrefixIcon = "fa-solid fa-calendar-plus", Disabled = !CanSchedule(_selectedRow), TooltipText = "Schedule an interview for the selected application" },
+                new ItemModel { Id = "app-record-outcome", Text = "Record Outcome", PrefixIcon = "fa-solid fa-clipboard-check", Disabled = !CanRecordOutcome(_selectedRow), TooltipText = "Record the outcome of the pending interview" },
+                new ItemModel { Id = "app-next-stage", Text = "Next Interview Stage", PrefixIcon = "fa-solid fa-forward", Disabled = action != KanbanCardAction.MoveToNextInterviewStage, TooltipText = "Move the candidate to the next interview stage" },
+                new ItemModel { Id = "app-offer",     Text = "Offer",              PrefixIcon = "fa-solid fa-file-signature", Disabled = action != KanbanCardAction.MakeOffer, TooltipText = "Make an offer to the selected candidate" },
+                new ItemModel { Id = "app-offer-response", Text = "Record Offer Response", PrefixIcon = "fa-solid fa-reply", Disabled = action != KanbanCardAction.RecordOfferResponse, TooltipText = "Record the candidate's response to the standing offer" },
+                new ItemModel { Id = "app-hire",      Text = "Hire",               PrefixIcon = "fa-solid fa-user-check", Disabled = action != KanbanCardAction.Hire, TooltipText = "Hire the selected candidate" },
+                new ItemModel { Id = "app-reject",    Text = "Reject",             PrefixIcon = "fa-solid fa-user-xmark", Disabled = !active, TooltipText = "Reject the selected candidate (cancels any pending interview)" },
+                new ItemModel { Id = "app-withdraw",  Text = "Withdraw",           PrefixIcon = "fa-solid fa-arrow-rotate-left", Disabled = !active, TooltipText = "Withdraw the selected application" },
             };
 
             if (_canAppoint)
             {
-                items.Insert(5, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = !CanAppoint(_selectedRow), TooltipText = "Complete internal appointment" });
+                items.Insert(6, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = action != KanbanCardAction.Appoint, TooltipText = "Complete internal appointment" });
             }
 
             return items;
         }
     }
 
-    // Internal recruitment Ticket 7: Hire is for EXTERNAL applications only; INTERNAL applications
-    // are completed via Appoint instead. Both share Hire's eligibility (active, no pending interview).
-    // A "Pending" appointment (an earlier attempt that didn't finish) keeps Appoint enabled so a
-    // retry can complete it; a "Completed" one disables it.
-    private bool CanHire(ApplicationListItemModel? row) =>
-        row is not null && !row.IsInternal && IsActive(row) && !HasPendingInterview(row);
+    private bool CanHire(ApplicationListItemModel? row) => ActionFor(row) == KanbanCardAction.Hire;
 
-    private bool CanAppoint(ApplicationListItemModel? row) =>
-        _canAppoint && row is not null && row.IsInternal && row.InternalAppointmentStatus != "Completed" && !row.IsWithdrawn &&
-        (row.InternalAppointmentStatus == "Pending" || (IsActive(row) && !HasPendingInterview(row)));
+    private bool CanAppoint(ApplicationListItemModel? row) => ActionFor(row) == KanbanCardAction.Appoint;
 
     private SelectedApplicationMarker? _selectionMarker;
 
@@ -1985,17 +1180,19 @@
     {
         if (_grid is null) return;
 
+        var action = ActionFor(_selectedRow);
         var active = _selectedRow is not null && IsActive(_selectedRow);
-        var pendingInterview = _selectedRow is not null && HasPendingInterview(_selectedRow);
-        var onOfferStage = _selectedRow is not null && IsOnOfferStage(_selectedRow);
-        var enabled = active && !pendingInterview;
-        var enabledPreOffer = enabled && !onOfferStage;
 
-        await _grid.EnableToolbarItemsAsync(["app-schedule", "app-review-cv", "app-offer", "app-reject"], enabledPreOffer);
-        await _grid.EnableToolbarItemsAsync(["app-hire"], CanHire(_selectedRow));
-        if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-appoint"], CanAppoint(_selectedRow));
-        await _grid.EnableToolbarItemsAsync(["app-withdraw"], _selectedRow is not null);
-        await _grid.EnableToolbarItemsAsync(["app-offer-response"], _selectedRow?.OfferResponseStatus == "AwaitingResponse");
+        await _grid.EnableToolbarItemsAsync(["app-review-cv"], action == KanbanCardAction.ReviewCv);
+        await _grid.EnableToolbarItemsAsync(["app-schedule"], CanSchedule(_selectedRow));
+        await _grid.EnableToolbarItemsAsync(["app-record-outcome"], CanRecordOutcome(_selectedRow));
+        await _grid.EnableToolbarItemsAsync(["app-next-stage"], action == KanbanCardAction.MoveToNextInterviewStage);
+        await _grid.EnableToolbarItemsAsync(["app-offer"], action == KanbanCardAction.MakeOffer);
+        await _grid.EnableToolbarItemsAsync(["app-hire"], action == KanbanCardAction.Hire);
+        if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-appoint"], action == KanbanCardAction.Appoint);
+        await _grid.EnableToolbarItemsAsync(["app-reject"], active);
+        await _grid.EnableToolbarItemsAsync(["app-withdraw"], active);
+        await _grid.EnableToolbarItemsAsync(["app-offer-response"], action == KanbanCardAction.RecordOfferResponse);
     }
 
     private async Task OnToolbarClick(ClickEventArgs args)
@@ -2007,6 +1204,12 @@
         {
             case "app-schedule":
                 await OpenScheduleDialog(row);
+                break;
+            case "app-next-stage":
+                await MoveToNextInterviewStageAsync(row);
+                break;
+            case "app-record-outcome":
+                await OpenRecordOutcomeDialogAsync(row);
                 break;
             case "app-review-cv":
                 Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{VacancyId}/applications/{row.Id}/review-cv?returnUrl={Uri.EscapeDataString($"companies/{CompanyId}/vacancies/{VacancyId}")}");
@@ -2032,64 +1235,6 @@
         }
     }
 
-    private async Task OnHireManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
-    {
-        args.PreventDefaultAction = true;
-        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
-        _hireManagerOptions = (result?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
-            .Select(e => new ManagerOption(e.Id, e.FullName))
-            .OrderBy(e => e.Name)
-            .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
-            .ToList();
-        await _hireManagerDropdown.FilterAsync(_hireManagerOptions, new Query());
-    }
-
     private sealed record ManagerOption(Guid Id, string Name);
 
-    private async Task ConfirmHireAsync()
-    {
-        var employeeNumberRequired = _hireEmployeeNumberMode != EmployeeNumberMode.Automatic;
-
-        if (_activeApplication is null)
-            return;
-
-        if (_hireOfferBlockedMessage is not null)
-        {
-            _dialogError = _hireOfferBlockedMessage;
-            return;
-        }
-
-        if (!_hireEditContext.Validate())
-        {
-            _dialogError = _hireEditContext.GetValidationMessages().FirstOrDefault()
-                ?? "Please correct the highlighted fields below.";
-            return;
-        }
-
-        var request = new HireCandidateRequest(
-            CompanyId, VacancyId, _activeApplication.Id,
-            _hireModel.StartDate, _hireModel.DateOfBirth!.Value, _hireModel.Nationality!, _hireModel.Gender!,
-            FormText.Optional(_hireModel.GenderOther),
-            employeeNumberRequired ? FormText.Required(_hireModel.EmployeeNumber!) : string.Empty, _hireModel.EmploymentTypeId!.Value,
-            _hireModel.ManagerId == Guid.Empty ? null : _hireModel.ManagerId,
-            FormText.Optional(_hireModel.AddressLine1),
-            FormText.Optional(_hireModel.AddressLine2),
-            FormText.Optional(_hireModel.City),
-            FormText.Optional(_hireModel.County),
-            FormText.Optional(_hireModel.PostCode));
-
-        var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _activeApplication.Id, request);
-
-        if (result is null)
-        {
-            _dialogError = error;
-            return;
-        }
-
-        _showHireDialog = false;
-        _actionSuccess = $"Candidate hired as employee {result.EmployeeId}.";
-        _actionError = null;
-        await LoadAsync();
-    }
 }

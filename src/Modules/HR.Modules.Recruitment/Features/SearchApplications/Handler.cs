@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Employees.Contracts;
 using Microsoft.EntityFrameworkCore;
 
@@ -95,6 +96,9 @@ internal sealed class SearchApplicationsHandler(
                 : [])
             .ToDictionary(p => p.Id);
 
+        var states = await InterviewStageStateReader.LoadAsync(
+            dbContext, request.CompanyId, rows.Select(r => (r.ApplicationId, r.CurrentStageId)).ToList(), cancellationToken);
+
         var items = rows
             .Select(r =>
             {
@@ -111,7 +115,14 @@ internal sealed class SearchApplicationsHandler(
                     r.CurrentStageName,
                     r.IsWithdrawn,
                     r.IsInternal,
-                    r.InternalEmployeeId);
+                    r.InternalEmployeeId,
+                    states.GetValueOrDefault(r.ApplicationId)?.CurrentStageHasPendingInterview ?? false,
+                    states.GetValueOrDefault(r.ApplicationId)?.PendingInterviewId,
+                    states.GetValueOrDefault(r.ApplicationId)?.LatestOutcome?.ToString(),
+                    states.GetValueOrDefault(r.ApplicationId)?.HasNextInterviewStage ?? false,
+                    states.GetValueOrDefault(r.ApplicationId)?.NextInterviewStageId,
+                    states.GetValueOrDefault(r.ApplicationId)?.NextInterviewStageName,
+                    states.GetValueOrDefault(r.ApplicationId)?.AllRequiredInterviewStagesPassed ?? true);
             })
             .ToList();
 

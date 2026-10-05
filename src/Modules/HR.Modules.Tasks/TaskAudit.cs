@@ -57,6 +57,7 @@ internal sealed record TaskCompletedAuditEvent(
     Guid? AssignedEmployeeId,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    Guid IAuditEvent.EventId => TaskId;
     string IAuditEvent.EventType => "task.completed";
     string IAuditEvent.EntityType => "TaskItem";
     Guid IAuditEvent.EntityId => TaskId;
@@ -68,4 +69,25 @@ internal sealed record TaskCompletedAuditEvent(
     object? IAuditEvent.Before => new { Status = PreviousStatus };
     object? IAuditEvent.After => new { Status = "Completed", CompletedBy };
     object? IAuditEvent.Metadata => null;
+}
+
+internal sealed record ProgrammaticTaskCompletionResetAuditEvent(
+    Guid CompanyId,
+    Guid TaskId,
+    Guid OperationId,
+    Guid OperatorUserId,
+    string Reason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "task.completion_reset";
+    string IAuditEvent.EntityType => "TaskItem";
+    Guid IAuditEvent.EntityId => TaskId;
+    Guid? IAuditEvent.ActorUserId => OperatorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    Guid? IAuditEvent.WorkflowId => OperationId;
+    string? IAuditEvent.Summary => "Terminal programmatic task completion reset by an operator";
+    object? IAuditEvent.Before => new { Terminal = true };
+    object? IAuditEvent.After => new { Terminal = false };
+    object? IAuditEvent.Metadata => new { OperationId, Reason };
 }

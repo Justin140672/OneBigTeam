@@ -62,6 +62,7 @@ public class RecruitmentApprovalSettingsEndToEndTests
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
+        db.Interviews.Add(PassedInterviewSeed.Create(companyId, application.Id, interviewStageId, Now));
         await db.SaveChangesAsync();
         return (vacancy.Id, application.Id);
     }
@@ -118,7 +119,7 @@ public class RecruitmentApprovalSettingsEndToEndTests
 
         // Offer rejected: application's offer has not been approved yet.
         var firstOfferResponse = await recruiterClient.PostAsJsonAsync(
-            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
+            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { offeredSalaryFrequency = "Annual" });
         Assert.Equal(HttpStatusCode.BadRequest, firstOfferResponse.StatusCode);
 
         var approveOfferResponse = await recruiterClient.PostAsJsonAsync(
@@ -126,7 +127,7 @@ public class RecruitmentApprovalSettingsEndToEndTests
         Assert.Equal(HttpStatusCode.OK, approveOfferResponse.StatusCode);
 
         var secondOfferResponse = await recruiterClient.PostAsJsonAsync(
-            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { });
+            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer", new { offeredSalaryFrequency = "Annual" });
         Assert.Equal(HttpStatusCode.OK, secondOfferResponse.StatusCode);
     }
 }

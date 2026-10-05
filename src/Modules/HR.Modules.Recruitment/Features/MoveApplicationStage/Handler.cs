@@ -103,6 +103,24 @@ internal sealed class MoveApplicationStageHandler(
                     $"Cannot move an application to the terminal stage '{newStage.Name}' via a generic stage move — " +
                     "use the dedicated workflow action for this outcome (e.g. Hire, Reject, Withdraw)."));
 
+        if (currentStage is not null)
+        {
+            var activeStages = await db.RecruitmentStages
+                .AsNoTracking()
+                .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
+                .ToListAsync(cancellationToken);
+
+            var interviews = await db.Interviews
+                .AsNoTracking()
+                .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId)
+                .ToListAsync(cancellationToken);
+
+            var violation = InterviewStageWorkflow.DescribeMoveViolation(currentStage, newStage, activeStages, interviews);
+
+            if (violation is not null)
+                return Result.Failure<MoveApplicationStageResponse>(Error.Validation(violation));
+        }
+
         var previousStageId = application.CurrentStageId;
         var expectedVersion = application.Version;
         var now = clock.UtcNowOffset();

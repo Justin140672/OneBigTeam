@@ -1,0 +1,140 @@
+@page "/companies/{CompanyId:guid}/recruitment-stages/add-interview"
+@rendermode InteractiveServer
+@inject RecruitmentStageService RecruitmentStageService
+@inject AppSession Session
+@inherits EditPageBase<InterviewStageEditModel, Guid>
+
+<PageTitle>Add Interview Stage</PageTitle>
+
+<div class="container py-4">
+    <SfBreadcrumb Class="mb-3">
+        <BreadcrumbItems>
+            <BreadcrumbItem Text="Recruitment Stages" Url="@($"/companies/{CompanyId}/recruitment-stages")" />
+            <BreadcrumbItem Text="Add Interview Stage" />
+        </BreadcrumbItems>
+    </SfBreadcrumb>
+
+    @if (IsLoading)
+    {
+        <HrLoadingIndicator />
+    }
+    else
+    {
+        <h1 class="mb-1">Add Interview Stage</h1>
+        <p class="text-muted mb-4">Candidates will progress through interview stages in the order shown on the Recruitment Stages page.</p>
+
+        @if (!string.IsNullOrEmpty(GlobalError))
+        {
+            <div class="alert alert-danger">@GlobalError</div>
+        }
+
+        <EditForm EditContext="EditContext">
+            <DataAnnotationsValidator />
+            <div class="row">
+                <div class="col-lg-7">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Interview Stage Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <HrTextField Label="Name" Required="true" Id="stage-name" @bind-Value="Model.Name" />
+                            </div>
+                            <dl class="row mb-0" data-testid="interview-stage-defaults">
+                                <dt class="col-sm-4">Purpose</dt>
+                                <dd class="col-sm-8" data-testid="interview-stage-purpose">Interview</dd>
+                                <dt class="col-sm-4">Terminal Outcome</dt>
+                                <dd class="col-sm-8" data-testid="interview-stage-terminal">None</dd>
+                                <dt class="col-sm-4">Status</dt>
+                                <dd class="col-sm-8" data-testid="interview-stage-status">Active</dd>
+                                <dt class="col-sm-4">Position</dt>
+                                <dd class="col-sm-8" data-testid="interview-stage-position">@PositionText</dd>
+                            </dl>
+                            @if (_suggestion?.StageToRenameName is not null)
+                            {
+                                <div class="alert alert-info mt-3 mb-0" data-testid="interview-stage-rename-notice">
+                                    The existing "@_suggestion.StageToRenameName" stage will be renamed to "@_suggestion.RenamedStageName".
+                                </div>
+                            }
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-3 justify-content-end">
+                        <SfButton IsPrimary="true" Disabled="@(Saving || IsSubscriptionReadOnly)" OnClick="SaveAsync">
+                            @if (Saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Save
+                        </SfButton>
+                        <SfButton OnClick="RequestClose" Disabled="@Saving">Cancel</SfButton>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+
+    <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges" />
+
+    <UnsavedChangesDialog Visible="ShowUnsavedChangesDialog"
+                          Message="You have unsaved changes. Save them, discard them, or stay on this page to keep editing."
+                          StayText="Stay on page"
+                          DiscardText="Discard changes"
+                          OnSaveAndClose="ConfirmSaveAndCloseAsync"
+                          OnDiscard="DiscardChangesAndClose"
+                          OnCancel="CancelCloseDialog" />
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+
+    private InterviewStageSuggestionResponse? _suggestion;
+    private InterviewStageEditService? _service;
+
+    private string PositionText => _suggestion is null
+        ? string.Empty
+        : _suggestion.ActiveInterviewStageCount == 0
+            ? "Added to the pipeline before the Offer stage"
+            : "Immediately after the final interview stage";
+
+    protected override IEditService<InterviewStageEditModel, Guid> Service =>
+        _service ??= new InterviewStageEditService(RecruitmentStageService);
+
+    protected override Guid GetCompanyId() => CompanyId;
+    protected override Guid? GetId() => null;
+
+    protected override string? ListUrl => $"/companies/{CompanyId}/recruitment-stages";
+
+    protected override string? InvalidFieldFocusScope => "form";
+
+    protected override async Task OnLoadedAsync()
+    {
+        if (!Session.CanManageRecruitment)
+        {
+            Navigation.NavigateTo("/access-denied", replace: true);
+            return;
+        }
+
+        _suggestion = await RecruitmentStageService.GetInterviewStageSuggestionAsync(CompanyId);
+        if (_suggestion is not null && string.IsNullOrWhiteSpace(Model.Name))
+            Model.Name = _suggestion.SuggestedName;
+    }
+
+    private sealed class InterviewStageEditService(RecruitmentStageService inner)
+        : IEditService<InterviewStageEditModel, Guid>
+    {
+        public Task<InterviewStageEditModel?> GetByIdAsync(Guid companyId, Guid id) =>
+            Task.FromResult<InterviewStageEditModel?>(null);
+
+        public async Task<(InterviewStageEditModel? Result, string? Error)> CreateAsync(
+            Guid companyId, InterviewStageEditModel model)
+        {
+            var (created, error) = await inner.AddInterviewStageAsync(companyId, FormText.Required(model.Name));
+            return (created is null ? null : model, error);
+        }
+
+        public Task<(InterviewStageEditModel? Result, string? Error)> UpdateAsync(
+            Guid companyId, Guid id, InterviewStageEditModel model) =>
+            Task.FromResult<(InterviewStageEditModel?, string?)>((null, "Not supported."));
+    }
+}

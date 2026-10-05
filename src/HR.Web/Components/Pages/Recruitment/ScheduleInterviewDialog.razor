@@ -1,0 +1,135 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@inject InterviewService InterviewService
+@inject EmployeeService EmployeeService
+
+<SfDialog Width="480px" IsModal="true" @bind-Visible="_visible" Header="Schedule Interview" CssClass="schedule-interview-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label id="schedule-interviewer-label" for="schedule-interviewer" class="form-label">Interviewer <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="Guid?" TItem="EmployeeListItemModel"
+                                    DataSource="@_employees" @bind-Value="_model.InterviewerId"
+                                    Placeholder="Select interviewer" AllowFiltering="true"
+                                    HtmlAttributes="@Aria("schedule-interviewer", nameof(ScheduleInterviewFormModel.InterviewerId), "Interviewer")">
+                        <DropDownListFieldSettings Value="Id" Text="FullName" />
+                        <DropDownListTemplates TItem="EmployeeListItemModel">
+                            <ItemTemplate Context="employeeItem">
+                                @{ var e = (EmployeeListItemModel)employeeItem; }
+                                <span>@e.FirstName @e.LastName</span>
+                            </ItemTemplate>
+                        </DropDownListTemplates>
+                    </SfDropDownList>
+                    <div id="schedule-interviewer-error" role="alert">
+                        <ValidationMessage For="@(() => _model.InterviewerId)" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label id="schedule-scheduled-at-label" for="schedule-scheduled-at" class="form-label">Scheduled At <span class="text-danger">*</span></label>
+                    <SfDateTimePicker TValue="DateTime?" @bind-Value="_model.ScheduledAt" Format="dd/MM/yyyy HH:mm"
+                                      HtmlAttributes="@Aria("schedule-scheduled-at", nameof(ScheduleInterviewFormModel.ScheduledAt), "Scheduled at")" />
+                    <div id="schedule-scheduled-at-error" role="alert">
+                        <ValidationMessage For="@(() => _model.ScheduledAt)" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <HrNumericField TValue="int?" Label="Duration (minutes)" Id="schedule-duration"
+                                    @bind-Value="_model.DurationMinutes" />
+                </div>
+                <div class="mb-3">
+                    <HrTextField Label="Location" Id="schedule-location"
+                                 @bind-Value="_model.Location" Placeholder="e.g. Remote" />
+                </div>
+            </EditForm>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger py-2" role="alert">@_error</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Schedule" IsPrimary="true" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback OnScheduled { get; set; }
+
+    private bool _visible;
+    private Guid _applicationId;
+    private string? _error;
+    private List<EmployeeListItemModel> _employees = [];
+    private readonly ScheduleInterviewFormModel _model = new();
+    private EditContext _editContext = default!;
+
+    protected override void OnInitialized() => _editContext = new EditContext(_model);
+
+    public async Task OpenAsync(Guid applicationId)
+    {
+        _error = null;
+        _applicationId = applicationId;
+        _model.InterviewerId = null;
+        _model.ScheduledAt = DateTime.Today.AddDays(3).AddHours(10);
+        _model.DurationMinutes = 30;
+        _model.Location = null;
+        _editContext = new EditContext(_model);
+
+        if (_employees.Count == 0)
+        {
+            var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 200);
+            _employees = result?.Items.ToList() ?? [];
+        }
+
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!_editContext.Validate())
+        {
+            return;
+        }
+
+        var (result, error) = await InterviewService.ScheduleInterviewAsync(
+            CompanyId, VacancyId, _applicationId,
+            new ScheduleInterviewRequest(
+                CompanyId, VacancyId, _applicationId, _model.InterviewerId!.Value,
+                new DateTimeOffset(_model.ScheduledAt!.Value).ToUniversalTime(), _model.DurationMinutes,
+                FormText.Optional(_model.Location)));
+
+        if (result is null)
+        {
+            _error = error;
+            return;
+        }
+
+        _visible = false;
+        await OnScheduled.InvokeAsync();
+    }
+
+    private Dictionary<string, object> Aria(string id, string property, string label)
+    {
+        var attributes = FieldAria.Build(_editContext, _model, id, property, true);
+        attributes["aria-label"] = label;
+        attributes["aria-labelledby"] = $"{id}-label";
+        return attributes;
+    }
+
+    public sealed class ScheduleInterviewFormModel
+    {
+        [Required(ErrorMessage = "Please select an interviewer.")]
+        public Guid? InterviewerId { get; set; }
+
+        [Required(ErrorMessage = "Please select a scheduled time.")]
+        public DateTime? ScheduledAt { get; set; }
+
+        public int? DurationMinutes { get; set; }
+        public string? Location { get; set; }
+    }
+}

@@ -23,6 +23,123 @@ namespace HR.Modules.Tasks.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HR.Modules.Tasks.Domain.ProgrammaticTaskCompletion", b =>
+                {
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("AuditPublishedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("audit_published_at");
+
+                    b.Property<Guid?>("ClaimedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("claimed_by");
+
+                    b.Property<DateTimeOffset?>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_until");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid>("CompletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("completed_by");
+
+                    b.Property<DateTimeOffset?>("CompletionNotificationAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completion_notification_at");
+
+                    b.Property<DateTimeOffset?>("ConfirmedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("confirmed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("DispatchMode")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("dispatch")
+                        .HasColumnName("dispatch_mode");
+
+                    b.Property<DateTimeOffset?>("DispatchedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("dispatched_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LastResetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reset_at");
+
+                    b.Property<Guid?>("LastResetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_reset_by");
+
+                    b.Property<DateTimeOffset?>("NotificationsClearedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notifications_cleared_at");
+
+                    b.Property<Guid>("OperationId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("PreviousStatus")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_status");
+
+                    b.Property<int>("ResetCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reset_count");
+
+                    b.Property<DateTimeOffset?>("TerminalFailureAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("terminal_failure_at");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(1)
+                        .HasColumnName("version");
+
+                    b.HasKey("TaskId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_programmatic_task_completions_unconfirmed")
+                        .HasFilter("confirmed_at IS NULL");
+
+                    b.HasIndex("OperationId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_programmatic_task_completions_operation_id");
+
+                    b.ToTable("programmatic_task_completions", "tasks");
+                });
+
             modelBuilder.Entity("HR.Modules.Tasks.Domain.TaskCompletionOperation", b =>
                 {
                     b.Property<Guid>("Id")

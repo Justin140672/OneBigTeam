@@ -725,3 +725,27 @@ internal sealed record InternalApplicationSubmittedAuditEvent(
         CandidateReactivated,
     };
 }
+
+internal sealed record InterviewOutcomeReconciliationRepairedAuditEvent(
+    Guid CompanyId,
+    Guid ReconciliationId,
+    Guid InterviewId,
+    Guid ApplicationId,
+    Guid OperatorUserId,
+    string BlockedCategory,
+    Guid? TasksOperationId,
+    string Reason,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType => "interview.outcome_reconciliation_repaired";
+    string IAuditEvent.EntityType => "Interview";
+    Guid IAuditEvent.EntityId => InterviewId;
+    Guid? IAuditEvent.ActorUserId => OperatorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    Guid? IAuditEvent.WorkflowId => ReconciliationId;
+    string? IAuditEvent.Summary => "Blocked interview outcome reconciliation retried by an operator";
+    object? IAuditEvent.Before => new { Blocked = true, BlockedCategory };
+    object? IAuditEvent.After => new { Blocked = false };
+    object? IAuditEvent.Metadata => new { ReconciliationId, ApplicationId, TasksOperationId, Reason };
+}

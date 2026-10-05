@@ -21,10 +21,10 @@ internal sealed class OfferCandidateValidator : AbstractValidator<OfferCandidate
             .When(r => r.OfferedSalary.HasValue);
 
         RuleFor(r => r.OfferedSalaryFrequency)
+            .NotEmpty().WithMessage("Offered salary frequency is required.")
             .Must(f => Enum.TryParse<OfferSalaryFrequency>(f, ignoreCase: true, out var parsed)
                        && Enum.IsDefined(parsed))
-            .WithMessage("Offered salary frequency must be one of: Annual, Hourly, Daily.")
-            .When(r => !string.IsNullOrWhiteSpace(r.OfferedSalaryFrequency));
+            .WithMessage("Offered salary frequency must be one of: Annual, Hourly, Daily.");
 
         RuleFor(r => r.OfferNotes)
             .MaximumLength(2000);

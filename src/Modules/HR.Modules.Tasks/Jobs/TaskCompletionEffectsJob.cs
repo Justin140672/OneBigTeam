@@ -1,6 +1,7 @@
 using Hangfire;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Persistence;
+using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
 using HR.SharedKernel.ExecutionContext;
 using HR.Infrastructure.Abstractions;
@@ -19,17 +20,19 @@ namespace HR.Modules.Tasks.Jobs;
 ///
 /// Idempotent: re-checks INotificationWriter.ExistsAsync before writing, so a retry after a
 /// partial failure (e.g. notification written, audit publish then failed) never double-writes the
-/// notification. Audit publishing has no natural dedupe key here, so a retry may in rare cases
-/// publish a duplicate TaskCompletedAuditEvent — accepted as a lesser risk than losing the audit
-/// trail entirely, consistent with "notification failures cannot permanently block business
-/// processing" (the business action and TaskItem completion are never re-run by this job).
+/// notification. The task-completed audit event has a deterministic EventId (the task id), so
+/// delivery goes through TaskCompletionAuditDelivery: publish only when absent and treat the
+/// operation as Processed only once the event is confirmed to exist (the global publisher swallows
+/// persistence failures, so a normal return proves nothing). An unconfirmed audit event throws and
+/// leaves the operation outstanding for the next retry. The business action and TaskItem completion
+/// are never re-run by this job.
 /// </summary>
 [AutomaticRetry(Attempts = MaxAttempts, DelaysInSeconds = new[] { 15, 60, 300 })]
 internal sealed class TaskCompletionEffectsJob(
     TasksDbContext dbContext,
     INotificationWriter notificationWriter,
     IClock clock,
-    IAuditEventPublisher auditPublisher,
+    TaskCompletionAuditDelivery auditDelivery,
     ILogger<TaskCompletionEffectsJob> logger,
     IExecutionContextAccessor? executionContextAccessor = null)
 {
@@ -60,10 +63,23 @@ internal sealed class TaskCompletionEffectsJob(
         var task = await dbContext.TaskItems.SingleOrDefaultAsync(t => t.Id == operation.TaskId);
         if (task is null)
         {
-            logger.LogWarning(
-                "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} no longer exists — marking processed.",
-                operation.TaskId, operationId);
-            operation.MarkProcessed(clock.UtcNowOffset());
+            if (await auditDelivery.ExistsAsync(operation.TaskId, CancellationToken.None))
+            {
+                logger.LogWarning(
+                    "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists but its completion audit event is confirmed — marking processed.",
+                    operation.TaskId, operationId, companyId);
+                operation.MarkProcessed(clock.UtcNowOffset());
+            }
+            else
+            {
+                logger.LogError(
+                    "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists and its completion audit event was never confirmed. Terminal=true FailureCategory=task_missing; the operation is flagged for investigation and will not be retried.",
+                    operation.TaskId, operationId, companyId);
+                operation.MarkDataIntegrityFailure(
+                    "Data integrity failure: the completed task no longer exists and its completion audit event is missing.",
+                    clock.UtcNowOffset());
+            }
+
             await dbContext.SaveChangesAsync();
             return;
         }
@@ -105,7 +121,7 @@ internal sealed class TaskCompletionEffectsJob(
                 }
             }
 
-            await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
+            await auditDelivery.EnsureDeliveredAsync(new TaskCompletedAuditEvent(
                 task.CompanyId,
                 task.Id,
                 operation.CompletedBy,

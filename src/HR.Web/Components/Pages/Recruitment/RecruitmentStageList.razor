@@ -12,6 +12,12 @@
     <h1 class="mb-1">Recruitment Stages</h1>
     <p class="text-muted mb-3">Set up the steps candidates move through, including when they are hired or rejected.</p>
 
+    <div class="d-flex flex-wrap align-items-center gap-3 mb-3" data-testid="interview-stage-guidance">
+        <p class="mb-0">Need multiple interview rounds? Add an interview stage for each round. Candidates will progress through them in the order shown.</p>
+        <SfButton CssClass="e-outline" Disabled="@Session.IsReadOnly" OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/recruitment-stages/add-interview"))"
+                  HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "add-interview-stage" })">Add interview stage</SfButton>
+    </div>
+
     <div class="mb-3 col-md-4 px-0">
         <label for="recruitment-stage-search" class="visually-hidden">Search recruitment stages</label>
         <HrTextBox Value="@SearchTerm"

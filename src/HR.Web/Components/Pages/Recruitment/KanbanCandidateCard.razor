@@ -26,6 +26,8 @@
             @* Stable hook: an "Internal" badge can render before this one on the card. *@
             <span data-testid="kanban-card-terminal-status"><StatusBadge Variant="@StatusVariant">@TerminalOutcome</StatusBadge></span>
         }
+        @if (!IsTerminalStage)
+        {
         <div class="kanban-candidate-card__actions">
             <button type="button" class="kanban-candidate-card__move-btn"
                     title="Move to stage…" aria-label="@($"Move {Candidate.CandidateFullName} to stage…")" aria-haspopup="true"
@@ -38,10 +40,69 @@
             {
                 <div class="kanban-candidate-card__move-menu" role="menu" aria-label="@($"Move {Candidate.CandidateFullName} to stage")"
                      data-testid="kanban-card-move-stage-menu">
-                    <button type="button" role="menuitem" data-testid="kanban-card-review-cv"
-                            @onclick="ReviewCv" @onclick:stopPropagation="true">
-                        Review CV
-                    </button>
+                    @switch (PrimaryAction)
+                    {
+                        case KanbanCardAction.RecordOfferResponse:
+                            <button type="button" role="menuitem" data-testid="kanban-card-record-offer-response"
+                                    @onclick="() => Invoke(OnRecordOfferResponse)" @onclick:stopPropagation="true">
+                                Record Offer Response
+                            </button>
+                            break;
+                        case KanbanCardAction.Hire:
+                            <button type="button" role="menuitem" data-testid="kanban-card-hire"
+                                    @onclick="() => Invoke(OnHire)" @onclick:stopPropagation="true">
+                                Hire
+                            </button>
+                            break;
+                        case KanbanCardAction.Appoint:
+                            <button type="button" role="menuitem" data-testid="kanban-card-appoint"
+                                    @onclick="() => Invoke(OnAppoint)" @onclick:stopPropagation="true">
+                                Appoint
+                            </button>
+                            break;
+                        case KanbanCardAction.MakeOffer:
+                            <button type="button" role="menuitem" data-testid="kanban-card-make-offer"
+                                    @onclick="() => Invoke(OnMakeOffer)" @onclick:stopPropagation="true">
+                                Make Offer
+                            </button>
+                            break;
+                        case KanbanCardAction.RecordOutcome:
+                            <button type="button" role="menuitem" data-testid="kanban-card-record-outcome"
+                                    @onclick="() => Invoke(OnRecordOutcome)" @onclick:stopPropagation="true">
+                                Record Outcome
+                            </button>
+                            break;
+                        case KanbanCardAction.MoveToNextInterviewStage:
+                            <button type="button" role="menuitem" data-testid="kanban-card-next-interview-stage"
+                                    @onclick="MoveToNextInterviewStage" @onclick:stopPropagation="true">
+                                Move to @Candidate.NextInterviewStageName
+                            </button>
+                            break;
+                        case KanbanCardAction.ScheduleInterview:
+                            <button type="button" role="menuitem" data-testid="kanban-card-schedule-interview"
+                                    @onclick="() => Invoke(OnScheduleInterview)" @onclick:stopPropagation="true">
+                                Schedule Interview
+                            </button>
+                            break;
+                        case KanbanCardAction.ReviewCv:
+                            <button type="button" role="menuitem" data-testid="kanban-card-review-cv"
+                                    @onclick="() => Invoke(OnReviewCv)" @onclick:stopPropagation="true">
+                                Review CV
+                            </button>
+                            break;
+                    }
+                    @if (ShowNoFurtherInterviewStage)
+                    {
+                        <span class="kanban-candidate-card__move-menu-empty" data-testid="kanban-card-no-further-interview-stage">
+                            There is no further interview stage in this recruitment pipeline.
+                        </span>
+                        @if (KanbanCardActionResolver.ShowAddInterviewStageLink(Candidate, IsInterviewStage, CanManageStages))
+                        {
+                            <a role="menuitem" href="@AddInterviewStageUrl" data-testid="kanban-card-add-interview-stage"
+                               @onclick:stopPropagation="true">Add another interview stage</a>
+                        }
+                    }
+                    <hr class="kanban-candidate-card__move-menu-divider" role="separator" />
                     @if (AvailableStages.Count == 0)
                     {
                         <span class="kanban-candidate-card__move-menu-empty">No other stages available</span>
@@ -57,9 +118,19 @@
                             </button>
                         }
                     }
+                    <hr class="kanban-candidate-card__move-menu-divider" role="separator" />
+                    <button type="button" role="menuitem" data-testid="kanban-card-reject"
+                            @onclick="() => Invoke(OnReject)" @onclick:stopPropagation="true">
+                        Reject
+                    </button>
+                    <button type="button" role="menuitem" data-testid="kanban-card-withdraw"
+                            @onclick="() => Invoke(OnWithdraw)" @onclick:stopPropagation="true">
+                        Withdraw
+                    </button>
                 </div>
             }
         </div>
+        }
     </div>
     <div class="kanban-candidate-card__meta">
         <span><i class="fa-regular fa-calendar me-1" aria-hidden="true"></i>Applied @Candidate.AppliedAt.ToString("d MMM yyyy")</span>
@@ -77,15 +148,42 @@
     [Parameter] public EventCallback<Guid> OnMoveToStage { get; set; }
 
     [Parameter] public EventCallback<KanbanCandidateModel> OnReviewCv { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnScheduleInterview { get; set; }
+    [Parameter] public bool IsInterviewStage { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnRecordOutcome { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnMakeOffer { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnRecordOfferResponse { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnHire { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnAppoint { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnReject { get; set; }
+    [Parameter] public EventCallback<KanbanCandidateModel> OnWithdraw { get; set; }
+    [Parameter] public bool IsOfferStage { get; set; }
+    [Parameter] public bool IsTerminalStage { get; set; }
+    [Parameter] public bool CanAppointInternal { get; set; }
+    [Parameter] public bool CanManageStages { get; set; }
+    [Parameter] public string AddInterviewStageUrl { get; set; } = string.Empty;
+
+    private bool ShowNoFurtherInterviewStage =>
+        KanbanCardActionResolver.ShowNoFurtherInterviewStage(Candidate, IsInterviewStage);
+
+    private KanbanCardAction PrimaryAction =>
+        KanbanCardActionResolver.Resolve(Candidate, IsInterviewStage, IsOfferStage, CanAppointInternal);
 
     private bool _menuOpen;
 
     private void ToggleMenu() => _menuOpen = !_menuOpen;
 
-    private async Task ReviewCv()
+    private async Task Invoke(EventCallback<KanbanCandidateModel> callback)
     {
         _menuOpen = false;
-        await OnReviewCv.InvokeAsync(Candidate);
+        await callback.InvokeAsync(Candidate);
+    }
+
+    private async Task MoveToNextInterviewStage()
+    {
+        _menuOpen = false;
+        if (Candidate.NextInterviewStageId is { } stageId)
+            await OnMoveToStage.InvokeAsync(stageId);
     }
 
     private async Task SelectStage(Guid stageId)

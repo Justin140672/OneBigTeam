@@ -25,6 +25,13 @@ internal static class RecruitmentStageTestData
         return new SeededStages(applicationReceived, cvReview, interview, offer, hired, rejected);
     }
 
+    public static Interview PassedInterview(Guid companyId, Guid applicationId, Guid stageId, DateTimeOffset now)
+    {
+        var interview = Interview.Create(Guid.NewGuid(), companyId, applicationId, Guid.NewGuid(), now.AddDays(-1), 30, null, now.AddDays(-2), stageId);
+        interview.RecordOutcome(InterviewOutcome.Passed, null, now.AddDays(-1));
+        return interview;
+    }
+
     internal sealed record SeededStages(
         RecruitmentStage ApplicationReceived,
         RecruitmentStage CvReview,

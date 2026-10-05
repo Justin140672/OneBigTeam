@@ -1,0 +1,87 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApplicationService ApplicationService
+
+<SfDialog Width="420px" IsModal="true" @bind-Visible="_visible" Header="Record Offer Response" CssClass="offer-response-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <label id="offer-response-status-label" for="offer-response-status" class="form-label">Response <span class="text-danger">*</span></label>
+                    <SfDropDownList TValue="string" TItem="string" DataSource="@_options"
+                                    @bind-Value="_model.Status" Placeholder="Select a response"
+                                    HtmlAttributes="@Aria()" />
+                    <div id="offer-response-status-error" role="alert">
+                        <ValidationMessage For="@(() => _model.Status)" />
+                    </div>
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="alert alert-danger py-2" role="alert">@_error</div>
+                }
+            </EditForm>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Record Response" IsPrimary="true" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback<string> OnRecorded { get; set; }
+
+    private static readonly string[] _options = ["Accepted", "Declined", "Withdrawn"];
+
+    private bool _visible;
+    private Guid _applicationId;
+    private string? _error;
+    private readonly FormModel _model = new();
+    private EditContext _editContext = default!;
+
+    protected override void OnInitialized() => _editContext = new EditContext(_model);
+
+    public void Open(Guid applicationId)
+    {
+        _error = null;
+        _applicationId = applicationId;
+        _model.Status = null;
+        _editContext = new EditContext(_model);
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!_editContext.Validate())
+            return;
+
+        var (result, error) = await ApplicationService.RespondToOfferAsync(CompanyId, VacancyId, _applicationId, _model.Status!);
+        if (result is null)
+        {
+            _error = error;
+            return;
+        }
+
+        _visible = false;
+        await OnRecorded.InvokeAsync(EnumDisplay.Humanize(result.OfferResponseStatus));
+    }
+
+    private Dictionary<string, object> Aria()
+    {
+        var attributes = FieldAria.Build(_editContext, _model, "offer-response-status", nameof(FormModel.Status), true);
+        attributes["aria-label"] = "Offer response";
+        attributes["aria-labelledby"] = "offer-response-status-label";
+        attributes["data-testid"] = "offer-response-status";
+        return attributes;
+    }
+
+    private sealed class FormModel
+    {
+        [Required(ErrorMessage = "Please select a response.")]
+        public string? Status { get; set; }
+    }
+}

@@ -2,6 +2,7 @@ using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RejectCandidate;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -259,8 +260,9 @@ public class RejectCandidateHandlerTests
     private static RejectCandidateHandler handler(
         RecruitmentDbContext db,
         FakeIntegrationEventPublisher? eventPublisher = null,
-        FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()));
+        FakeAuditPublisher? auditPublisher = null,
+        FakeTaskCanceller? taskCanceller = null) =>
+        new(db, new FakeClock(FixedUtcNow), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()), new InterviewTaskCleanupService(db, taskCanceller ?? new FakeTaskCanceller(), new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

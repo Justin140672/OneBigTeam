@@ -90,6 +90,21 @@ internal sealed class MoveApplicationForwardHandler(
             return Result.Failure<MoveApplicationForwardResponse>(
                 Error.Validation($"There is no active recruitment stage after '{currentStage.Name}' to move this application forward to."));
 
+        var activeStages = await db.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal)
+            .ToListAsync(cancellationToken);
+
+        var interviews = await db.Interviews
+            .AsNoTracking()
+            .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId)
+            .ToListAsync(cancellationToken);
+
+        var violation = InterviewStageWorkflow.DescribeMoveViolation(currentStage, nextStage, activeStages, interviews);
+
+        if (violation is not null)
+            return Result.Failure<MoveApplicationForwardResponse>(Error.Validation(violation));
+
         var now = clock.UtcNowOffset();
         var previousStageId = application.CurrentStageId;
         var expectedVersion = application.Version;

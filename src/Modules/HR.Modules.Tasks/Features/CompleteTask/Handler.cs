@@ -18,7 +18,7 @@ internal sealed class CompleteTaskHandler(
     TasksDbContext dbContext,
     INotificationWriter notificationWriter,
     IClock clock,
-    IAuditEventPublisher auditPublisher,
+    TaskCompletionAuditDelivery auditDelivery,
     TaskCompletionDispatcher dispatcher,
     TasksResourceAuthorizer resourceAuthorizer,
     IBackgroundJobClient backgroundJobClient,
@@ -242,7 +242,7 @@ internal sealed class CompleteTaskHandler(
                     cancellationToken);
             }
 
-            await auditPublisher.PublishAsync(new TaskCompletedAuditEvent(
+            await auditDelivery.EnsureDeliveredAsync(new TaskCompletedAuditEvent(
                 task.CompanyId,
                 task.Id,
                 task.CompletedBy!.Value,

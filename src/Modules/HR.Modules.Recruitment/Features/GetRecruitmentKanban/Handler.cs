@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.SharedKernel;
@@ -56,6 +57,11 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 c.LastName,
                 a.CurrentStageId,
                 a.WithdrawnAt,
+                a.InterviewOutcome,
+                a.OfferResponseStatus,
+                a.OfferedSalary,
+                a.OfferedStartDate,
+                a.AppointmentStatus,
                 a.AppliedAt,
                 // Internal recruitment Ticket 6: Source is the authoritative internal indicator; the
                 // employee link is only surfaced for Internal applications (a hired external candidate
@@ -64,6 +70,15 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 InternalEmployeeId = a.Source == Domain.ApplicationSource.Internal ? c.EmployeeId : null,
             })
             .ToListAsync(cancellationToken);
+
+        var applicationIds = candidates.Select(c => c.Id).ToList();
+
+        var interviewsByApplication = (await db.Interviews
+                .AsNoTracking()
+                .Where(i => i.CompanyId == request.CompanyId && applicationIds.Contains(i.ApplicationId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(i => i.ApplicationId)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var groupedByStage = candidates
             .GroupBy(a => a.CurrentStageId)
@@ -75,7 +90,15 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                 var items = groupedByStage.TryGetValue(stage.Id, out var group) ? group : [];
 
                 var summaries = items
-                    .Select(a => new KanbanCandidateSummary(
+                    .Select(a =>
+                    {
+                        var state = InterviewStageWorkflow.Evaluate(
+                            stage, stages, interviewsByApplication.GetValueOrDefault(a.Id) ?? []);
+                        var nextStageName = state.NextInterviewStageId is { } nextId
+                            ? stages.First(s => s.Id == nextId).Name
+                            : null;
+
+                        return new KanbanCandidateSummary(
                         a.Id,
                         a.CandidateId,
                         a.FirstName,
@@ -89,7 +112,20 @@ internal sealed class GetRecruitmentKanbanHandler(RecruitmentDbContext db, IPosi
                         assignedRecruiterAgencyName,
                         vacancyTitle,
                         a.IsInternal,
-                        a.InternalEmployeeId))
+                        a.InternalEmployeeId,
+                        a.InterviewOutcome?.ToString(),
+                        a.OfferResponseStatus?.ToString(),
+                        a.OfferedSalary,
+                        a.OfferedStartDate,
+                        state.CurrentStageHasPendingInterview,
+                        state.PendingInterviewId,
+                        state.LatestOutcome?.ToString(),
+                        state.HasNextInterviewStage,
+                        state.NextInterviewStageId,
+                        nextStageName,
+                        a.AppointmentStatus?.ToString(),
+                        state.AllRequiredInterviewStagesPassed);
+                    })
                     .ToList();
 
                 return new KanbanColumn(stage.Id, stage.Name, stage.IsTerminal, summaries.Count, summaries, stage.Purpose);

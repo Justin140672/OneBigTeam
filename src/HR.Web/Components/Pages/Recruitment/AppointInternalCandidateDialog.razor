@@ -1,0 +1,365 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@using Syncfusion.Blazor.Data
+@inject ApplicationService ApplicationService
+@inject EmployeeService EmployeeService
+@inject VacancyService VacancyService
+@inject DepartmentService DepartmentService
+@inject EmployeeDirectoryService EmployeeDirectoryService
+@inject AppSession Session
+
+@* Internal recruitment Ticket 7: an INTERNAL application is completed by appointing the existing
+   employee (the backend rejects Hire for internal applications). Position profile, department and
+   location are derived server-side from the vacancy and only shown here for confirmation. *@
+<SfDialog Width="560px" IsModal="true" @bind-Visible="_visible" Header="Complete internal appointment" CssClass="appoint-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <div data-testid="appoint-candidate-dialog">
+                <EditForm EditContext="_appointEditContext">
+                    <DataAnnotationsValidator />
+                    <div class="alert alert-info py-2" data-testid="appoint-existing-employee-notice">
+                        @_appointCandidateName is an existing employee. Their existing employee record will be updated — no new employee will be created. Employee number, start date, continuous service and system access stay the same.
+                    </div>
+                    @if (_appointPending)
+                    {
+                        <div class="alert alert-warning py-2" data-testid="appoint-pending-notice">
+                            Appointment in progress — a previous attempt did not finish. Appointing again will complete it.
+                        </div>
+                    }
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <span id="appoint-derived-position-profile-label" class="form-label d-block">Position Profile</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-position-profile-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-position-profile">@_derivedPositionProfileName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <span id="appoint-derived-department-label" class="form-label d-block">Department</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-department-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-department">@_derivedDepartmentName</div>
+                        </div>
+                        <div class="col-md-6">
+                            <span id="appoint-derived-location-label" class="form-label d-block">Location</span>
+                            <div class="p-2 rounded border bg-light" role="group" aria-labelledby="appoint-derived-location-label" aria-describedby="appoint-derived-help" data-testid="appoint-derived-location">@_derivedLocationName</div>
+                        </div>
+                        <div class="col-12">
+                            <div id="appoint-derived-help" class="form-text mt-0">Derived from the vacancy's position profile — the employee is moved to this profile, department and location.</div>
+                        </div>
+                        <div class="col-md-6">
+                            <HrDateField TValue="DateOnly?" Label="Effective Date" Required="true" Id="appoint-effective-date"
+                                         @bind-Value="_appointModel.EffectiveDate" Format="dd/MM/yyyy"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-effective-date" })" />
+                            @if (_appointModel.IsFutureDated)
+                            {
+                                <div class="form-text" role="status" data-testid="appoint-future-date-hint">The change will be applied automatically on this date.</div>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <label id="appoint-manager-label" for="appoint-manager" class="form-label">Manager <span class="text-danger">*</span></label>
+                            <SfDropDownList @ref="_appointManagerDropdown"
+                                            TValue="Guid?"
+                                            TItem="ManagerOption"
+                                            DataSource="@_appointManagerOptions"
+                                            @bind-Value="_appointModel.ManagerId"
+                                            Placeholder="Select a manager"
+                                            AllowFiltering="true"
+                                            HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-manager", nameof(AppointFormModel.ManagerId), "Manager", required: true, testId: "appoint-manager")">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnAppointManagerFilteringAsync" />
+                            </SfDropDownList>
+                            <div id="appoint-manager-error" role="alert">
+                                <ValidationMessage For="@(() => _appointModel.ManagerId)" />
+                            </div>
+                        </div>
+                        @if (_appointModel.IsBackdated)
+                        {
+                            <div class="col-12" data-testid="appoint-confirm-backdated">
+                                <HrCheckBoxField Label="I confirm this backdated appointment should apply immediately" Id="appoint-confirm-backdated-input"
+                                                 Value="_appointModel.ConfirmBackdated"
+                                                 ValueChanged="@(v => _appointModel.ConfirmBackdated = v)"
+                                                 ValueExpression="@(() => _appointModel.ConfirmBackdated)" />
+                            </div>
+                        }
+                        <div class="col-12" data-testid="appoint-change-compensation">
+                            <HrCheckBoxField Label="Change compensation" Id="appoint-change-compensation-input"
+                                             @bind-Checked="_appointModel.ChangeCompensation" />
+                        </div>
+                        @if (_appointModel.ChangeCompensation)
+                        {
+                            <div class="col-md-4">
+                                <label id="appoint-salary-type-label" for="appoint-salary-type" class="form-label">Salary Type <span class="text-danger">*</span></label>
+                                <SfDropDownList TValue="string" TItem="string" DataSource="@_appointSalaryTypeOptions"
+                                                @bind-Value="_appointModel.SalaryType"
+                                                HtmlAttributes="@Aria(_appointEditContext, _appointModel, "appoint-salary-type", nameof(AppointFormModel.SalaryType), "Salary type", required: true, testId: "appoint-salary-type")" />
+                                <div id="appoint-salary-type-error" role="alert">
+                                    <ValidationMessage For="@(() => _appointModel.SalaryType)" />
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
+                                                @bind-Value="_appointModel.Salary" Format="n2" Min="0"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-salary" })" />
+                            </div>
+                            <div class="col-md-4">
+                                <HrTextField Label="Currency" Required="true" Id="appoint-currency"
+                                             @bind-Value="_appointModel.Currency" Placeholder="e.g. GBP"
+                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-currency" })" />
+                            </div>
+                            <div class="col-md-6">
+                                <HrNumericField TValue="decimal?" Label="Hours per Week" Id="appoint-hours-per-week"
+                                                @bind-Value="_appointModel.HoursPerWeek" Format="n2" Min="0"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-hours-per-week" })" />
+                            </div>
+                            <div class="col-md-6">
+                                <HrNumericField TValue="decimal?" Label="FTE" Id="appoint-fte"
+                                                @bind-Value="_appointModel.Fte" Format="n2" Min="0" Max="1" Step="0.1"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-fte" })" />
+                            </div>
+                            <div class="col-12">
+                                <HrTextField Label="Compensation Notes" Id="appoint-compensation-notes"
+                                             @bind-Value="_appointModel.CompensationNotes" Multiline="true" Rows="2"
+                                             HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-compensation-notes" })" />
+                            </div>
+                        }
+                    </div>
+                    @if (_error is not null)
+                    {
+                        <div class="alert alert-danger py-2 mt-3" role="alert" data-testid="appoint-error">@_error</div>
+                    }
+                </EditForm>
+            </div>
+        </Content>
+        <FooterTemplate>
+            @* Disabled while in flight so a double click can't submit twice. *@
+            <SfButton IsPrimary="true" Disabled="@(_appointing || Session.IsReadOnly)" OnClick="ConfirmAppointAsync" data-testid="appoint-confirm">
+                @if (_appointing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                }
+                Appoint
+            </SfButton>
+            <SfButton Disabled="_appointing" OnClick="() => _visible = false" data-testid="appoint-cancel">Cancel</SfButton>
+        </FooterTemplate>
+    </DialogTemplates>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback<AppointedInfo> OnAppointed { get; set; }
+
+    public sealed record AppointedInfo(Guid EmployeeId, string EmployeeName, bool IsApplied, DateOnly EffectiveDate);
+
+    private bool _visible;
+    private string? _error;
+    private Guid _applicationId;
+    private bool _appointing;
+    private bool _appointPending;
+    private string _appointCandidateName = string.Empty;
+    private string _derivedDepartmentName = string.Empty;
+    private readonly AppointFormModel _appointModel = new();
+    private EditContext _appointEditContext = default!;
+    private SfDropDownList<Guid?, ManagerOption> _appointManagerDropdown = default!;
+    private List<ManagerOption> _appointManagerOptions = [];
+    private Guid? _appointEmployeeId;
+    private static readonly string[] _appointSalaryTypeOptions = ["Annual", "Hourly", "Daily"];
+
+    private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
+
+
+    public sealed class AppointFormModel : IValidatableObject
+    {
+        [Required(ErrorMessage = "Please select an effective date.")]
+        public DateOnly? EffectiveDate { get; set; }
+
+        public bool ConfirmBackdated { get; set; }
+
+        [Required(ErrorMessage = "Please select a manager, or choose \"No manager\".")]
+        public Guid? ManagerId { get; set; }
+
+        public bool ChangeCompensation { get; set; }
+        public string? SalaryType { get; set; } = "Annual";
+        public decimal? Salary { get; set; }
+        public string? Currency { get; set; } = "GBP";
+        public decimal? HoursPerWeek { get; set; }
+        public decimal? Fte { get; set; }
+        [MaxLength(4000, ErrorMessage = "Compensation notes cannot exceed 4000 characters.")]
+        public string? CompensationNotes { get; set; }
+
+        public bool IsBackdated => EffectiveDate is { } d && d < DateOnly.FromDateTime(DateTime.Today);
+        public bool IsFutureDated => EffectiveDate is { } d && d > DateOnly.FromDateTime(DateTime.Today);
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (IsBackdated && !ConfirmBackdated)
+                yield return new ValidationResult(
+                    "The effective date is in the past — confirm the backdated appointment to continue.",
+                    [nameof(ConfirmBackdated)]);
+
+            if (!ChangeCompensation)
+                yield break;
+
+            if (SalaryType is not ("Annual" or "Hourly" or "Daily"))
+                yield return new ValidationResult("Please select a salary type.", [nameof(SalaryType)]);
+
+            if (Salary is null or <= 0)
+                yield return new ValidationResult("Please enter a salary greater than zero.", [nameof(Salary)]);
+
+            if (string.IsNullOrWhiteSpace(Currency) || Currency.Trim().Length != 3)
+                yield return new ValidationResult("Please enter a 3-letter currency code, e.g. GBP.", [nameof(Currency)]);
+
+            if (HoursPerWeek is <= 0)
+                yield return new ValidationResult("Hours per week must be greater than zero.", [nameof(HoursPerWeek)]);
+
+            if (Fte is < 0 or > 1)
+                yield return new ValidationResult("FTE must be between 0 and 1.", [nameof(Fte)]);
+        }
+    }
+    private string _derivedLocationName = string.Empty;
+    private string _derivedPositionProfileName = string.Empty;
+
+
+    private sealed record ManagerOption(Guid Id, string Name);
+
+    private static Dictionary<string, object> Aria(
+        EditContext context, object model, string id, string property, string label,
+        bool required = false, string? testId = null)
+    {
+        var attributes = FieldAria.Build(context, model, id, property, required);
+        attributes["aria-label"] = label;
+        attributes["aria-labelledby"] = $"{id}-label";
+        if (testId is not null) attributes["data-testid"] = testId;
+        return attributes;
+    }
+
+    protected override void OnInitialized() => _appointEditContext = new EditContext(_appointModel);
+
+    public async Task OpenAsync(
+        Guid applicationId, string candidateName, Guid? employeeId, string? appointmentStatus,
+        DateOnly? offeredStartDate, decimal? offeredSalary)
+    {
+        _error = null;
+        _appointing = false;
+        _applicationId = applicationId;
+        _appointEmployeeId = employeeId;
+        _appointPending = appointmentStatus == "Pending";
+        _appointCandidateName = candidateName;
+
+        _appointModel.EffectiveDate = offeredStartDate ?? DateOnly.FromDateTime(DateTime.Today);
+        _appointModel.ConfirmBackdated = false;
+        _appointModel.ManagerId = null;
+        _appointModel.ChangeCompensation = false;
+        _appointModel.SalaryType = "Annual";
+        _appointModel.Salary = offeredSalary;
+        _appointModel.Currency = "GBP";
+        _appointModel.HoursPerWeek = null;
+        _appointModel.Fte = null;
+        _appointModel.CompensationNotes = null;
+        _appointEditContext = new EditContext(_appointModel);
+
+        _derivedPositionProfileName = string.Empty;
+        _derivedDepartmentName = string.Empty;
+        _derivedLocationName = string.Empty;
+
+        var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+        var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
+        await Task.WhenAll(vacancyTask, managerTask);
+
+        var vacancy = await vacancyTask;
+        _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
+        _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
+        _derivedDepartmentName = "(none set)";
+        if (vacancy?.PositionProfileDepartmentId is Guid departmentId)
+        {
+            var department = await DepartmentService.GetDepartmentAsync(CompanyId, departmentId);
+            _derivedDepartmentName = department?.Name ?? "(unknown)";
+        }
+
+        _appointManagerOptions = BuildAppointManagerOptions((await managerTask)?.Items);
+
+        _appointModel.ManagerId = NoManagerOption.Id;
+        if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
+        {
+            if (_appointManagerOptions.Any(o => o.Id == vacancy.HiringManagerId))
+            {
+                _appointModel.ManagerId = vacancy.HiringManagerId;
+            }
+            else
+            {
+                var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
+                if (hiringManager is not null)
+                {
+                    _appointManagerOptions.Insert(1, new ManagerOption(hiringManager.Id, hiringManager.DisplayName));
+                    _appointModel.ManagerId = hiringManager.Id;
+                }
+            }
+        }
+
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private List<ManagerOption> BuildAppointManagerOptions(IEnumerable<EmployeeListItemModel>? employees) =>
+        (employees ?? [])
+            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != _appointEmployeeId)
+            .Select(e => new ManagerOption(e.Id, e.FullName))
+            .OrderBy(e => e.Name)
+            .Prepend(NoManagerOption)
+            .ToList();
+
+    private async Task OnAppointManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _appointManagerOptions = BuildAppointManagerOptions(result?.Items);
+        await _appointManagerDropdown.FilterAsync(_appointManagerOptions, new Query());
+    }
+
+    private async Task ConfirmAppointAsync()
+    {
+        if (_appointing)
+            return;
+
+        _error = null;
+        if (!_appointEditContext.Validate())
+        {
+            _error = _appointEditContext.GetValidationMessages().FirstOrDefault()
+                ?? "Please correct the highlighted fields below.";
+            return;
+        }
+
+        var noManager = _appointModel.ManagerId == NoManagerOption.Id;
+        var changeComp = _appointModel.ChangeCompensation;
+        var request = new AppointInternalCandidateRequest(
+            EffectiveDate: _appointModel.EffectiveDate,
+            ConfirmBackdatedEffectiveDate: _appointModel.IsBackdated && _appointModel.ConfirmBackdated,
+            ManagerId: noManager ? null : _appointModel.ManagerId,
+            NoManager: noManager,
+            CreateCompensationChange: changeComp,
+            CompensationSalaryType: changeComp ? _appointModel.SalaryType : null,
+            CompensationSalary: changeComp ? _appointModel.Salary : null,
+            CompensationCurrency: changeComp ? _appointModel.Currency?.Trim().ToUpperInvariant() : null,
+            CompensationHoursPerWeek: changeComp ? _appointModel.HoursPerWeek : null,
+            CompensationFte: changeComp ? _appointModel.Fte : null,
+            CompensationNotes: changeComp ? FormText.Optional(_appointModel.CompensationNotes) : null);
+
+        _appointing = true;
+        try
+        {
+            var (result, error) = await ApplicationService.AppointInternalCandidateAsync(
+                CompanyId, VacancyId, _applicationId, request);
+
+            if (result is null)
+            {
+                _error = error;
+                return;
+            }
+
+            _visible = false;
+            await OnAppointed.InvokeAsync(new AppointedInfo(
+                result.EmployeeId, _appointCandidateName, result.IsApplied, result.EffectiveDate));
+        }
+        finally
+        {
+            _appointing = false;
+        }
+    }
+}

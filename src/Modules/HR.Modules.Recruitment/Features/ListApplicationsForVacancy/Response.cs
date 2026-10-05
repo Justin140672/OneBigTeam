@@ -25,4 +25,11 @@ internal sealed record ApplicationListItem(
     // Internal recruitment Ticket 7: internal appointment progress ("Pending" / "Completed"; null when
     // none started) and, once completed, the effective date of the employee change.
     string? InternalAppointmentStatus = null,
-    DateOnly? InternalAppointmentEffectiveDate = null);
+    DateOnly? InternalAppointmentEffectiveDate = null,
+    bool CurrentStageHasPendingInterview = false,
+    Guid? PendingInterviewId = null,
+    string? CurrentStageInterviewOutcome = null,
+    bool HasNextInterviewStage = false,
+    Guid? NextInterviewStageId = null,
+    string? NextInterviewStageName = null,
+    bool AllRequiredInterviewStagesPassed = true);

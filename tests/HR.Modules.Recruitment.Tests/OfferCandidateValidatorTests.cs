@@ -14,6 +14,7 @@ public class OfferCandidateValidatorTests
             CompanyId     = Guid.NewGuid(),
             VacancyId     = Guid.NewGuid(),
             ApplicationId = Guid.NewGuid(),
+            OfferedSalaryFrequency = "Annual",
         });
 
         Assert.True(result.IsValid);
@@ -40,10 +41,11 @@ public class OfferCandidateValidatorTests
         CompanyId     = Guid.NewGuid(),
         VacancyId     = Guid.NewGuid(),
         ApplicationId = Guid.NewGuid(),
+        OfferedSalaryFrequency = "Annual",
     };
 
     [Fact]
-    public void Validate_Passes_When_All_Optional_Offer_Fields_Are_Omitted()
+    public void Validate_Passes_When_Only_Required_Offer_Fields_Are_Supplied()
     {
         Assert.True(_validator.Validate(Valid()).IsValid);
     }
@@ -88,13 +90,18 @@ public class OfferCandidateValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(OfferCandidateRequest.OfferedSalaryFrequency));
     }
 
-    [Fact]
-    public void Validate_Skips_Frequency_Rule_When_Frequency_Is_Whitespace_Or_Null()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("None")]
+    public void Validate_Fails_When_Frequency_Is_Missing_Or_None(string? frequency)
     {
-        Assert.True(_validator.Validate(Valid() with { OfferedSalaryFrequency = null }).IsValid);
-        Assert.True(_validator.Validate(Valid() with { OfferedSalaryFrequency = "   " }).IsValid);
-    }
+        var result = _validator.Validate(Valid() with { OfferedSalaryFrequency = frequency });
 
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(OfferCandidateRequest.OfferedSalaryFrequency));
+    }
     [Fact]
     public void Validate_Passes_When_OfferNotes_Is_Exactly_2000_Chars()
     {

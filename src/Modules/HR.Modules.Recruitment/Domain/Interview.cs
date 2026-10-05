@@ -12,6 +12,7 @@ internal sealed class Interview : HR.SharedKernel.IVersionedAggregate
     public Guid Id { get; private set; }
     public Guid CompanyId { get; private set; }
     public Guid ApplicationId { get; private set; }
+    public Guid? StageId { get; private set; }
     public Guid InterviewerEmployeeId { get; private set; }
     public DateTimeOffset ScheduledAt { get; private set; }
     public int? DurationMinutes { get; private set; }
@@ -29,11 +30,13 @@ internal sealed class Interview : HR.SharedKernel.IVersionedAggregate
         DateTimeOffset scheduledAt,
         int? durationMinutes,
         string? location,
-        DateTimeOffset now) => new()
+        DateTimeOffset now,
+        Guid? stageId = null) => new()
     {
         Id                    = id,
         CompanyId             = companyId,
         ApplicationId         = applicationId,
+        StageId               = stageId,
         InterviewerEmployeeId = interviewerEmployeeId,
         ScheduledAt           = scheduledAt,
         DurationMinutes       = durationMinutes,
@@ -59,6 +62,14 @@ internal sealed class Interview : HR.SharedKernel.IVersionedAggregate
         DurationMinutes        = durationMinutes;
         Location               = string.IsNullOrWhiteSpace(location) ? null : location.Trim();
         UpdatedAt              = now;
+    }
+
+    public void AssignStage(Guid stageId)
+    {
+        if (StageId is not null)
+            throw new InvalidOperationException("Interview is already associated with a stage.");
+
+        StageId = stageId;
     }
 
     public void RecordOutcome(InterviewOutcome outcome, string? notes, DateTimeOffset now)

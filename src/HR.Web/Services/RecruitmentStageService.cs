@@ -29,6 +29,24 @@ public sealed class RecruitmentStageService(HrApiHttpClientFactory httpClientFac
         return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to create recruitment stage."));
     }
 
+    public async Task<InterviewStageSuggestionResponse?> GetInterviewStageSuggestionAsync(Guid companyId)
+    {
+        var result = await ApiResponseReader.ExecuteAsync<InterviewStageSuggestionResponse>(
+            ct => Http.GetAsync($"api/companies/{companyId}/recruitment-stages/interview-stage-suggestion", ct),
+            HrApiJsonOptions.Default);
+        return result.Success ? result.Value : null;
+    }
+
+    public async Task<(AddInterviewStageResponse? Result, string? Error)> AddInterviewStageAsync(
+        Guid companyId, string? name)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/recruitment-stages/interview-stages",
+            new AddInterviewStageRequest(companyId, name), HrApiJsonOptions.Default);
+        var result = await ApiResponseReader.ReadJsonAsync<AddInterviewStageResponse>(response, HrApiJsonOptions.Default);
+        return (result.Value, result.Success ? null : (result.DisplayMessage ?? "Failed to add interview stage."));
+    }
+
     public async Task<(UpdateRecruitmentStageResponse? Result, string? Error)> UpdateAsync(
         Guid companyId, Guid recruitmentStageId, UpdateRecruitmentStageRequest request)
     {

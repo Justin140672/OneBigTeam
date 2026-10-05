@@ -22,7 +22,14 @@ public record ApplicationListItemModel(
     Guid? EmployeeId = null,
     // Internal recruitment Ticket 7: "Pending" | "Completed" | null (no appointment attempted yet).
     string? InternalAppointmentStatus = null,
-    DateOnly? InternalAppointmentEffectiveDate = null);
+    DateOnly? InternalAppointmentEffectiveDate = null,
+    bool CurrentStageHasPendingInterview = false,
+    Guid? PendingInterviewId = null,
+    string? CurrentStageInterviewOutcome = null,
+    bool HasNextInterviewStage = false,
+    Guid? NextInterviewStageId = null,
+    string? NextInterviewStageName = null,
+    bool AllRequiredInterviewStagesPassed = true) : IKanbanActionSource;
 
 
 public record GetApplicationResponse(
@@ -74,7 +81,14 @@ public record GetApplicationResponse(
     Guid? EmployeeId = null,
     // Internal recruitment Ticket 7: "Pending" | "Completed" | null (no appointment attempted yet).
     string? InternalAppointmentStatus = null,
-    DateOnly? InternalAppointmentEffectiveDate = null);
+    DateOnly? InternalAppointmentEffectiveDate = null,
+    bool CurrentStageHasPendingInterview = false,
+    Guid? PendingInterviewId = null,
+    string? CurrentStageInterviewOutcome = null,
+    bool HasNextInterviewStage = false,
+    Guid? NextInterviewStageId = null,
+    string? NextInterviewStageName = null,
+    bool AllRequiredInterviewStagesPassed = true) : IKanbanActionSource;
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 

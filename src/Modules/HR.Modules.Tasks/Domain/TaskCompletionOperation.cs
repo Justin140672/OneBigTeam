@@ -37,6 +37,7 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
     public const string StatusRejected        = "rejected";
     public const string StatusDispatchApplied = "dispatch_applied";
     public const string StatusProcessed       = "processed";
+    public const string StatusDataIntegrityFailure = "data_integrity_failure";
 
     /// <summary>Ticket 19 (P2): same generous-relative-to-normal-runtime lease duration as
     /// AccountDisablement.LeaseDuration — see that type's remarks for the reasoning. Both
@@ -158,6 +159,14 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
         Status = StatusProcessed;
         ProcessedAt = now;
         FailureReason = null;
+        ReleaseClaim();
+    }
+
+    public void MarkDataIntegrityFailure(string reason, DateTimeOffset now)
+    {
+        Status = StatusDataIntegrityFailure;
+        FailureReason = reason.Length > 500 ? reason[..500] : reason;
+        LastAttemptAt = now;
         ReleaseClaim();
     }
 

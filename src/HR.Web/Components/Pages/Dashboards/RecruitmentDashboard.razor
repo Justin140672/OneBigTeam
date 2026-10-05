@@ -120,6 +120,10 @@
                                                  Placeholder="Select a vacancy" AllowFiltering="true"
                                                  HtmlAttributes="@VacancyPickerAttributes" />
                             </div>
+                            <SfButton Disabled="@(_selectedVacancyId is null)" OnClick="NavigateToSelectedVacancy"
+                                      HtmlAttributes="@ViewVacancyAttributes">
+                                View
+                            </SfButton>
                             <HrTextBox Placeholder="Search by name or email…"
                                        Value="@_boardSearchText"
                                        ValueChange="OnBoardSearchChanged"
@@ -475,6 +479,18 @@
 
     private void OnBoardSearchChanged(Syncfusion.Blazor.Inputs.ChangedEventArgs args) =>
         _boardSearchText = args.Value ?? string.Empty;
+
+    private static readonly Dictionary<string, object> ViewVacancyAttributes = new()
+    {
+        ["data-testid"] = "recruitment-board-view-vacancy-btn",
+        ["aria-label"] = "View selected vacancy",
+    };
+
+    private void NavigateToSelectedVacancy()
+    {
+        if (_selectedVacancyId is Guid id)
+            Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies/{id}?tab=applications");
+    }
 
     private void NavigateToNewVacancy() =>
         Navigation.NavigateTo($"/companies/{Session.CompanyId}/vacancies/new");

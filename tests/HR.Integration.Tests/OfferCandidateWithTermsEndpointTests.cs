@@ -57,6 +57,7 @@ public class OfferCandidateWithTermsEndpointTests
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
+        db.Interviews.Add(PassedInterviewSeed.Create(companyId, application.Id, interviewStageId, Now));
         await db.SaveChangesAsync();
         return (vacancy.Id, application.Id);
     }
@@ -126,6 +127,7 @@ public class OfferCandidateWithTermsEndpointTests
                 companyId,
                 vacancyId,
                 applicationId = Guid.NewGuid(),
+                offeredSalaryFrequency = "Annual",
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
@@ -145,6 +147,7 @@ public class OfferCandidateWithTermsEndpointTests
                 vacancyId,
                 applicationId,
                 offeredSalary = 0m,
+                offeredSalaryFrequency = "Annual",
             });
 
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
@@ -217,6 +220,7 @@ public class OfferCandidateWithTermsEndpointTests
                 companyId = companyB,
                 vacancyId,
                 applicationId,
+                offeredSalaryFrequency = "Annual",
             });
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

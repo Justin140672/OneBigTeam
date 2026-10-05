@@ -8,8 +8,7 @@ internal sealed record OfferCandidateRequest
 
     // Ticket 2: the actual agreed offer terms. All optional on the wire:
     //  - OfferedSalary: when omitted, the handler pre-populates from the Position Profile's SalaryMin.
-    //  - OfferedSalaryFrequency: "Annual" | "Hourly" | "Daily"; when omitted, taken from the Position
-    //    Profile's SalaryType where available.
+    //  - OfferedSalaryFrequency: required — "Annual" | "Hourly" | "Daily".
     //  - ProposedStartDate: the date the candidate is expected to start.
     //  - OfferDate: the date the offer is made; when omitted the handler defaults it to today.
     //  - OfferNotes: free-text context for the offer.

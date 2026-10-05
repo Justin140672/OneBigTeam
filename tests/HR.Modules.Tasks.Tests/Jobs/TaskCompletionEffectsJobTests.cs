@@ -1,3 +1,4 @@
+using HR.Modules.Tasks.Services;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Jobs;
@@ -27,11 +28,13 @@ public class TaskCompletionEffectsJobTests
         return new TasksDbContext(options);
     }
 
+    private static TaskCompletionAuditDelivery AuditDelivery(FakeAuditPublisher audit) => new(audit, audit);
+
     private static TaskCompletionEffectsJob BuildJob(
         TasksDbContext context,
         FakeNotificationWriter? notif = null,
         FakeAuditPublisher? audit = null) =>
-        new(context, notif ?? new FakeNotificationWriter(), Clock, audit ?? new FakeAuditPublisher(),
+        new(context, notif ?? new FakeNotificationWriter(), Clock, AuditDelivery(audit ?? new FakeAuditPublisher()),
             NullLogger<TaskCompletionEffectsJob>.Instance);
 
     private static TaskItem MakeCompletedTask(Guid companyId, Guid? assignedEmployeeId, Guid completedBy)
@@ -113,14 +116,13 @@ public class TaskCompletionEffectsJobTests
     }
 
     [Fact]
-    public async Task ProcessAsync_Marks_Processed_Without_Side_Effects_When_TaskItem_No_Longer_Exists()
+    public async Task ProcessAsync_Records_Data_Integrity_Failure_And_Does_Not_Mark_Processed_When_TaskItem_Is_Missing_And_Audit_Absent()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var completedBy = Guid.NewGuid();
 
         var operation = TaskCompletionOperation.CreatePending(
-            Guid.NewGuid(), companyId, Guid.NewGuid(), completedBy, null, null, DateTimeOffset.UtcNow);
+            Guid.NewGuid(), companyId, Guid.NewGuid(), Guid.NewGuid(), null, null, DateTimeOffset.UtcNow);
         operation.MarkDispatchApplied(DateTimeOffset.UtcNow);
         context.TaskCompletionOperations.Add(operation);
         await context.SaveChangesAsync();
@@ -132,11 +134,94 @@ public class TaskCompletionEffectsJobTests
         await job.ProcessAsync(operation.Id, companyId);
 
         var reloaded = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);
-        Assert.Equal(TaskCompletionOperation.StatusProcessed, reloaded.Status);
-        Assert.NotNull(reloaded.ProcessedAt);
+        Assert.Equal(TaskCompletionOperation.StatusDataIntegrityFailure, reloaded.Status);
+        Assert.Null(reloaded.ProcessedAt);
+        Assert.Contains("Data integrity", reloaded.FailureReason);
         Assert.Empty(notif.Written);
         Assert.Empty(audit.Published);
     }
+
+    [Fact]
+    public async Task ProcessAsync_Marks_Processed_When_TaskItem_Is_Missing_But_Audit_Event_Is_Confirmed()
+    {
+        await using var context = BuildContext();
+        var companyId = Guid.NewGuid();
+        var taskId = Guid.NewGuid();
+
+        var operation = TaskCompletionOperation.CreatePending(
+            Guid.NewGuid(), companyId, taskId, Guid.NewGuid(), null, null, DateTimeOffset.UtcNow);
+        operation.MarkDispatchApplied(DateTimeOffset.UtcNow);
+        context.TaskCompletionOperations.Add(operation);
+        await context.SaveChangesAsync();
+
+        var audit = new FakeAuditPublisher();
+        audit.Seed(new TaskCompletedAuditEvent(
+            companyId, taskId, Guid.NewGuid(), "Open", null, DateTimeOffset.UtcNow));
+        var job = BuildJob(context, audit: audit);
+
+        await job.ProcessAsync(operation.Id, companyId);
+
+        var reloaded = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);
+        Assert.Equal(TaskCompletionOperation.StatusProcessed, reloaded.Status);
+        Assert.Single(audit.Published);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Swallowed_Audit_Persistence_Failure_Throws_And_Leaves_Operation_Outstanding()
+    {
+        await using var context = BuildContext();
+        var (companyId, _, _, _, operation) = await SeedDispatchAppliedOperationAsync(context);
+        var audit = new FakeAuditPublisher { SwallowPersistenceFailure = true };
+        var job = BuildJob(context, audit: audit);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(operation.Id, companyId));
+
+        var reloaded = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);
+        Assert.Equal(TaskCompletionOperation.StatusDispatchApplied, reloaded.Status);
+        Assert.Null(reloaded.ProcessedAt);
+        Assert.Contains("not confirmed", reloaded.FailureReason);
+        Assert.Equal(1, audit.PublishCalls);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Retry_Marks_Processed_Once_The_Audit_Event_Becomes_Visible_Without_Republishing()
+    {
+        await using var context = BuildContext();
+        var (companyId, _, _, task, operation) = await SeedDispatchAppliedOperationAsync(context);
+        var audit = new FakeAuditPublisher { SwallowPersistenceFailure = true };
+        var job = BuildJob(context, audit: audit);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => job.ProcessAsync(operation.Id, companyId));
+        Assert.Equal(1, audit.PublishCalls);
+
+        audit.Seed(new TaskCompletedAuditEvent(
+            companyId, task.Id, operation.CompletedBy, "InProgress", null, DateTimeOffset.UtcNow));
+        await job.ProcessAsync(operation.Id, companyId);
+
+        var reloaded = await context.TaskCompletionOperations.AsNoTracking().SingleAsync(o => o.Id == operation.Id);
+        Assert.Equal(TaskCompletionOperation.StatusProcessed, reloaded.Status);
+        Assert.Equal(1, audit.PublishCalls);
+        Assert.Single(audit.Published);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_Retry_After_Successful_Publish_Creates_At_Most_One_Audit_Record()
+    {
+        await using var context = BuildContext();
+        var (companyId, _, _, _, operation) = await SeedDispatchAppliedOperationAsync(context);
+        var audit = new FakeAuditPublisher();
+        var job = BuildJob(context, audit: audit);
+
+        await job.ProcessAsync(operation.Id, companyId);
+        operation = await context.TaskCompletionOperations.SingleAsync(o => o.Id == operation.Id);
+        context.Entry(operation).Property(nameof(TaskCompletionOperation.Status)).CurrentValue = TaskCompletionOperation.StatusDispatchApplied;
+        await context.SaveChangesAsync();
+        await job.ProcessAsync(operation.Id, companyId);
+
+        Assert.Equal(1, audit.PublishCalls);
+        Assert.Single(audit.Published);
+    }
+
 
     [Fact]
     public async Task ProcessAsync_Writes_Notification_Publishes_Audit_And_Marks_Processed_When_Notification_Not_Already_Sent()

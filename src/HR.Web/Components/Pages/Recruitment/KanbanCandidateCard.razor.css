@@ -127,7 +127,8 @@
     padding: 0.25rem;
 }
 
-.kanban-candidate-card__move-menu button {
+.kanban-candidate-card__move-menu button,
+.kanban-candidate-card__move-menu a {
     text-align: left;
     background: transparent;
     border: none;
@@ -136,9 +137,12 @@
     font-size: 0.8rem;
     color: var(--hr-gray-900);
     cursor: pointer;
+    text-decoration: none;
 }
 
 .kanban-candidate-card__move-menu button:hover,
+.kanban-candidate-card__move-menu a:hover,
+.kanban-candidate-card__move-menu a:focus-visible,
 .kanban-candidate-card__move-menu button:focus-visible {
     background: var(--hr-gray-100);
 }
@@ -147,4 +151,11 @@
     padding: 0.4rem 0.6rem;
     font-size: 0.8rem;
     color: var(--hr-gray-500);
+}
+
+.kanban-candidate-card__move-menu-divider {
+    margin: 0.25rem 0;
+    border: 0;
+    border-top: 1px solid var(--hr-gray-200);
+    opacity: 1;
 }

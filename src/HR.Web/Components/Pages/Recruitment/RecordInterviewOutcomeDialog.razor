@@ -1,0 +1,89 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@inject InterviewService InterviewService
+
+<SfDialog Width="460px" IsModal="true" @bind-Visible="_visible" Header="Record Interview Outcome" CssClass="record-outcome-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="mb-3">
+                    <HrDropDownField TValue="string" TItem="OutcomeOption" Label="Outcome" Required="true" Id="interview-outcome"
+                                     DataSource="@_outcomeOptions" @bind-Value="_model.Outcome" ValueField="Value" TextField="Label"
+                                     Placeholder="Select outcome" />
+                </div>
+                <div class="mb-3">
+                    <HrTextField Label="Notes (optional)" Id="interview-outcome-notes"
+                                 @bind-Value="_model.Notes" Multiline="true" Rows="3" />
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="alert alert-danger py-2" role="alert">@_error</div>
+                }
+            </EditForm>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Save" IsPrimary="true" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback OnRecorded { get; set; }
+
+    private bool _visible;
+    private Guid _applicationId;
+    private Guid _interviewId;
+    private string? _error;
+    private readonly RecordOutcomeFormModel _model = new();
+    private EditContext _editContext = default!;
+
+    private sealed record OutcomeOption(string Value, string Label);
+
+    private static readonly OutcomeOption[] _outcomeOptions =
+        [.. new[] { "Passed", "Failed", "NoShow", "Cancelled" }.Select(o => new OutcomeOption(o, EnumDisplay.Humanize(o)))];
+
+    protected override void OnInitialized() => _editContext = new EditContext(_model);
+
+    public void Open(Guid applicationId, Guid interviewId)
+    {
+        _error = null;
+        _applicationId = applicationId;
+        _interviewId = interviewId;
+        _model.Outcome = null;
+        _model.Notes = null;
+        _editContext = new EditContext(_model);
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!_editContext.Validate())
+            return;
+
+        var (result, error) = await InterviewService.RecordInterviewOutcomeAsync(
+            CompanyId, VacancyId, _applicationId, _interviewId, _model.Outcome!, _model.Notes);
+
+        if (result is null)
+        {
+            _error = error;
+            return;
+        }
+
+        _visible = false;
+        await OnRecorded.InvokeAsync();
+    }
+
+    private sealed class RecordOutcomeFormModel
+    {
+        [Required(ErrorMessage = "Please select an outcome.")]
+        public string? Outcome { get; set; }
+
+        [MaxLength(4000)]
+        public string? Notes { get; set; }
+    }
+}

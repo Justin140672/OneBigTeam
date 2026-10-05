@@ -3,6 +3,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.Modules.Recruitment.Tests.Infrastructure;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
@@ -197,6 +198,47 @@ public class RecordInterviewOutcomeHandlerTests
         Assert.Equal(recordedBy, call.CompletedBy);
     }
 
+    [Theory]
+    [InlineData("Passed")]
+    [InlineData("Failed")]
+    [InlineData("NoShow")]
+    public async Task HandleAsync_Cancels_Only_The_Review_Task_Scoped_To_Company(string outcomeName)
+    {
+        await using var db = BuildContext();
+        var canceller = new FakeTaskCanceller();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        application.SetInterviewOutcome(InterviewOutcome.Pending, Now);
+        var interview = Interview.Create(Guid.NewGuid(), companyId, application.Id, Guid.NewGuid(), Now.AddDays(2), 30, null, Now);
+        db.Vacancies.Add(vacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        db.Interviews.Add(interview);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, taskCanceller: canceller).HandleAsync(
+            new RecordInterviewOutcomeRequest
+            {
+                CompanyId     = companyId,
+                VacancyId     = vacancy.Id,
+                ApplicationId = application.Id,
+                InterviewId   = interview.Id,
+                Outcome       = Enum.Parse<InterviewOutcome>(outcomeName),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var call = Assert.Single(canceller.Calls);
+        Assert.Equal(companyId, call.CompanyId);
+        Assert.Equal(new[] { interview.Id }, call.SourceEntityIds);
+        Assert.Equal(TaskSource.Recruitment, call.Source);
+        Assert.Equal(TaskActionType.Review, call.ActionType);
+    }
+
     [Fact]
     public async Task HandleAsync_Does_Not_Complete_Task_When_Interview_Missing()
     {
@@ -230,10 +272,12 @@ public class RecordInterviewOutcomeHandlerTests
     private static RecordInterviewOutcomeHandler handler(
         RecruitmentDbContext db,
         FakeTaskCompleter? taskCompleter = null,
-        FakeAuditPublisher? auditPublisher = null) =>
+        FakeAuditPublisher? auditPublisher = null,
+        FakeTaskCanceller? taskCanceller = null) =>
         new(
-            new InterviewOutcomeRecorder(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher()),
-            taskCompleter ?? new FakeTaskCompleter());
+            OutcomeWiring.Recorder(db, auditPublisher ?? new FakeAuditPublisher()),
+            new InterviewOutcomeTaskReconciliationService(db, new FakeTaskResolution(taskCompleter ?? new FakeTaskCompleter(),
+                taskCanceller ?? new FakeTaskCanceller()), OutcomeWiring.Delivery(db, new FakeAuditPublisher()), new FakeClock(FixedUtcNow), Microsoft.Extensions.Logging.Abstractions.NullLogger<InterviewOutcomeTaskReconciliationService>.Instance));
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

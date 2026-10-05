@@ -1,6 +1,7 @@
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
+using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
@@ -8,7 +9,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.RejectCandidate;
 
-internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clock, RecruitmentStageChangeRecorder recorder)
+internal sealed class RejectCandidateHandler(
+    RecruitmentDbContext db,
+    IClock clock,
+    RecruitmentStageChangeRecorder recorder,
+    InterviewTaskCleanupService cleanupService)
 {
     public async Task<Result<RejectCandidateResponse>> HandleAsync(
         RejectCandidateRequest request,
@@ -28,6 +33,7 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await cleanupService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<RejectCandidateResponse>(
@@ -83,6 +89,23 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
         var expectedVersion = application.Version;
 
         application.RecordRejection(rejectedStage.Id, request.RejectionReason, now);
+
+        var pendingInterviews = await db.Interviews
+            .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId
+                && i.Outcome == Domain.InterviewOutcome.Pending)
+            .ToListAsync(cancellationToken);
+
+        foreach (var interview in pendingInterviews)
+            interview.Cancel(now);
+
+        InterviewTaskCleanup? cleanup = null;
+        if (pendingInterviews.Count > 0)
+        {
+            cleanup = InterviewTaskCleanup.Create(
+                Guid.NewGuid(), request.CompanyId, application.Id, pendingInterviews.Select(i => i.Id).ToList(), now);
+            db.InterviewTaskCleanups.Add(cleanup);
+        }
+
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now, request.RejectionReason);
 
         var response = new RejectCandidateResponse(
@@ -111,6 +134,7 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await cleanupService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(outcome.Response!);
                 case IdempotencyOutcomeKind.ConcurrencyConflict:
                     return Result.Failure<RejectCandidateResponse>(Error.Concurrency(conflictMessage));
@@ -125,6 +149,9 @@ internal sealed class RejectCandidateHandler(RecruitmentDbContext db, IClock clo
             if (!saveResult.IsSuccess)
                 return Result.Failure<RejectCandidateResponse>(saveResult.Error);
         }
+
+        if (cleanup is not null)
+            await cleanupService.RunAsync(cleanup, cancellationToken);
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
 

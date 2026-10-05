@@ -736,6 +736,10 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("scheduled_at");
 
+                    b.Property<Guid?>("StageId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("stage_id");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -751,9 +755,246 @@ namespace HR.Modules.Recruitment.Migrations
 
                     b.HasIndex("CompanyId");
 
+                    b.HasIndex("StageId");
+
                     b.HasIndex("ApplicationId", "ScheduledAt");
 
+                    b.HasIndex("ApplicationId", "StageId");
+
                     b.ToTable("interviews", "recruitment");
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.InterviewOutcomeTaskReconciliation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("AuditDeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("audit_delivered_at");
+
+                    b.Property<DateTimeOffset?>("BlockedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("blocked_at");
+
+                    b.Property<string>("BlockedCategory")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("blocked_category");
+
+                    b.Property<Guid?>("BlockedTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_task_id");
+
+                    b.Property<Guid?>("BlockedTasksOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_tasks_operation_id");
+
+                    b.Property<DateTimeOffset?>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_until");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<Guid>("InterviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("interview_id");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LastRepairedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_repaired_at");
+
+                    b.Property<Guid?>("LastRepairedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_repaired_by");
+
+                    b.Property<Guid>("RecordedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recorded_by");
+
+                    b.Property<int>("RepairCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("repair_count");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BlockedAt")
+                        .HasDatabaseName("ix_interview_outcome_task_reconciliations_blocked")
+                        .HasFilter("blocked_at IS NOT NULL");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_interview_outcome_task_reconciliations_outstanding")
+                        .HasFilter("completed_at IS NULL AND blocked_at IS NULL");
+
+                    b.HasIndex("InterviewId")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "ApplicationId");
+
+                    b.ToTable("interview_outcome_task_reconciliations", "recruitment");
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.InterviewTaskCleanup", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("InterviewIdsJson")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("interview_ids_json");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_interview_task_cleanups_outstanding")
+                        .HasFilter("completed_at IS NULL");
+
+                    b.HasIndex("CompanyId", "ApplicationId");
+
+                    b.ToTable("interview_task_cleanups", "recruitment");
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.InterviewTaskEffect", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<string>("CandidateName")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("candidate_name");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("completed_at");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<Guid>("InterviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("interview_id");
+
+                    b.Property<Guid>("InterviewerEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("interviewer_employee_id");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset>("ScheduledAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("scheduled_at");
+
+                    b.Property<Guid>("ScheduledBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scheduled_by");
+
+                    b.Property<string>("VacancyTitle")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("vacancy_title");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_interview_task_effects_outstanding")
+                        .HasFilter("completed_at IS NULL");
+
+                    b.HasIndex("InterviewId")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "ApplicationId");
+
+                    b.ToTable("interview_task_effects", "recruitment");
                 });
 
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.RecruitmentStage", b =>
@@ -1019,6 +1260,11 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasForeignKey("ApplicationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.HasOne("HR.Modules.Recruitment.Domain.RecruitmentStage", null)
+                        .WithMany()
+                        .HasForeignKey("StageId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.Vacancy", b =>

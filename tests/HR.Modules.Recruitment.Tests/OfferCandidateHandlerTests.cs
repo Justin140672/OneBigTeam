@@ -25,6 +25,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -50,6 +51,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -101,6 +103,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -132,6 +135,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -168,6 +172,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Olivia", "Grant", "olivia.grant@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         application.Withdraw(Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -210,6 +215,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Priya", "Nair", "priya.nair@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancyId, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
         await db.SaveChangesAsync();
@@ -256,6 +262,7 @@ public class OfferCandidateHandlerTests
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         candidate.Deactivate(Guid.NewGuid(), "No longer available", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -283,6 +290,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -313,6 +321,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         application.ApproveOffer(Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
@@ -342,6 +351,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -366,6 +376,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Interview.Id, null, Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         db.Vacancies.Add(vacancy);
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
@@ -575,6 +586,7 @@ public class OfferCandidateHandlerTests
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         db.Vacancies.Add(vacancy);
         var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, Guid.NewGuid(), Now);
+        db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         await db.SaveChangesAsync();
 
         var result = await handler(db).HandleAsync(

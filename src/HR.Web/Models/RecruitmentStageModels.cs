@@ -96,6 +96,31 @@ public sealed record GetRecruitmentStageUsageResponse(
     int ActiveVacancyCount,
     IReadOnlyList<string> VacancyLabels);
 
+public sealed record InterviewStageSuggestionResponse(
+    string SuggestedName,
+    int DisplayOrder,
+    int ActiveInterviewStageCount,
+    string? StageToRenameName,
+    string? RenamedStageName);
+
+public sealed record AddInterviewStageRequest(Guid CompanyId, string? Name = null);
+
+public sealed record AddInterviewStageResponse(
+    Guid Id,
+    Guid CompanyId,
+    string Name,
+    int DisplayOrder,
+    bool IsActive,
+    Guid? RenamedStageId,
+    string? RenamedStageName);
+
+public sealed class InterviewStageEditModel
+{
+    [Required(ErrorMessage = "Name is required.")]
+    [MaxLength(100, ErrorMessage = "Name must be 100 characters or fewer.")]
+    public string Name { get; set; } = string.Empty;
+}
+
 public sealed class RecruitmentStageEditModel : IHasVersion
 {
     public int Version { get; set; }

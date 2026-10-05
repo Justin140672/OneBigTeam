@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Tests;
 
 /// <summary>
 /// Verifies the "Update Vacancy Details and List Screens" story's UI changes:
-/// - Vacancy list: the Title column shows a muted "(from Position Profile)" fallback indicator
+/// - Vacancy list: the Title column shows the vacancy's effective title with no extra indicator
 ///   when the vacancy's own AdvertTitle is null (VacancyList.razor). The Location column has no
 ///   such indicator — Vacancy.Location was removed entirely by a later correction, so Location is
 ///   now unconditionally just the linked Position Profile's location.
@@ -47,8 +47,7 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         // A fresh Position Profile is required here rather than the seeded "Senior Software
         // Engineer" — that profile already has a permanently-open vacancy in seed data (see
         // PositionProfileTestHelpers' remarks), which the "one live vacancy per position profile"
-        // rule would otherwise reject a second vacancy against. (The seeded vacancy is still read,
-        // not created, by the fallback-indicator assertion further down.)
+        // rule would otherwise reject a second vacancy against.
         var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
             _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
 
@@ -60,18 +59,6 @@ public sealed class VacancyDetailsAndListScreensUpdateTests(CrossUserFixture fix
         await vacancyDetail.SaveNewVacancyAsync();
 
         Assert.True(await vacancyList.HasVacancyAsync(withOverrideTitle));
-        Assert.False(await vacancyList.HasTitleColumnPositionProfileFallbackIndicatorAsync(withOverrideTitle),
-            "Did not expect the '(from Position Profile)' indicator for a vacancy with its own AdvertTitle set");
-
-        // "Senior Software Engineer" is the seeded vacancy with no AdvertTitle of its own — per
-        // RecruitmentModule.SeedRecruitmentAsync's own comment, it's an exact title match to its
-        // linked Position Profile, deliberately left with a null AdvertTitle to exercise the
-        // fallback path. "HR Business Partner"/"Product Designer" are NOT fallback cases — the
-        // same seed method deliberately gives them their own distinct AdvertTitle, since their
-        // linked Position Profile's title genuinely differs (no "HR Business Partner"/"Product
-        // Designer" profile exists) — so they never show this indicator.
-        Assert.True(await vacancyList.HasTitleColumnPositionProfileFallbackIndicatorAsync("Senior Software Engineer"),
-            "Expected the '(from Position Profile)' indicator for the seeded vacancy with no AdvertTitle override");
     }
 
     // NOTE: VacancyList_LocationColumn_ShowsFallbackIndicatorOnlyWhenLocationIsUnset used to live

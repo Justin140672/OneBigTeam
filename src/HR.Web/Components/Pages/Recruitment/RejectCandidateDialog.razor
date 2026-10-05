@@ -1,0 +1,53 @@
+@inject ApplicationService ApplicationService
+
+<SfDialog Width="420px" IsModal="true" @bind-Visible="_visible" Header="Reject Candidate" CssClass="reject-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <div class="mb-3">
+                <HrTextField Label="Reason (optional)" Id="reject-reason"
+                             Value="_reason" ValueChanged="@(v => _reason = v)" Multiline="true" Rows="2" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="alert alert-danger py-2" role="alert">@_error</div>
+            }
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Reject" IsPrimary="true" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback OnRejected { get; set; }
+
+    private bool _visible;
+    private Guid _applicationId;
+    private string? _reason;
+    private string? _error;
+
+    public void Open(Guid applicationId)
+    {
+        _error = null;
+        _reason = null;
+        _applicationId = applicationId;
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        var (result, error) = await ApplicationService.RejectCandidateAsync(CompanyId, VacancyId, _applicationId, _reason);
+        if (result is null)
+        {
+            _error = error;
+            return;
+        }
+
+        _visible = false;
+        await OnRejected.InvokeAsync();
+    }
+}

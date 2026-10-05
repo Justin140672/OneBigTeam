@@ -73,10 +73,6 @@
                             var row = (context as VacancyListItemModel)!;
                         }
                         <a href="/companies/@CompanyId/vacancies/@row.Id">@row.EffectiveTitle</a>
-                        @if (row.AdvertTitle is null)
-                        {
-                            <span class="text-muted fst-italic ms-1">(from Position Profile)</span>
-                        }
                     </Template>
                 </GridColumn>
                 <GridColumn Field="@nameof(VacancyListItemModel.PositionProfileTitle)" HeaderText="Position Profile" Width="200" />

@@ -1,0 +1,162 @@
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Components.Forms
+@inject ApplicationService ApplicationService
+@inject VacancyService VacancyService
+@inject PositionProfileService PositionProfileService
+
+<SfDialog Width="520px" IsModal="true" @bind-Visible="_visible" Header="Make an Offer" CssClass="offer-candidate-dialog">
+    <DialogTemplates>
+        <Content>
+            <EditForm EditContext="_editContext">
+                <DataAnnotationsValidator />
+                <div class="alert alert-light border py-2" data-testid="offer-position-profile-context">
+                    <div class="fw-semibold">@(_profileTitle ?? "Position Profile")</div>
+                    <div class="text-muted small">
+                        Salary range:
+                        @if (_salaryMin is not null || _salaryMax is not null)
+                        {
+                            <span>@FormatMoney(_salaryMin) – @FormatMoney(_salaryMax)</span>
+                            <span> (@(_salaryType ?? "—"))</span>
+                        }
+                        else
+                        {
+                            <span>Not specified</span>
+                        }
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <HrNumericField TValue="decimal?" Label="Offered Salary" Id="offer-salary"
+                                        @bind-Value="_model.OfferedSalary" Format="c0" Min="0"
+                                        HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-salary" })" />
+                    </div>
+                    <div class="col-md-6">
+                        <label id="offer-salary-frequency-label" for="offer-salary-frequency" class="form-label">Salary Frequency</label>
+                        <SfDropDownList TValue="string" TItem="string" DataSource="@_salaryFrequencyOptions"
+                                        @bind-Value="_model.OfferedSalaryFrequency"
+                                        HtmlAttributes="@Aria("offer-salary-frequency", nameof(OfferFormModel.OfferedSalaryFrequency), "Salary frequency")" />
+                        <div id="offer-salary-frequency-error" role="alert">
+                            <ValidationMessage For="@(() => _model.OfferedSalaryFrequency)" />
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <HrDateField TValue="DateOnly?" Label="Proposed Start Date" Id="offer-proposed-start-date"
+                                     @bind-Value="_model.ProposedStartDate"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-proposed-start-date" })" />
+                    </div>
+                    <div class="col-md-6">
+                        <HrDateField TValue="DateOnly?" Label="Offer Date" Id="offer-date"
+                                     @bind-Value="_model.OfferDate"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-date" })" />
+                    </div>
+                    <div class="col-12">
+                        <HrTextField Label="Offer Notes" Id="offer-notes"
+                                     @bind-Value="_model.OfferNotes" Multiline="true" Rows="3"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-notes" })" />
+                    </div>
+                </div>
+                @if (_error is not null)
+                {
+                    <div class="alert alert-danger py-2 mt-3" role="alert">@_error</div>
+                }
+            </EditForm>
+        </Content>
+    </DialogTemplates>
+    <DialogButtons>
+        <DialogButton Content="Make Offer" IsPrimary="true" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+    </DialogButtons>
+</SfDialog>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public Guid VacancyId { get; set; }
+    [Parameter] public EventCallback OnOffered { get; set; }
+
+    private static readonly string[] _salaryFrequencyOptions = ["Annual", "Hourly", "Daily"];
+
+    private bool _visible;
+    private Guid _applicationId;
+    private string? _error;
+    private string? _profileTitle;
+    private decimal? _salaryMin;
+    private decimal? _salaryMax;
+    private string? _salaryType;
+    private readonly OfferFormModel _model = new();
+    private EditContext _editContext = default!;
+
+    protected override void OnInitialized() => _editContext = new EditContext(_model);
+
+    public async Task OpenAsync(Guid applicationId)
+    {
+        _error = null;
+        _applicationId = applicationId;
+        _model.OfferedSalary = null;
+        _model.OfferedSalaryFrequency = "Annual";
+        _model.ProposedStartDate = null;
+        _model.OfferDate = DateOnly.FromDateTime(DateTime.Today);
+        _model.OfferNotes = null;
+        _profileTitle = null;
+        _salaryMin = _salaryMax = null;
+        _salaryType = null;
+
+        var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
+        _profileTitle = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle;
+        if (vacancy is not null)
+        {
+            var profile = await PositionProfileService.GetPositionProfileAsync(CompanyId, vacancy.PositionProfileId);
+            _salaryMin = profile?.SalaryMin;
+            _salaryMax = profile?.SalaryMax;
+            _salaryType = profile?.SalaryType;
+        }
+
+        _model.OfferedSalary = _salaryMin;
+
+        _editContext = new EditContext(_model);
+        _visible = true;
+        StateHasChanged();
+    }
+
+    private async Task ConfirmAsync()
+    {
+        if (!_editContext.Validate())
+            return;
+
+        var freq = _model.OfferedSalaryFrequency;
+        var request = new OfferCandidateRequest(
+            CompanyId, VacancyId, _applicationId,
+            _model.OfferedSalary, freq, _model.ProposedStartDate, _model.OfferDate,
+            FormText.Optional(_model.OfferNotes));
+
+        var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, _applicationId, request);
+        if (result is null)
+        {
+            _error = error;
+            return;
+        }
+
+        _visible = false;
+        await OnOffered.InvokeAsync();
+    }
+
+    private Dictionary<string, object> Aria(string id, string property, string label)
+    {
+        var attributes = FieldAria.Build(_editContext, _model, id, property, false);
+        attributes["aria-label"] = label;
+        attributes["aria-labelledby"] = $"{id}-label";
+        attributes["data-testid"] = id;
+        return attributes;
+    }
+
+    private static string FormatMoney(decimal? value) => value is null ? "—" : value.Value.ToString("C0");
+
+    public sealed class OfferFormModel
+    {
+        public decimal? OfferedSalary { get; set; }
+        public string? OfferedSalaryFrequency { get; set; } = "Annual";
+        public DateOnly? ProposedStartDate { get; set; }
+        public DateOnly? OfferDate { get; set; }
+        [MaxLength(2000, ErrorMessage = "Offer notes cannot exceed 2000 characters.")]
+        public string? OfferNotes { get; set; }
+    }
+}

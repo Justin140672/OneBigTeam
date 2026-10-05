@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
 
@@ -50,6 +51,9 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
             })
             .ToListAsync(cancellationToken);
 
+        var states = await InterviewStageStateReader.LoadAsync(
+            db, request.CompanyId, rows.Select(r => (r.Id, r.CurrentStageId)).ToList(), cancellationToken);
+
         var items = rows
             .Select(r => new ApplicationListItem(
                 r.Id,
@@ -67,7 +71,14 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 r.IsInternal,
                 r.InternalEmployeeId,
                 r.AppointmentStatus?.ToString(),
-                r.AppointmentEffectiveDate))
+                r.AppointmentEffectiveDate,
+                states.GetValueOrDefault(r.Id)?.CurrentStageHasPendingInterview ?? false,
+                states.GetValueOrDefault(r.Id)?.PendingInterviewId,
+                states.GetValueOrDefault(r.Id)?.LatestOutcome?.ToString(),
+                states.GetValueOrDefault(r.Id)?.HasNextInterviewStage ?? false,
+                states.GetValueOrDefault(r.Id)?.NextInterviewStageId,
+                states.GetValueOrDefault(r.Id)?.NextInterviewStageName,
+                states.GetValueOrDefault(r.Id)?.AllRequiredInterviewStagesPassed ?? true))
             .ToList();
 
         return Result.Success(new ListApplicationsForVacancyResponse(items));

@@ -5,6 +5,7 @@ using HR.Modules.Recruitment.Persistence;
 using HR.Infrastructure.Abstractions;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Services;
 
@@ -19,8 +20,9 @@ namespace HR.Modules.Recruitment.Services;
 internal sealed class InterviewFeedbackService(
     RecruitmentDbContext db,
     InterviewOutcomeRecorder recorder,
-    IAuditEventPublisher auditPublisher,
-    IClock clock) : IInterviewFeedbackService
+    InterviewOutcomeAuditDelivery auditDelivery,
+    IClock clock,
+    ILogger<InterviewFeedbackService>? logger = null) : IInterviewFeedbackService
 {
     public async Task<Result> RecordFeedbackAsync(
         Guid companyId,
@@ -54,14 +56,8 @@ internal sealed class InterviewFeedbackService(
             && parsedOutcome != InterviewOutcome.Pending
             && dispatchOperationId != Guid.Empty)
         {
-            await auditPublisher.PublishAsync(
-                new InterviewOutcomeRecordedAuditEvent(
-                    companyId, interviewId, location.ApplicationId, location.VacancyId,
-                    location.CandidateId, parsedOutcome, location.Notes, recordedByEmployeeId,
-                    clock.UtcNowOffset()),
-                cancellationToken);
-
-            return Result.Success();
+            return await ConfirmReplayAuditAsync(
+                companyId, interviewId, location.ApplicationId, recordedByEmployeeId, cancellationToken);
         }
 
         var result = await recorder.RecordAsync(
@@ -79,4 +75,68 @@ internal sealed class InterviewFeedbackService(
 
         return result.IsSuccess ? Result.Success() : Result.Failure(result.Error);
     }
+
+    // Replay of an already-recorded outcome proves only that the primary mutation committed. Audit
+    // delivery is driven through the durable reconciliation row (created here for legacy data that
+    // lacks one) and is only reported confirmed once the audit event is seen to exist. If it cannot
+    // be confirmed yet, the outstanding row is the durable handoff: reconciliation delivers it.
+    private async Task<Result> ConfirmReplayAuditAsync(
+        Guid companyId, Guid interviewId, Guid applicationId, Guid recordedBy, CancellationToken cancellationToken)
+    {
+        var record = await FindReconciliationAsync(companyId, interviewId, cancellationToken);
+
+        if (record is null)
+        {
+            record = InterviewOutcomeTaskReconciliation.Create(
+                Guid.NewGuid(), companyId, applicationId, interviewId, recordedBy, clock.UtcNowOffset());
+            db.InterviewOutcomeTaskReconciliations.Add(record);
+
+            try
+            {
+                await db.SaveChangesAsync(cancellationToken);
+                logger?.LogWarning(
+                    "Created a repair interview-outcome reconciliation for an outcome recorded without one. ReconciliationId={ReconciliationId} CompanyId={CompanyId} InterviewId={InterviewId} ApplicationId={ApplicationId}",
+                    record.Id, companyId, interviewId, applicationId);
+            }
+            catch (DbUpdateException)
+            {
+                db.Entry(record).State = EntityState.Detached;
+                record = await FindReconciliationAsync(companyId, interviewId, cancellationToken);
+
+                if (record is null)
+                    throw;
+            }
+        }
+
+        if (record.IsBlocked)
+        {
+            return Result.Failure(Error.Conflict(
+                $"Interview outcome reconciliation {record.Id} for interview {interviewId} requires operator attention ({record.BlockedCategory}) before its audit can be confirmed."));
+        }
+
+        if (record.AuditDeliveredAt is not null)
+            return Result.Success();
+
+        try
+        {
+            await auditDelivery.DeliverAsync(record, cancellationToken);
+        }
+        catch (InterviewOutcomeSourceDataMissingException ex)
+        {
+            return Result.Failure(Error.Conflict(ex.Message));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger?.LogWarning(ex,
+                "Interview outcome audit is unconfirmed on replay; the outstanding reconciliation is the durable handoff. ReconciliationId={ReconciliationId} CompanyId={CompanyId} InterviewId={InterviewId} ApplicationId={ApplicationId}",
+                record.Id, companyId, interviewId, applicationId);
+        }
+
+        return Result.Success();
+    }
+
+    private Task<InterviewOutcomeTaskReconciliation?> FindReconciliationAsync(
+        Guid companyId, Guid interviewId, CancellationToken cancellationToken) =>
+        db.InterviewOutcomeTaskReconciliations
+            .SingleOrDefaultAsync(r => r.CompanyId == companyId && r.InterviewId == interviewId, cancellationToken);
 }

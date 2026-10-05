@@ -35,11 +35,12 @@ public sealed class TasksDatabaseFixture : IAsyncLifetime
         await _postgres.DisposeAsync();
     }
 
-    internal TasksDbContext BuildContext()
+    internal TasksDbContext BuildContext(params Microsoft.EntityFrameworkCore.Diagnostics.IInterceptor[] interceptors)
     {
         var options = new DbContextOptionsBuilder<TasksDbContext>()
             .UseNpgsql(ConnectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "tasks"))
+            .AddInterceptors(interceptors)
             .Options;
 
         return new TasksDbContext(options);

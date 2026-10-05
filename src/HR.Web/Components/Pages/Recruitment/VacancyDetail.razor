@@ -71,12 +71,6 @@
                         Publish Vacancy
                     </SfButton>
                 }
-                @if (Session.CanManageRecruitment && _vacancy is not null && _vacancy.Status != "Draft")
-                {
-                    <SfButton OnClick="@(() => Navigation.NavigateTo($"/companies/{CompanyId}/vacancies/{Id}/kanban"))">
-                        View Kanban Board
-                    </SfButton>
-                }
                 @if (CanClose)
                 {
                     <SfButton CssClass="e-danger e-outline close-vacancy-btn" OnClick="@(() => _showCloseConfirm = true)" Disabled="@(_closing || Session.IsReadOnly)"
@@ -184,6 +178,7 @@
 @code {
     [Parameter] public Guid CompanyId { get; set; }
     [Parameter] public Guid? Id { get; set; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? Tab { get; set; }
 
     private GetVacancyResponse? _vacancy;
     private List<DepartmentListItemModel> _departments = [];
@@ -276,6 +271,9 @@
         if (!IsNew)
         {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
+
+            if (string.Equals(Tab, "applications", StringComparison.OrdinalIgnoreCase) && _vacancy is { Status: not "Draft" })
+                _selectedTabIndex = 1;
 
             if (_vacancy is { } loadedVacancy)
             {

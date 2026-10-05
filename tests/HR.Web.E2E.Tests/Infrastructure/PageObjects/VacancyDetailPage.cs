@@ -764,6 +764,14 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await (await ApplicationsToolbarButtonAsync("Hire", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
+    public async Task<bool> IsApplicationsToolbarButtonEnabledAsync(string candidateNameFragment, string buttonName, bool exact = false)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        var button = await ApplicationsToolbarButtonAsync(buttonName, exact);
+        await page.WaitForTimeoutAsync(500);
+        return await button.GetAttributeAsync("aria-disabled") != "true";
+    }
+
 
     public async Task WaitForScheduleDialogAsync() =>
         await page.Locator("[role='dialog'].schedule-interview-dialog").WaitForAsync(

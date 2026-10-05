@@ -67,7 +67,9 @@ public class HireCandidateUsesAcceptedOfferEndToEndTests
         Assert.Equal(HttpStatusCode.Created, applicationResponse.StatusCode);
         var application = await applicationResponse.Content.ReadFromJsonAsync<ApplicationPayload>();
 
-        return (vacancy.Id, application!.Id);
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(_factory, companyId, application!.Id);
+
+        return (vacancy.Id, application.Id);
     }
 
     [Fact]

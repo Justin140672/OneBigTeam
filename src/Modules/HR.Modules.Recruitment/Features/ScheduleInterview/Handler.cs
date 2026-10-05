@@ -1,4 +1,3 @@
-using HR.Modules.Tasks.Contracts;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
 using HR.Modules.Recruitment.Services;
@@ -13,10 +12,11 @@ namespace HR.Modules.Recruitment.Features.ScheduleInterview;
 
 internal sealed class ScheduleInterviewHandler(
     RecruitmentDbContext db,
-    ITaskCreator taskCreator,
     INotificationWriter notificationWriter,
     IClock clock,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    RecruitmentStageChangeRecorder recorder,
+    InterviewTaskEffectsService effectsService)
 {
     public async Task<Result<ScheduleInterviewResponse>> HandleAsync(
         ScheduleInterviewRequest request,
@@ -36,6 +36,7 @@ internal sealed class ScheduleInterviewHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<ScheduleInterviewResponse>(
@@ -80,9 +81,50 @@ internal sealed class ScheduleInterviewHandler(
 
         var now = clock.UtcNowOffset();
         var expectedVersion = application.Version;
+        var previousStageId = application.CurrentStageId;
 
-        if (application.InterviewOutcome is null)
-            application.SetInterviewOutcome(Domain.InterviewOutcome.Pending, now);
+        var interviewStages = await db.RecruitmentStages
+            .AsNoTracking()
+            .Where(s => s.CompanyId == request.CompanyId && s.IsActive && !s.IsTerminal && s.Purpose == RecruitmentStagePurpose.Interview)
+            .OrderBy(s => s.DisplayOrder)
+            .ToListAsync(cancellationToken);
+
+        Guid interviewStageId;
+        var movesToInterviewStage = false;
+
+        if (currentStage is { Purpose: RecruitmentStagePurpose.Interview })
+        {
+            var existingInterviews = await db.Interviews
+                .AsNoTracking()
+                .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId)
+                .ToListAsync(cancellationToken);
+
+            var state = InterviewStageWorkflow.Evaluate(currentStage, interviewStages, existingInterviews);
+
+            if (!state.CurrentStageHasPendingInterview && state.LatestOutcome == Domain.InterviewOutcome.Passed && state.HasNextInterviewStage)
+                return Result.Failure<ScheduleInterviewResponse>(
+                    Error.Validation($"The interview in '{currentStage.Name}' has already been passed. Move the candidate to the next interview stage to schedule the next interview."));
+
+            interviewStageId = currentStage.Id;
+        }
+        else
+        {
+            var interviewStage = interviewStages.FirstOrDefault(s =>
+                s.Id != application.CurrentStageId
+                && (currentStage is null || s.DisplayOrder > currentStage.DisplayOrder));
+
+            if (interviewStage is null)
+                return Result.Failure<ScheduleInterviewResponse>(
+                    Error.Validation("There is no active interview stage after the current stage to schedule this interview in."));
+
+            movesToInterviewStage = true;
+            interviewStageId = interviewStage.Id;
+
+            application.MoveToStage(interviewStage.Id, now);
+            recorder.AddHistoryEntry(application, previousStageId, scheduledBy, now);
+        }
+
+        application.SetInterviewOutcome(Domain.InterviewOutcome.Pending, now);
 
         var interview = Interview.Create(
             Guid.NewGuid(),
@@ -92,9 +134,31 @@ internal sealed class ScheduleInterviewHandler(
             request.ScheduledAt,
             request.DurationMinutes,
             request.Location,
-            now);
+            now,
+            interviewStageId);
 
         db.Interviews.Add(interview);
+
+        var candidateName = await db.Candidates
+            .Where(c => c.Id == application.CandidateId)
+            .Select(c => c.FirstName + " " + c.LastName)
+            .SingleOrDefaultAsync(cancellationToken) ?? "the candidate";
+
+        var vacancyFields = await db.Vacancies
+            .Where(v => v.Id == application.VacancyId)
+            .Select(v => new { v.AdvertTitle, v.PositionProfileId })
+            .SingleOrDefaultAsync(cancellationToken);
+
+        var vacancyPositionProfile = vacancyFields is not null
+            ? await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancyFields.PositionProfileId, cancellationToken)
+            : null;
+
+        var vacancyTitle = vacancyFields?.AdvertTitle ?? vacancyPositionProfile?.Title ?? "this vacancy";
+
+        var effect = InterviewTaskEffect.Create(
+            Guid.NewGuid(), request.CompanyId, request.ApplicationId, interview.Id, scheduledBy,
+            request.InterviewerEmployeeId, request.ScheduledAt, candidateName, vacancyTitle, now);
+        db.InterviewTaskEffects.Add(effect);
 
         var response = new ScheduleInterviewResponse(
             interview.Id,
@@ -120,6 +184,7 @@ internal sealed class ScheduleInterviewHandler(
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(outcome.Response!);
                 case IdempotencyOutcomeKind.ConcurrencyConflict:
                     return Result.Failure<ScheduleInterviewResponse>(Error.Concurrency(conflictMessage));
@@ -134,53 +199,13 @@ internal sealed class ScheduleInterviewHandler(
                 return Result.Failure<ScheduleInterviewResponse>(saveResult.Error);
         }
 
-        var candidateName = await db.Candidates
-            .Where(c => c.Id == application.CandidateId)
-            .Select(c => c.FirstName + " " + c.LastName)
-            .SingleOrDefaultAsync(cancellationToken) ?? "the candidate";
+        if (movesToInterviewStage)
+            await recorder.PublishStageChangedEventsAsync(application, previousStageId, scheduledBy, now, cancellationToken);
 
-        var vacancyFields = await db.Vacancies
-            .Where(v => v.Id == application.VacancyId)
-            .Select(v => new { v.AdvertTitle, v.PositionProfileId })
-            .SingleOrDefaultAsync(cancellationToken);
+        var interviewStillPending = await effectsService.RunAsync(effect, cancellationToken);
 
-        var vacancyPositionProfile = vacancyFields is not null
-            ? await positionProfileReader.GetSummaryAsync(request.CompanyId, vacancyFields.PositionProfileId, cancellationToken)
-            : null;
-
-        var vacancyTitle = vacancyFields?.AdvertTitle ?? vacancyPositionProfile?.Title ?? "this vacancy";
-
-        var interviewDate = DateOnly.FromDateTime(request.ScheduledAt.UtcDateTime);
-
-        await taskCreator.CreateAsync(
-            request.CompanyId,
-            createdBy:          scheduledBy,
-            title:              $"Prepare for interview: {candidateName}",
-            description:        $"Review {candidateName}'s application for the {vacancyTitle} vacancy ahead of the interview.",
-            priority:           TaskPriority.Medium,
-            source:             TaskSource.Recruitment,
-            actionType:         TaskActionType.Review,
-            dueDate:            interviewDate,
-            assignedEmployeeId: request.InterviewerEmployeeId,
-            assignedUserId:     request.InterviewerEmployeeId,
-            sourceEntityId:     interview.Id,
-            cancellationToken,
-            notifyAssignee:     false);
-
-        await taskCreator.CreateAsync(
-            request.CompanyId,
-            createdBy:          scheduledBy,
-            title:              $"Provide feedback: interview with {candidateName}",
-            description:        $"Record the outcome and feedback for {candidateName}'s interview for the {vacancyTitle} vacancy.",
-            priority:           TaskPriority.Medium,
-            source:             TaskSource.Recruitment,
-            actionType:         TaskActionType.Complete,
-            dueDate:            interviewDate.AddDays(1),
-            assignedEmployeeId: request.InterviewerEmployeeId,
-            assignedUserId:     request.InterviewerEmployeeId,
-            sourceEntityId:     interview.Id,
-            cancellationToken,
-            notifyAssignee:     false);
+        if (!interviewStillPending)
+            return Result.Success(response);
 
         await notificationWriter.WriteAsync(
             Guid.NewGuid(),

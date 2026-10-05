@@ -1,3 +1,4 @@
+using FluentValidation;
 using Hangfire;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
@@ -14,6 +15,7 @@ using HR.Modules.Tasks.Features.ReturnToWorkReviewRequired;
 using HR.Modules.Tasks.Features.SicknessEvidenceOverdue;
 using HR.Modules.Tasks.Features.SicknessEvidenceRequested;
 using HR.Modules.Tasks.Features.ReassignTask;
+using HR.Modules.Tasks.Features.ResetProgrammaticTaskCompletion;
 using HR.Modules.Tasks.Persistence;
 using HR.Modules.Tasks.Services;
 using HR.SharedKernel;
@@ -42,8 +44,16 @@ public static class TasksModule
     private static void AddFeatureServices(IServiceCollection services)
     {
         services.AddScoped<ITaskCreator, TaskCreator>();
-        services.AddScoped<ITaskCompleter, TaskCompleter>();
-        services.AddScoped<ITaskCanceller, TaskCanceller>();
+        services.AddScoped<TaskCompleter>();
+        services.AddScoped<ITaskCompleter>(sp => sp.GetRequiredService<TaskCompleter>());
+        services.AddScoped<TaskCanceller>();
+        services.AddScoped<ITaskCanceller>(sp => sp.GetRequiredService<TaskCanceller>());
+        services.AddScoped<ITaskResolution, TaskResolution>();
+        services.AddScoped<TaskCompletionAuditDelivery>();
+        services.AddScoped<ITaskCompletionRecovery, TaskCompletionRecovery>();
+        services.AddScoped<ResetProgrammaticTaskCompletionHandler>();
+        services.AddScoped<IValidator<ResetProgrammaticTaskCompletionRequest>, ResetProgrammaticTaskCompletionValidator>();
+        services.AddScoped<Jobs.ProgrammaticTaskCompletionReconciliationJob>();
         services.AddScoped<ITaskRescheduler, TaskRescheduler>();
         services.AddScoped<ITaskReassigner, TaskReassigner>();
         services.AddScoped<IOpenTaskBySourceEntityReader, OpenTaskBySourceEntityReader>();
@@ -94,6 +104,10 @@ public static class TasksModule
             "tasks-completion-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
+        jobManager.AddOrUpdate<Jobs.ProgrammaticTaskCompletionReconciliationJob>(
+            "tasks-programmatic-completion-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 

@@ -13,6 +13,7 @@ internal sealed class TasksDbContext : DbContext
 
     public DbSet<TaskItem> TaskItems => Set<TaskItem>();
     public DbSet<TaskCompletionOperation> TaskCompletionOperations => Set<TaskCompletionOperation>();
+    public DbSet<ProgrammaticTaskCompletion> ProgrammaticTaskCompletions => Set<ProgrammaticTaskCompletion>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

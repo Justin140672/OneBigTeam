@@ -20,6 +20,10 @@ internal sealed class FakeNotificationWriter : INotificationWriter
     /// </summary>
     public bool ThrowOnWrite { get; set; }
 
+    public bool ThrowOnRemove { get; set; }
+
+    public NotificationType? ThrowOnRemoveFor { get; set; }
+
     public Task WriteAsync(
         Guid id, Guid companyId, Guid employeeId,
         string title, string? body,
@@ -74,6 +78,9 @@ internal sealed class FakeNotificationWriter : INotificationWriter
         Guid companyId, Guid sourceEntityId, NotificationType type,
         CancellationToken cancellationToken = default)
     {
+        if (ThrowOnRemove || ThrowOnRemoveFor == type)
+            throw new InvalidOperationException("Simulated notification removal failure.");
+
         var removed = Written.RemoveAll(n =>
             n.CompanyId == companyId && n.SourceEntityId == sourceEntityId && n.Type == type);
         return Task.FromResult(removed);

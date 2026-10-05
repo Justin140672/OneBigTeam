@@ -19,7 +19,7 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         // E2E run) the same navigation genuinely takes longer than a fixed single-shot timeout
         // often enough to fail — see EmployeeListPage.ClickNewEmployeeAsync, which already uses
         // this exact retry pattern for the same reason.
-        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add" });
+        var button = page.GetByRole(AriaRole.Button, new() { Name = "Add", Exact = true });
         await button.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
         const int maxAttempts = 8;
         for (var attempt = 1; attempt <= maxAttempts; attempt++)

@@ -10,6 +10,8 @@ internal sealed class FakeTaskCompleter : ITaskCompleter
     public IReadOnlyList<CompletedCall> Calls => _calls;
     public int CallCount => _calls.Count;
 
+    public bool Fail { get; set; }
+
     public Task CompleteBySourceEntityAsync(
         Guid companyId,
         Guid sourceEntityId,
@@ -18,6 +20,7 @@ internal sealed class FakeTaskCompleter : ITaskCompleter
         Guid completedBy,
         CancellationToken cancellationToken)
     {
+        if (Fail) throw new InvalidOperationException("Tasks module unavailable.");
         _calls.Add(new CompletedCall(companyId, sourceEntityId, source, actionType, completedBy));
         return Task.CompletedTask;
     }

@@ -75,6 +75,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         var now = DateTimeOffset.UtcNow;
 
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, now);
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(_factory, companyId, seeded.ApplicationId);
 
         Guid interviewStageId, offerStageId;
         using (var scope = _factory.Services.CreateScope())
@@ -243,6 +244,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         var now = DateTimeOffset.UtcNow;
 
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, now);
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(_factory, companyId, seeded.ApplicationId);
 
         Guid interviewStageId, offerStageId;
         using (var scope = _factory.Services.CreateScope())
@@ -263,7 +265,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
 
         var offerRequest = BuildIdempotentPostRequest(
             $"/api/companies/{companyId}/vacancies/{seeded.VacancyId}/applications/{seeded.ApplicationId}/offer",
-            new { companyId, vacancyId = seeded.VacancyId, applicationId = seeded.ApplicationId }, keyOffer);
+            new { companyId, vacancyId = seeded.VacancyId, applicationId = seeded.ApplicationId, offeredSalaryFrequency = "Annual" }, keyOffer);
         var moveRequest = BuildIdempotentPostRequest(
             $"/api/companies/{companyId}/vacancies/{seeded.VacancyId}/applications/{seeded.ApplicationId}/move-stage",
             new { companyId, newStageId = interviewStageId }, keyMove);
@@ -316,6 +318,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
         var now = DateTimeOffset.UtcNow;
 
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(_factory, companyId, now);
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(_factory, companyId, seeded.ApplicationId);
 
         Guid interviewStageId, offerStageId;
         using (var scope = _factory.Services.CreateScope())

@@ -103,6 +103,7 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
                 companyId,
                 vacancyId = vacancy.Id,
                 applicationId = application.Id,
+                offeredSalaryFrequency = "Annual",
             });
         Assert.Equal(HttpStatusCode.OK, offerResponse.StatusCode);
         var offer = await offerResponse.Content.ReadFromJsonAsync<OfferPayload>();

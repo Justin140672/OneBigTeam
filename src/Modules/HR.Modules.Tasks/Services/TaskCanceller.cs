@@ -21,17 +21,14 @@ internal sealed class TaskCanceller(TasksDbContext dbContext, INotificationWrite
                      && t.SourceEntityId == sourceEntityId
                      && t.Source == source
                      && t.ActionType == actionType
-                     && t.Status != TaskItemStatus.Completed
-                     && t.Status != TaskItemStatus.Cancelled)
+                     && t.Status != TaskItemStatus.Completed)
+            .OrderBy(t => t.Status == TaskItemStatus.Cancelled)
             .FirstOrDefaultAsync(cancellationToken);
 
         if (task is null)
             return;
 
-        task.Cancel(clock.UtcNowOffset());
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await RemovePendingNotificationsAsync(companyId, [task.Id], cancellationToken);
+        await CancelAndCleanAsync(companyId, [task], cancellationToken);
     }
 
     public async Task<int> CancelAllBySourceEntityAsync(
@@ -46,22 +43,10 @@ internal sealed class TaskCanceller(TasksDbContext dbContext, INotificationWrite
                      && t.SourceEntityId == sourceEntityId
                      && t.Source == source
                      && t.ActionType == actionType
-                     && t.Status != TaskItemStatus.Completed
-                     && t.Status != TaskItemStatus.Cancelled)
+                     && t.Status != TaskItemStatus.Completed)
             .ToListAsync(cancellationToken);
 
-        if (tasks.Count == 0)
-            return 0;
-
-        var now = clock.UtcNowOffset();
-        foreach (var task in tasks)
-            task.Cancel(now);
-
-        await dbContext.SaveChangesAsync(cancellationToken);
-
-        await RemovePendingNotificationsAsync(companyId, tasks.Select(t => t.Id), cancellationToken);
-
-        return tasks.Count;
+        return await CancelAndCleanAsync(companyId, tasks, cancellationToken);
     }
 
     public async Task<int> CancelManyBySourceEntitiesAsync(
@@ -80,33 +65,42 @@ internal sealed class TaskCanceller(TasksDbContext dbContext, INotificationWrite
                      && sourceEntityIds.Contains(t.SourceEntityId.Value)
                      && t.Source == source
                      && t.ActionType == actionType
-                     && t.Status != TaskItemStatus.Completed
-                     && t.Status != TaskItemStatus.Cancelled)
+                     && t.Status != TaskItemStatus.Completed)
             .ToListAsync(cancellationToken);
 
+        return await CancelAndCleanAsync(companyId, tasks, cancellationToken);
+    }
+
+    private async Task<int> CancelAndCleanAsync(
+        Guid companyId, List<TaskItem> tasks, CancellationToken cancellationToken)
+    {
         if (tasks.Count == 0)
             return 0;
 
-        var now = clock.UtcNowOffset();
-        foreach (var task in tasks)
-            task.Cancel(now);
+        var toCancel = tasks.Where(t => t.Status != TaskItemStatus.Cancelled).ToList();
 
-        await dbContext.SaveChangesAsync(cancellationToken);
+        if (toCancel.Count > 0)
+        {
+            var now = clock.UtcNowOffset();
+            foreach (var task in toCancel)
+                task.Cancel(now);
+
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
 
         await RemovePendingNotificationsAsync(companyId, tasks.Select(t => t.Id), cancellationToken);
 
-        return tasks.Count;
+        return toCancel.Count;
     }
 
-    // Cancelling a task must not leave a stale "due soon"/"overdue" notification sitting in
-    // someone's inbox referencing work that no longer needs doing. DueSoonNotifier itself will
-    // never raise a *new* one for a cancelled task (it only considers Open/InProgress tasks), but
-    // any notification already written before cancellation needs explicit cleanup here.
+    // Any notification already written for an open task must not outlive the cancellation; the
+    // removal is idempotent so a retry after a partial failure still converges.
     private async Task RemovePendingNotificationsAsync(
         Guid companyId, IEnumerable<Guid> taskIds, CancellationToken cancellationToken)
     {
         foreach (var taskId in taskIds)
         {
+            await notificationWriter.RemoveBySourceEntityAsync(companyId, taskId, NotificationType.TaskAssigned, cancellationToken);
             await notificationWriter.RemoveBySourceEntityAsync(companyId, taskId, NotificationType.TaskDueSoon, cancellationToken);
             await notificationWriter.RemoveBySourceEntityAsync(companyId, taskId, NotificationType.TaskOverdue, cancellationToken);
         }

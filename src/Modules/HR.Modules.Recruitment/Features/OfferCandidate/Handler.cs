@@ -88,6 +88,16 @@ internal sealed class OfferCandidateHandler(
             .OrderByDescending(s => s.DisplayOrder)
             .ToListAsync(cancellationToken);
 
+        var interviews = await db.Interviews
+            .AsNoTracking()
+            .Where(i => i.ApplicationId == application.Id && i.CompanyId == request.CompanyId)
+            .ToListAsync(cancellationToken);
+
+        var violation = InterviewStageWorkflow.DescribeOfferViolation(activeNonTerminalStages, interviews);
+
+        if (violation is not null)
+            return Result.Failure<OfferCandidateResponse>(Error.Validation(violation));
+
         var offerStage = activeNonTerminalStages
             .FirstOrDefault(s => s.Purpose == RecruitmentStagePurpose.Offer)
             ?? activeNonTerminalStages.FirstOrDefault();

@@ -97,6 +97,7 @@ public class RecruitmentPositionProfileTenantIsolationTests
                 companyId = companyB,
                 vacancyId = vacancyAId,
                 applicationId = applicationAId,
+                offeredSalaryFrequency = "Annual",
             });
         Assert.Equal(HttpStatusCode.NotFound, offerResponse.StatusCode);
 

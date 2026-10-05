@@ -24,6 +24,9 @@ internal sealed class InterviewConfiguration : IEntityTypeConfiguration<Intervie
             .HasColumnName("application_id")
             .IsRequired();
 
+        builder.Property(i => i.StageId)
+            .HasColumnName("stage_id");
+
         builder.Property(i => i.InterviewerEmployeeId)
             .HasColumnName("interviewer_employee_id")
             .IsRequired();
@@ -68,7 +71,13 @@ internal sealed class InterviewConfiguration : IEntityTypeConfiguration<Intervie
             .HasForeignKey(i => i.ApplicationId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne<RecruitmentStage>()
+            .WithMany()
+            .HasForeignKey(i => i.StageId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         builder.HasIndex(i => i.CompanyId);
+        builder.HasIndex(i => new { i.ApplicationId, i.StageId });
         builder.HasIndex(i => new { i.ApplicationId, i.ScheduledAt });
     }
 }

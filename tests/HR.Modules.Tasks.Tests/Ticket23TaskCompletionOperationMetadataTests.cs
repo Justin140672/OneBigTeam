@@ -1,3 +1,4 @@
+using HR.Infrastructure.Abstractions;
 using HR.Modules.Tasks.Contracts;
 using HR.Modules.Tasks.Domain;
 using HR.Modules.Tasks.Features.CompleteTask;
@@ -63,11 +64,13 @@ public class Ticket23TaskCompletionOperationMetadataTests
     }
 
 
+    private static TaskCompletionAuditDelivery NewAuditDelivery() { var audit = new FakeAuditPublisher(); return new(audit, audit); }
+
     private static CompleteTaskHandler BuildHandler(
         TasksDbContext context,
         IExecutionContextAccessor? executionContextAccessor,
         RecordingBackgroundJobClient? backgroundJobClient = null) =>
-        new(context, new FakeNotificationWriter(), Clock, new FakeAuditPublisher(), NoOpDispatcher,
+        new(context, new FakeNotificationWriter(), Clock, NewAuditDelivery(), NoOpDispatcher,
             new TasksResourceAuthorizer(
                 new FakeRoleAuthorizationService(HrAdministratorRoleId), new FakeDirectReportsReader()),
             backgroundJobClient ?? new RecordingBackgroundJobClient(),
@@ -128,13 +131,20 @@ public class Ticket23TaskCompletionOperationMetadataTests
     }
 
 
-    private sealed class ContextCapturingAuditPublisher(IExecutionContextAccessor accessor) : IAuditEventPublisher
+    private sealed class ContextCapturingAuditPublisher(IExecutionContextAccessor accessor) : IAuditEventPublisher, IAuditEventExistenceReader
     {
+        private readonly HashSet<Guid> _published = [];
+
         public IExecutionContext? ObservedDuringPublish { get; private set; }
+
+        public Task<bool> ExistsAsync(Guid eventId, CancellationToken cancellationToken = default) =>
+            Task.FromResult(_published.Contains(eventId));
 
         public Task PublishAsync<TAuditEvent>(TAuditEvent auditEvent, CancellationToken cancellationToken)
         {
             ObservedDuringPublish = accessor.Current;
+            if (auditEvent is IAuditEvent evt)
+                _published.Add(evt.EventId);
             return Task.CompletedTask;
         }
     }
@@ -168,7 +178,7 @@ public class Ticket23TaskCompletionOperationMetadataTests
         var accessor = new ExecutionContextAccessor();
         var auditPublisher = new ContextCapturingAuditPublisher(accessor);
         var job = new TaskCompletionEffectsJob(
-            context, new FakeNotificationWriter(), Clock, auditPublisher,
+            context, new FakeNotificationWriter(), Clock, new TaskCompletionAuditDelivery(auditPublisher, auditPublisher),
             NullLogger<TaskCompletionEffectsJob>.Instance, accessor);
 
         await job.ProcessAsync(operation.Id, companyId);
@@ -199,7 +209,7 @@ public class Ticket23TaskCompletionOperationMetadataTests
         var accessor = new ExecutionContextAccessor();
         var auditPublisher = new ContextCapturingAuditPublisher(accessor);
         var job = new TaskCompletionEffectsJob(
-            context, new FakeNotificationWriter(), Clock, auditPublisher,
+            context, new FakeNotificationWriter(), Clock, new TaskCompletionAuditDelivery(auditPublisher, auditPublisher),
             NullLogger<TaskCompletionEffectsJob>.Instance, accessor);
 
         var exception = await Record.ExceptionAsync(() => job.ProcessAsync(operation.Id, companyId));

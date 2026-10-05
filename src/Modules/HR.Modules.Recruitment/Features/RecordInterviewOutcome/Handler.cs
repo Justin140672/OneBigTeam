@@ -1,10 +1,11 @@
-using HR.Modules.Tasks.Contracts;
-using HR.Infrastructure.Abstractions;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 
 namespace HR.Modules.Recruitment.Features.RecordInterviewOutcome;
 
-internal sealed class RecordInterviewOutcomeHandler(InterviewOutcomeRecorder recorder, ITaskCompleter taskCompleter)
+internal sealed class RecordInterviewOutcomeHandler(
+    InterviewOutcomeRecorder recorder,
+    InterviewOutcomeTaskReconciliationService reconciliationService)
 {
     public async Task<Result<RecordInterviewOutcomeResponse>> HandleAsync(
         RecordInterviewOutcomeRequest request,
@@ -16,13 +17,8 @@ internal sealed class RecordInterviewOutcomeHandler(InterviewOutcomeRecorder rec
         if (result.IsFailure)
             return result;
 
-        await taskCompleter.CompleteBySourceEntityAsync(
-            request.CompanyId,
-            request.InterviewId,
-            TaskSource.Recruitment,
-            TaskActionType.Complete,
-            recordedBy,
-            cancellationToken);
+        await reconciliationService.RunOutstandingForInterviewAsync(
+            request.CompanyId, request.InterviewId, cancellationToken);
 
         return result;
     }

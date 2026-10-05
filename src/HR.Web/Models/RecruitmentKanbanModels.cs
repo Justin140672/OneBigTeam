@@ -32,7 +32,19 @@ public sealed record KanbanCandidateModel(
     // Internal recruitment Ticket 6: true only when the application's Source == Internal (never
     // inferred from EmployeeId). EmployeeId is populated only for internal applications.
     bool IsInternal = false,
-    Guid? EmployeeId = null)
+    Guid? EmployeeId = null,
+    string? InterviewOutcome = null,
+    string? OfferResponseStatus = null,
+    decimal? OfferedSalary = null,
+    DateOnly? OfferedStartDate = null,
+    bool CurrentStageHasPendingInterview = false,
+    Guid? PendingInterviewId = null,
+    string? CurrentStageInterviewOutcome = null,
+    bool HasNextInterviewStage = false,
+    Guid? NextInterviewStageId = null,
+    string? NextInterviewStageName = null,
+    string? InternalAppointmentStatus = null,
+    bool AllRequiredInterviewStagesPassed = true) : IKanbanActionSource
 {
     public string CandidateFullName => $"{CandidateFirstName} {CandidateLastName}";
 }

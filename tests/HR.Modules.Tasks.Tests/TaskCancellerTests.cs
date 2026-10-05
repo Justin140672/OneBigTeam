@@ -254,4 +254,59 @@ public class TaskCancellerTests
         Assert.Equal(TaskItemStatus.Cancelled, (await dbContext.TaskItems.SingleAsync(t => t.Id == task1.Id)).Status);
         Assert.Equal(TaskItemStatus.Cancelled, (await dbContext.TaskItems.SingleAsync(t => t.Id == task2.Id)).Status);
     }
+
+    [Fact]
+    public async Task CancelManyBySourceEntitiesAsync_Retry_Removes_Notifications_Left_By_Failed_Removal()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var task = MakeTask(companyId, sourceEntityId, TaskItemStatus.Open);
+        dbContext.TaskItems.Add(task);
+        await dbContext.SaveChangesAsync();
+
+        var notificationWriter = new FakeNotificationWriter();
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(), companyId, Guid.NewGuid(), "Overdue", null, task.Id,
+            NotificationType.TaskOverdue, NotificationPriority.High, Now);
+        var canceller = BuildCanceller(dbContext, notificationWriter);
+
+        notificationWriter.ThrowOnRemove = true;
+        await Assert.ThrowsAsync<InvalidOperationException>(() => canceller.CancelManyBySourceEntitiesAsync(
+            companyId, [sourceEntityId], TaskSource.Offboarding, TaskActionType.Complete, CancellationToken.None));
+        Assert.Equal(TaskItemStatus.Cancelled, (await dbContext.TaskItems.SingleAsync()).Status);
+        Assert.Single(notificationWriter.Written);
+
+        notificationWriter.ThrowOnRemove = false;
+        var count = await canceller.CancelManyBySourceEntitiesAsync(
+            companyId, [sourceEntityId], TaskSource.Offboarding, TaskActionType.Complete, CancellationToken.None);
+
+        Assert.Equal(0, count);
+        Assert.Empty(notificationWriter.Written);
+    }
+
+    [Fact]
+    public async Task CancelManyBySourceEntitiesAsync_Retry_Does_Not_Touch_Other_Company_Or_Completed_Task_Notifications()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var completed = MakeTask(companyId, sourceEntityId, TaskItemStatus.Completed);
+        var otherCompany = MakeTask(otherCompanyId, sourceEntityId, TaskItemStatus.Cancelled);
+        dbContext.TaskItems.AddRange(completed, otherCompany);
+        await dbContext.SaveChangesAsync();
+
+        var notificationWriter = new FakeNotificationWriter();
+        foreach (var t in new[] { completed, otherCompany })
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), t.CompanyId, Guid.NewGuid(), "Overdue", null, t.Id,
+                NotificationType.TaskOverdue, NotificationPriority.High, Now);
+
+        await BuildCanceller(dbContext, notificationWriter).CancelManyBySourceEntitiesAsync(
+            companyId, [sourceEntityId], TaskSource.Offboarding, TaskActionType.Complete, CancellationToken.None);
+
+        Assert.Equal(2, notificationWriter.Written.Count);
+        Assert.Equal(TaskItemStatus.Completed, (await dbContext.TaskItems.SingleAsync(t => t.Id == completed.Id)).Status);
+    }
 }

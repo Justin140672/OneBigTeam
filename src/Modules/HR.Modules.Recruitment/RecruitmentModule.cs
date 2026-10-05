@@ -271,6 +271,10 @@ public static class RecruitmentModule
             Features.AppointInternalCandidate.AppointInternalCandidateValidator>();
         services.AddScoped<InternalAppointmentCompleter>();
         services.AddScoped<Jobs.InternalAppointmentReconciliationJob>();
+        services.AddScoped<InterviewTaskCleanupService>();
+        services.AddScoped<InterviewTaskEffectsService>();
+        services.AddScoped<InterviewOutcomeTaskReconciliationService>();
+        services.AddScoped<Jobs.InterviewTaskCleanupReconciliationJob>();
 
         services.AddScoped<ScheduleInterviewHandler>();
         services.AddScoped<IValidator<ScheduleInterviewRequest>, ScheduleInterviewValidator>();
@@ -278,6 +282,11 @@ public static class RecruitmentModule
         services.AddScoped<UpdateInterviewHandler>();
         services.AddScoped<IValidator<UpdateInterviewRequest>, UpdateInterviewValidator>();
 
+        services.AddScoped<InterviewOutcomeAuditDelivery>();
+        services.AddScoped<Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationHandler>();
+        services.AddScoped<IValidator<Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationRequest>, Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationValidator>();
+        services.AddScoped<Features.ListBlockedInterviewOutcomeReconciliations.ListBlockedInterviewOutcomeReconciliationsHandler>();
+        services.AddScoped<IValidator<Features.ListBlockedInterviewOutcomeReconciliations.ListBlockedInterviewOutcomeReconciliationsRequest>, Features.ListBlockedInterviewOutcomeReconciliations.ListBlockedInterviewOutcomeReconciliationsValidator>();
         services.AddScoped<InterviewOutcomeRecorder>();
         services.AddScoped<RecordInterviewOutcomeHandler>();
         services.AddScoped<IValidator<RecordInterviewOutcomeRequest>, RecordInterviewOutcomeValidator>();
@@ -360,6 +369,9 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<UpdateRecruitmentStageRequest>, UpdateRecruitmentStageValidator>();
 
         services.AddScoped<ReorderRecruitmentStagesHandler>();
+        services.AddScoped<HR.Modules.Recruitment.Features.AddInterviewStage.AddInterviewStageHandler>();
+        services.AddScoped<HR.Modules.Recruitment.Features.GetInterviewStageSuggestion.GetInterviewStageSuggestionHandler>();
+        services.AddScoped<IValidator<HR.Modules.Recruitment.Features.AddInterviewStage.AddInterviewStageRequest>, HR.Modules.Recruitment.Features.AddInterviewStage.AddInterviewStageValidator>();
         services.AddScoped<IValidator<ReorderRecruitmentStagesRequest>, ReorderRecruitmentStagesValidator>();
 
         services.AddScoped<SetRecruitmentStageActiveStatusHandler>();
@@ -407,6 +419,10 @@ public static class RecruitmentModule
             "recruitment-internal-appointment-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
+        jobManager.AddOrUpdate<Jobs.InterviewTaskCleanupReconciliationJob>(
+            "recruitment-interview-task-cleanup-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
         return app;
     }
 
