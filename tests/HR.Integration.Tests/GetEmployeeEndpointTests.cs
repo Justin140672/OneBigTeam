@@ -70,7 +70,7 @@ public class GetEmployeeEndpointTests
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Alice", payload.FirstName);
         Assert.Equal("Smith", payload.LastName);
-        Assert.Equal("Draft", payload.Status);
+        Assert.Equal("Active", payload.Status);
     }
 
     [Fact]
@@ -176,6 +176,9 @@ public class GetEmployeeEndpointTests
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
         empResponse.EnsureSuccessStatusCode();
@@ -254,6 +257,9 @@ public class GetEmployeeEndpointTests
                 startDate = "2025-01-01",
                 dateOfBirth = "1985-01-01",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Female",
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
                 employmentTypeId,
@@ -358,6 +364,9 @@ public class GetEmployeeEndpointTests
                 startDate = "2026-07-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Female",
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
                 employmentTypeId,
@@ -550,6 +559,9 @@ public class GetEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-01-01",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Male",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             employmentTypeId,

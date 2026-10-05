@@ -51,6 +51,7 @@ internal sealed class GetVacancyHandler(RecruitmentDbContext db, IPositionProfil
             positionProfile?.LocationName,
             applicationCount,
             UpdateVacancyHandler.CanChangePositionProfile(vacancy.Status, applicationCount),
-            vacancy.Version));
+            vacancy.Version,
+            vacancy.EmploymentTypeId));
     }
 }

@@ -18,7 +18,7 @@ public class PublishVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
@@ -48,7 +48,7 @@ public class PublishVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         vacancy.Open(Now, DateOnly.FromDateTime(Now.UtcDateTime));
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
@@ -67,7 +67,7 @@ public class PublishVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
@@ -91,7 +91,7 @@ public class PublishVacancyHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         vacancy.Approve(Guid.NewGuid(), Now);
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
@@ -114,7 +114,7 @@ public class PublishVacancyHandlerTests
         // pre-existing PublishVacancy behaviour for an unapproved vacancy.
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
 
@@ -126,14 +126,53 @@ public class PublishVacancyHandlerTests
         Assert.Equal(VacancyStatus.Open, result.Value!.Status);
     }
 
+    [Fact]
+    public async Task HandleAsync_Rejects_Legacy_Vacancy_Without_EmploymentType()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new PublishVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("Employment type required", result.Error.Message);
+        Assert.Equal(VacancyStatus.Draft, (await db.Vacancies.SingleAsync()).Status);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Vacancy_Whose_EmploymentType_Is_No_Longer_Active()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, employmentTypeReader: FakeEmploymentTypeReader.Active()).HandleAsync(
+            new PublishVacancyRequest { CompanyId = companyId, VacancyId = vacancy.Id },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Equal(VacancyStatus.Draft, (await db.Vacancies.SingleAsync()).Status);
+    }
+
     private static PublishVacancyHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null,
         IPositionProfileReader? positionProfileReader = null,
-        FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null) =>
+        FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null,
+        IEmploymentTypeReader? employmentTypeReader = null) =>
         new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(),
             positionProfileReader ?? new FakePositionProfileReader(),
-            recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader());
+            recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(),
+            employmentTypeReader ?? FakeEmploymentTypeReader.Permissive());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

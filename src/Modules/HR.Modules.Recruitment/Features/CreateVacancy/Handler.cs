@@ -14,7 +14,8 @@ internal sealed class CreateVacancyHandler(
     RecruitmentDbContext db,
     IClock clock,
     IPositionProfileReader positionProfileReader,
-    RecruitmentStageSeeder stageSeeder)
+    RecruitmentStageSeeder stageSeeder,
+    IEmploymentTypeReader employmentTypeReader)
 {
     public async Task<Result<CreateVacancyResponse>> HandleAsync(
         CreateVacancyRequest request,
@@ -46,6 +47,10 @@ internal sealed class CreateVacancyHandler(
         if (!positionProfileExists)
             return Result.Failure<CreateVacancyResponse>(
                 Error.NotFound($"Position profile '{request.PositionProfileId}' was not found."));
+
+        if (!await employmentTypeReader.IsActiveAsync(request.CompanyId, request.EmploymentTypeId, cancellationToken))
+            return Result.Failure<CreateVacancyResponse>(
+                Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found or is inactive."));
 
         var hasConcurrentVacancy = await db.Vacancies
             .AsNoTracking()
@@ -90,7 +95,8 @@ internal sealed class CreateVacancyHandler(
             request.HiringManagerId,
             now,
             request.AssignedRecruiterId,
-            request.IsAdvertisedInternally);
+            request.IsAdvertisedInternally,
+            request.EmploymentTypeId);
 
         db.Vacancies.Add(vacancy);
 
@@ -107,7 +113,8 @@ internal sealed class CreateVacancyHandler(
             vacancy.OpenedAt,
             vacancy.ClosedAt,
             vacancy.CreatedAt,
-            vacancy.UpdatedAt);
+            vacancy.UpdatedAt,
+            vacancy.EmploymentTypeId);
 
         if (request.IdempotencyKey is { } key)
         {

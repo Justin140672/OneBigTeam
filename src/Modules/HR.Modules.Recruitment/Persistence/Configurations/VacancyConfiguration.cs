@@ -54,6 +54,9 @@ internal sealed class VacancyConfiguration : IEntityTypeConfiguration<Vacancy>
             .HasDefaultValue(false)
             .IsRequired();
 
+        builder.Property(v => v.EmploymentTypeId)
+            .HasColumnName("employment_type_id");
+
         // Nullable: an external recruitment agency may not yet be assigned. FK to ExternalRecruiter —
         // both entities live in this same module/schema, so unlike PositionProfileId this can (and
         // does) have a real database constraint. See Vacancy.AssignedRecruiterId's remarks for the

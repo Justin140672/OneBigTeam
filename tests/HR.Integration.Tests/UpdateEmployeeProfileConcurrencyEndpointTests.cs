@@ -164,6 +164,9 @@ public class UpdateEmployeeProfileConcurrencyEndpointTests
             firstName,
             lastName = "Smith",
             workEmail,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             startDate = "2026-01-15",
             expectedVersion
         };

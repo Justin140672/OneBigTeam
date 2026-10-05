@@ -75,6 +75,9 @@ public class UpdateMyContactDetailsConcurrencyEndpointTests
                 firstName = "AdminEdited",
                 lastName = "Employee",
                 workEmail = $"admin.{Guid.NewGuid():N}@example.com",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 startDate = "2026-01-15",
                 expectedVersion = version
             });
@@ -127,7 +130,7 @@ public class UpdateMyContactDetailsConcurrencyEndpointTests
 
         var after = await GetContactDetailsAsync(ctx.EmployeeClient, ctx.CompanyId);
         Assert.Equal(before.Version, after.Version);
-        Assert.Null(after.City);
+        Assert.Equal("London", after.City);
     }
 
     [Fact]

@@ -53,7 +53,7 @@
                     {
                         <div class="mb-3">
                             <label class="form-label fw-medium">New Probation End Date <span class="text-danger">*</span></label>
-                            <SfDatePicker TValue="DateOnly?" @bind-Value="_model.ExtensionDate" Format="dd/MM/yyyy" />
+                            <HrDatePicker TValue="DateOnly?" @bind-Value="_model.ExtensionDate" Format="dd/MM/yyyy" />
                             <ValidationMessage For="@(() => _model.ExtensionDate)" />
                         </div>
                     }

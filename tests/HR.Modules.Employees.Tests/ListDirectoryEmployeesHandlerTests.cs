@@ -23,7 +23,6 @@ public class ListDirectoryEmployeesHandlerTests
     private static Employee Active(Employee e) { e.Activate(Now); return e; }
 
     [Theory]
-    [InlineData("Draft")]
     [InlineData("Suspended")]
     [InlineData("Leaving")]
     [InlineData("FormerEmployee")]

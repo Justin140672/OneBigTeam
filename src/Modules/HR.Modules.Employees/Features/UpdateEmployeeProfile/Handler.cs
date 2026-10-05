@@ -41,6 +41,13 @@ internal sealed class UpdateEmployeeProfileHandler
         Guid actorEmployeeId,
         CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.AddressLine1))
+            return Result.Failure<UpdateEmployeeProfileResponse>(Error.Validation("Address line 1 is required."));
+        if (string.IsNullOrWhiteSpace(request.City))
+            return Result.Failure<UpdateEmployeeProfileResponse>(Error.Validation("City is required."));
+        if (string.IsNullOrWhiteSpace(request.PostCode))
+            return Result.Failure<UpdateEmployeeProfileResponse>(Error.Validation("Postcode is required."));
+
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(request.PostCode) &&
@@ -138,14 +145,6 @@ internal sealed class UpdateEmployeeProfileHandler
             now);
         employee.SetSystemAccess(request.HasSystemAccess, now);
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
-
-        // The initial company admin employee (auto-created at self-service signup, see
-        // Employee.IsInitialCompanyAdmin/RequiresInitialSetup) starts life in Draft. Once the user
-        // completes/saves this record via the normal profile edit, move it out of Draft into
-        // Active — this is the one and only automatic Draft -> Active transition in the system,
-        // scoped deliberately to just this seed-admin completion flow.
-        if (employee.IsInitialCompanyAdmin && employee.Status == HR.Modules.Employees.Domain.EmploymentStatus.Draft)
-            employee.Activate(now);
 
         // Position/Location "after" is known now (mutation already applied above, save has not run
         // yet) — snapshot early so the position-change integration event can be staged in the SAME

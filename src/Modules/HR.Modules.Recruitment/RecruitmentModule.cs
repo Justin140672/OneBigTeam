@@ -283,6 +283,8 @@ public static class RecruitmentModule
         services.AddScoped<IValidator<UpdateInterviewRequest>, UpdateInterviewValidator>();
 
         services.AddScoped<InterviewOutcomeAuditDelivery>();
+        services.AddScoped<InterviewOutcomeRepairAuditDelivery>();
+        services.AddScoped<InterviewOutcomeRepairService>();
         services.AddScoped<Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationHandler>();
         services.AddScoped<IValidator<Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationRequest>, Features.RetryInterviewOutcomeReconciliation.RetryInterviewOutcomeReconciliationValidator>();
         services.AddScoped<Features.ListBlockedInterviewOutcomeReconciliations.ListBlockedInterviewOutcomeReconciliationsHandler>();
@@ -466,7 +468,10 @@ public static class RecruitmentModule
         var acmeJamesId     = Guid.Parse("30000000-0000-0000-0000-000000000002");
         var acmeLauraId     = Guid.Parse("30000000-0000-0000-0000-000000000005");
 
-        var acmeSeniorEngVacancyId = Guid.Parse("e0000000-0000-0000-0000-000000000001");
+        var acmePermanentEmploymentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000001");
+        var betaPermanentEmploymentTypeId = Guid.Parse("40000000-0000-0000-0000-000000000011");
+
+        var acmeSeniorEngVacancyId =Guid.Parse("e0000000-0000-0000-0000-000000000001");
         var acmeHrBpVacancyId      = Guid.Parse("e0000000-0000-0000-0000-000000000002");
         var acmeDesignerVacancyId  = Guid.Parse("e0000000-0000-0000-0000-000000000003");
 
@@ -483,12 +488,12 @@ public static class RecruitmentModule
             // back to Position Profile title" path); hrBpVacancy/designerVacancy keep a distinct
             // AdvertTitle since their linked Position Profile's title genuinely differs (see the
             // comments on acmeHrAdvisorPositionProfileId/acmeSoftwareEngineerPositionProfileId above).
-            var seniorEngVacancy = Vacancy.Create(acmeSeniorEngVacancyId, acmeId, acmeSenSoftwareEngineerPositionProfileId, null, "Own delivery of core platform services.", acmeJamesId, now);
+            var seniorEngVacancy = Vacancy.Create(acmeSeniorEngVacancyId, acmeId, acmeSenSoftwareEngineerPositionProfileId, null, "Own delivery of core platform services.", acmeJamesId, now, employmentTypeId: acmePermanentEmploymentTypeId);
             seniorEngVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-14)));
 
-            var hrBpVacancy = Vacancy.Create(acmeHrBpVacancyId, acmeId, acmeHrAdvisorPositionProfileId, "HR Business Partner", "Partner with department leads on people strategy.", acmeLauraId, now);
+            var hrBpVacancy = Vacancy.Create(acmeHrBpVacancyId, acmeId, acmeHrAdvisorPositionProfileId, "HR Business Partner", "Partner with department leads on people strategy.", acmeLauraId, now, employmentTypeId: acmePermanentEmploymentTypeId);
 
-            var designerVacancy = Vacancy.Create(acmeDesignerVacancyId, acmeId, acmeSoftwareEngineerPositionProfileId, "Product Designer", "Own end-to-end design for the employee portal.", acmeJamesId, now);
+            var designerVacancy = Vacancy.Create(acmeDesignerVacancyId, acmeId, acmeSoftwareEngineerPositionProfileId, "Product Designer", "Own end-to-end design for the employee portal.", acmeJamesId, now, employmentTypeId: acmePermanentEmploymentTypeId);
             designerVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-60)));
             designerVacancy.Close(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-5)));
 
@@ -544,7 +549,7 @@ public static class RecruitmentModule
 
         if (!await db.Vacancies.AnyAsync(v => v.CompanyId == betaCorpId))
         {
-            var backendVacancy = Vacancy.Create(betaBackendVacancyId, betaCorpId, betaSoftwareDeveloperPositionProfileId, "Backend Engineer", "Build and scale our payments platform.", betaAliceId, now);
+            var backendVacancy = Vacancy.Create(betaBackendVacancyId, betaCorpId, betaSoftwareDeveloperPositionProfileId, "Backend Engineer", "Build and scale our payments platform.", betaAliceId, now, employmentTypeId: betaPermanentEmploymentTypeId);
             backendVacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime.AddDays(-7)));
 
             db.Vacancies.Add(backendVacancy);

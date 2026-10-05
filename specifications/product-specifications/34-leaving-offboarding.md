@@ -111,7 +111,7 @@ An offboarding plan snapshots its last working day and template version. It cont
 | Leaving | Leaving date becomes due | Former Employee | Finalise regardless of checklist completion. |
 | Former Employee | Corrective reactivation | Active | A separate authorised reactivation workflow is required; cancellation is not allowed after finalisation. |
 
-Draft employees cannot start leaving. Former employees cannot start another leaving process until reactivated. `On Leave` is an employment presentation state and does not suspend the leaving date.
+Former employees cannot start another leaving process until reactivated. `On Leave` is an employment presentation state and does not suspend the leaving date.
 
 ### Leaving-process state
 

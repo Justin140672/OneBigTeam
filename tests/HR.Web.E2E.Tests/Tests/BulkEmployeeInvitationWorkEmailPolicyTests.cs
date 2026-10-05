@@ -17,7 +17,7 @@ namespace HR.Web.E2E.Tests.Tests;
 ///  • all-public selection -> the API returns 400 work_email_required and the dialog stays open
 ///    showing its ".alert-danger" error (naming the rejected address).
 ///
-/// Arrange creates fresh, uniquely-named Draft employees in Acme via POST
+/// Arrange creates fresh, uniquely-named employees in Acme via POST
 /// /api/companies/{companyId}/employees under Laura Bennett's dev-persona session — the same fast
 /// API arrange ManagerTeamProfileTests.CreateEmployeeViaApiAsync / EmployeeNotesTabTests use,
 /// rather than the multi-combobox New Employee form. Creating an employee record with a gmail
@@ -169,6 +169,9 @@ public sealed class BulkEmployeeInvitationWorkEmailPolicyTests(HrAdminPersonaFix
                 startDate = "2026-03-01",
                 dateOfBirth = "1990-06-15",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Male",
                 employeeNumber = $"E2E-WEP-{employeeNumberSuffix}",
                 employmentTypeId = EmploymentTypeId,

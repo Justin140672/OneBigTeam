@@ -46,7 +46,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Effective Date <span class="text-danger">*</span></label>
-                            <SfDatePicker TValue="DateOnly?" @bind-Value="Model.EffectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
+                            <HrDatePicker TValue="DateOnly?" @bind-Value="Model.EffectiveDate" Format="dd/MM/yyyy" Placeholder="dd/mm/yyyy" />
                             <ValidationMessage For="@(() => Model.EffectiveDate)" />
                         </div>
                         <div class="col-12">
@@ -286,7 +286,7 @@
 
         var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         _managerOptions = (managerResult?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))
@@ -312,7 +312,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "Not assigned"))

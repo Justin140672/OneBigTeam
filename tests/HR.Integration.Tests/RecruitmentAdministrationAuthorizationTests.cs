@@ -99,6 +99,7 @@ public class RecruitmentAdministrationAuthorizationTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });

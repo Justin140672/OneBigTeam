@@ -29,7 +29,7 @@
                     {
                         <div class="col-md-6">
                             <label class="form-label">Acknowledgement Due Date</label>
-                            <SfDatePicker TValue="DateOnly?"
+                            <HrDatePicker TValue="DateOnly?"
                                           @bind-Value="Model.AcknowledgementDueDate"
                                           Format="dd/MM/yyyy"
                                           Placeholder="dd/mm/yyyy"
@@ -39,7 +39,7 @@
                         <div class="col-12 @(_isLocked ? "view-mode" : "")">
                             <div class="d-flex justify-content-between align-items-center">
                                 <label class="form-label mb-0">Acknowledgement Statement</label>
-                                <SfButton CssClass="e-small e-outline" Disabled="@(_isLocked || Session.IsReadOnly)" OnClick="ResetToDefault">
+                                <SfButton CssClass="e-small e-outline" Disabled="@(_isLocked || Session.IsReadOnly)" OnClick="ResetToDefaultAsync">
                                     Reset to Default
                                 </SfButton>
                             </div>
@@ -82,6 +82,7 @@
 
     private const string AcknowledgementStatementPlaceholder = "I confirm that I have read and understood this document.";
     private string? _companyDefaultAcknowledgementStatement;
+    private bool _companyDefaultLoaded;
 
     private bool _isLocked => Document is not null && Document.Status != "Draft";
 
@@ -101,13 +102,22 @@
             Model.AcknowledgementStatement = Document.AcknowledgementStatement;
         }
 
-        _companyDefaultAcknowledgementStatement =
-            (await CompanyService.GetHrSettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+        _companyDefaultLoaded = false;
+        await LoadCompanyDefaultAsync();
     }
 
-    private void ResetToDefault()
+    private async Task LoadCompanyDefaultAsync()
+    {
+        _companyDefaultAcknowledgementStatement =
+            (await CompanyService.GetHrSettingsAsync(CompanyId))?.DefaultAcknowledgementStatement;
+        _companyDefaultLoaded = true;
+    }
+
+    private async Task ResetToDefaultAsync()
     {
         if (_isLocked) return;
+        if (!_companyDefaultLoaded)
+            await LoadCompanyDefaultAsync();
         Model.AcknowledgementStatement = _companyDefaultAcknowledgementStatement;
     }
 

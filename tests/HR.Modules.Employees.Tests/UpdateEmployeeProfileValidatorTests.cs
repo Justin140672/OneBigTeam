@@ -6,6 +6,7 @@ public class UpdateEmployeeProfileValidatorTests
 {
     private static UpdateEmployeeProfileRequest ValidRequest() => new()
     {
+        AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
         CompanyId = Guid.NewGuid(),
         Id = Guid.NewGuid(),
         FirstName = "Alice",

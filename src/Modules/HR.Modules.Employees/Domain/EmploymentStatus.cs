@@ -2,7 +2,9 @@ namespace HR.Modules.Employees.Domain;
 
 internal enum EmploymentStatus
 {
-    Draft = 0,
+    // 0 was Draft, retired — new employees are created Active and future starters are identified by
+    // start date. Deliberately not reused so any stray old data or serialized value doesn't
+    // silently collide with a new meaning.
     Active = 1,
     // 2 was OnLeave, retired — it duplicated the live, leave-request-derived "on leave today"
     // indicator (IEmployeeLeaveStatusReader, used by the direct-reports widget) with a second,

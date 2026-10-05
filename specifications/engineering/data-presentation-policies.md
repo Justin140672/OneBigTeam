@@ -1,14 +1,13 @@
 # Data presentation policies
 
-## Headcount definition (Option A)
+## Headcount definition
 
-- Total Headcount counts every employee record whose status is not Draft.
+- Total Headcount counts every employee record. Employees are created Active; a future starter is identified by start date, not status.
 - Every counted employee falls into exactly one category, so
   Total Headcount = Active + Future Starters + Leavers + Suspended or Serving Notice.
 - Precedence when classifying: Leaver (Former Employee, or leaving date on or before today), then Future Starter
   (start date after today), then Active (status Active), then Suspended or Serving Notice.
-- Draft records are excluded from the KPI cards, the report table, report exports, status filters, saved views and the
-  dashboard charts (department, employment type, gender), which show the Active category only.
+- The dashboard charts (department, employment type, gender) show the Active category only.
 - Implementation: `HeadcountRules` in HR.Modules.Employees is the single source of the rules.
 
 ## Employee display name

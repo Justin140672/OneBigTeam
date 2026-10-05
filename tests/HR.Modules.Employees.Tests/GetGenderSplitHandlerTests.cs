@@ -78,12 +78,10 @@ public class GetGenderSplitHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Draft_Suspended_And_Terminated_Employees()
+    public async Task HandleAsync_Excludes_Suspended_And_Former_Employees()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-
-        var draft = NewEmployee(companyId, "Draft", "Employee", "Female");
 
         var suspended = NewEmployee(companyId, "Suspended", "Employee", "Female");
         suspended.Activate(Now);
@@ -96,7 +94,7 @@ public class GetGenderSplitHandlerTests
         var active = NewEmployee(companyId, "Active", "Employee", "Female");
         active.Activate(Now);
 
-        context.Employees.AddRange(draft, suspended, terminated, active);
+        context.Employees.AddRange(suspended, terminated, active);
         await context.SaveChangesAsync();
 
         var handler = new GetGenderSplitHandler(context);

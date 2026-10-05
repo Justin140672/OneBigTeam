@@ -42,6 +42,7 @@ public class RecruitmentDashboardSummaryEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             title = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });

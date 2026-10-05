@@ -53,6 +53,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle),
@@ -73,7 +74,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.FillScheduledAtAsync("01/09/2026 10:00");
         await vacancyDetail.SubmitScheduleInterviewAsync();
 
-        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Interview", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.OpenInterviewsTabAsync();
         Assert.Equal("Pending", await vacancyDetail.GetInterviewOutcomeAsync(candidateLast));
@@ -86,9 +87,10 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         Assert.Equal("Passed", await vacancyDetail.GetInterviewOutcomeAsync(candidateLast));
 
         await vacancyDetail.OpenApplicationsTabAsync();
-        Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+        Assert.Equal("Interview", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.ClickOfferForAsync(candidateLast);
+        await AcceptOfferAsync(vacancyDetail, candidateLast);
         Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await vacancyDetail.ClickHireForAsync(candidateLast);
@@ -100,9 +102,10 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
 
         Assert.Equal(profileTitle, await vacancyDetail.GetHireDerivedPositionProfileTextAsync());
         Assert.Equal("London Office", await vacancyDetail.GetHireDerivedLocationTextAsync());
+        Assert.Equal("Permanent", await vacancyDetail.GetHireDerivedEmploymentTypeTextAsync());
 
         await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{unique}");
-        await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
+        await vacancyDetail.FillHireAddressAsync("1 Test Street", "London", "SW1A 1AA");
 
         await vacancyDetail.SubmitHireAsync();
 
@@ -156,6 +159,85 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
     }
 
+    [Fact]
+    public async Task HireCandidateDialog_ShowsVacancyEmploymentType_PreselectsHiringManager_AndLeavesNationalityBlank()
+    {
+        var (candidateLast, vacancyDetail, _) = await ArrangeOfferedApplicationAsync();
+
+        await vacancyDetail.ClickHireForAsync(candidateLast);
+        await vacancyDetail.WaitForHireDialogAsync();
+
+        Assert.Equal("Permanent", await vacancyDetail.GetHireDerivedEmploymentTypeTextAsync());
+        Assert.False(await vacancyDetail.IsHireEmploymentTypeRequiredVisibleAsync());
+        Assert.False(await vacancyDetail.HasHireDropdownLabelAsync("Employment Type"),
+            "Expected no employment type dropdown in the Hire dialog; the type comes from the vacancy");
+
+        Assert.Contains("James", await vacancyDetail.GetSelectedHireManagerTextAsync());
+        Assert.Contains("hiring manager", await vacancyDetail.GetHireManagerHelpTextAsync(), StringComparison.OrdinalIgnoreCase);
+
+        Assert.True(string.IsNullOrEmpty(await vacancyDetail.GetSelectedHireNationalityTextAsync()),
+            "Nationality must never be preselected or inferred in the Hire dialog");
+
+        await vacancyDetail.CancelHireDialogAsync();
+    }
+
+    [Fact]
+    public async Task HireCandidateDialog_AllowsNoManagerOverride_AndHires()
+    {
+        var (candidateLast, vacancyDetail, _) = await ArrangeOfferedApplicationAsync();
+
+        await vacancyDetail.ClickHireForAsync(candidateLast);
+        await vacancyDetail.WaitForHireDialogAsync();
+        await vacancyDetail.FillHireStartDateAsync("01/10/2026");
+        await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
+        await vacancyDetail.SelectHireNationalityAsync("British");
+        await vacancyDetail.SelectHireGenderAsync("Male");
+        await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{Guid.NewGuid().ToString("N")[..8]}");
+        await vacancyDetail.SelectHireManagerAsync("No Manager");
+        await vacancyDetail.FillHireAddressAsync("1 Test Street", "London", "SW1A 1AA");
+
+        await vacancyDetail.SubmitHireAsync();
+
+        Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task HireCandidateDialog_BlankOrWhitespaceAddress_ShowsFieldErrors_AndDoesNotHire(string blank)
+    {
+        var (candidateLast, vacancyDetail, _) = await ArrangeOfferedApplicationAsync();
+
+        await vacancyDetail.ClickHireForAsync(candidateLast);
+        await vacancyDetail.WaitForHireDialogAsync();
+        await vacancyDetail.FillHireStartDateAsync("01/10/2026");
+        await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
+        await vacancyDetail.SelectHireNationalityAsync("British");
+        await vacancyDetail.SelectHireGenderAsync("Male");
+        await vacancyDetail.FillHireEmployeeNumberAsync($"E2E-{Guid.NewGuid().ToString("N")[..8]}");
+        await vacancyDetail.FillHireAddressAsync(blank, blank, blank);
+
+        foreach (var fieldId in new[] { "hire-address-line-1", "hire-city", "hire-post-code" })
+            Assert.Equal("true", await vacancyDetail.GetHireFieldAriaRequiredAsync(fieldId));
+
+        await vacancyDetail.ClickHireSubmitButtonAsync();
+
+        await _page.WaitForSelectorAsync(".hire-candidate-dialog .alert-danger", new() { Timeout = 10_000 });
+        Assert.Contains("address line 1", await vacancyDetail.GetHireFieldErrorAsync("hire-address-line-1"), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("city", await vacancyDetail.GetHireFieldErrorAsync("hire-city"), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("post code", await vacancyDetail.GetHireFieldErrorAsync("hire-post-code"), StringComparison.OrdinalIgnoreCase);
+
+        await vacancyDetail.CancelHireDialogAsync();
+        Assert.Equal("Offer", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+    }
+
+    private static async Task AcceptOfferAsync(VacancyDetailPage vacancyDetail, string candidateLast)
+    {
+        await vacancyDetail.OpenRecordOfferResponseDialogAsync(candidateLast);
+        await vacancyDetail.SelectOfferResponseStatusAsync("Accepted");
+        await vacancyDetail.SubmitOfferResponseAsync();
+    }
+
     private async Task<(string CandidateLast, VacancyDetailPage VacancyDetail, string ProfileTitle)> ArrangeOfferedApplicationAsync()
     {
         var unique         = Guid.NewGuid().ToString("N")[..8];
@@ -192,6 +274,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
@@ -215,6 +298,7 @@ public sealed class ApplicationToEmployeeFlowTests(CrossUserFixture fixture) : R
 
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickOfferForAsync(candidateLast);
+        await AcceptOfferAsync(vacancyDetail, candidateLast);
 
         return (candidateLast, vacancyDetail, profileTitle);
     }

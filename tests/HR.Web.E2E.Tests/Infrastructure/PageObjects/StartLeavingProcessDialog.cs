@@ -81,7 +81,12 @@ public sealed class StartLeavingProcessDialog(IPage page)
         await page.Keyboard.PressAsync("Delete");
         await input.FillAsync(ddMMyyyy);
         await page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(input).ToHaveValueAsync(ddMMyyyy, new() { Timeout = 10_000 });
     }
+
+    public Task ExpectBackdatedConfirmationHiddenAsync() =>
+        Assertions.Expect(Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" }))
+            .ToBeHiddenAsync(new() { Timeout = 10_000 });
 
     public Task<bool> IsBackdatedConfirmationVisibleAsync() =>
         Dialog.Locator(".e-checkbox-wrapper").Filter(new() { HasText = "This leaving date is in the past" })

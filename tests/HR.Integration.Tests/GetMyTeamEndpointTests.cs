@@ -50,7 +50,7 @@ public class GetMyTeamEndpointTests
         return id;
     }
 
-    private async Task ActivateAsync(HttpClient admin, Guid companyId, Guid employeeId)
+    private async Task ActivateAsync(HttpClient admin, Guid companyId, Guid employeeId, string status = "Active")
     {
         var versionResp = await admin.GetAsync($"/api/companies/{companyId}/employees/{employeeId}");
         versionResp.EnsureSuccessStatusCode();
@@ -64,7 +64,7 @@ public class GetMyTeamEndpointTests
                 id = employeeId,
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
                 employmentTypeId = (Guid?)null,
-                status = "Active",
+                status,
                 startDate = "2026-01-01",
                 expectedVersion = version
             });
@@ -131,11 +131,12 @@ public class GetMyTeamEndpointTests
         var (admin, companyId, refData) = await ContextAsync();
         var managerId = await CreateEmployeeAsync(admin, companyId, refData, "Mandy", "Manager");
         var activeReportId = await CreateEmployeeAsync(admin, companyId, refData, "Aaron", "Active");
-        var draftReportId = await CreateEmployeeAsync(admin, companyId, refData, "Drew", "Draft");
+        var suspendedReportId = await CreateEmployeeAsync(admin, companyId, refData, "Sam", "Suspended");
 
         await ActivateAsync(admin, companyId, activeReportId);
         await AssignManagerAsync(admin, companyId, activeReportId, managerId);
-        await AssignManagerAsync(admin, companyId, draftReportId, managerId);
+        await ActivateAsync(admin, companyId, suspendedReportId, "Suspended");
+        await AssignManagerAsync(admin, companyId, suspendedReportId, managerId);
 
         using var client = AsEmployee(managerId, companyId);
         var payload = await client.GetFromJsonAsync<TeamPayload>(

@@ -151,7 +151,7 @@ internal sealed class SignUpHandler(
             WorkEmail: request.AdminEmail.Trim(),
             StartDate: DateOnly.FromDateTime(clock.UtcNowOffset().Date),
             DateOfBirth: new DateOnly(1900, 1, 1),
-            Nationality: "British",
+            Nationality: string.Empty,
             Gender: "Unknown",
             EmployeeNumber: string.Empty,
             EmploymentTypeId: defaults.EmploymentTypeId,

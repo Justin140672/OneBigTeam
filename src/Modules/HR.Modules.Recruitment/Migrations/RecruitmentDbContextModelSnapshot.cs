@@ -764,6 +764,107 @@ namespace HR.Modules.Recruitment.Migrations
                     b.ToTable("interviews", "recruitment");
                 });
 
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.InterviewOutcomeRepairAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("AuditAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("audit_attempt_count");
+
+                    b.Property<DateTimeOffset?>("AuditDeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("audit_delivered_at");
+
+                    b.Property<string>("BlockedCategory")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("blocked_category");
+
+                    b.Property<DateTimeOffset?>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_until");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<Guid>("InterviewId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("interview_id");
+
+                    b.Property<DateTimeOffset?>("LastAuditAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_audit_attempt_at");
+
+                    b.Property<string>("LastAuditFailure")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_audit_failure");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OperatorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_user_id");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<Guid>("ReconciliationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reconciliation_id");
+
+                    b.Property<int>("SequenceNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence_number");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("source");
+
+                    b.Property<Guid?>("TasksOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("tasks_operation_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_interview_outcome_repair_actions_undelivered")
+                        .HasFilter("audit_delivered_at IS NULL");
+
+                    b.HasIndex("CompanyId", "InterviewId");
+
+                    b.HasIndex("ReconciliationId", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_interview_outcome_repair_actions_reconciliation_sequence");
+
+                    b.ToTable("interview_outcome_repair_actions", "recruitment");
+                });
+
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.InterviewOutcomeTaskReconciliation", b =>
                 {
                     b.Property<Guid>("Id")
@@ -850,6 +951,14 @@ namespace HR.Modules.Recruitment.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("integer")
                         .HasColumnName("version");
+
+                    b.Property<DateTimeOffset?>("WaivedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("waived_at");
+
+                    b.Property<Guid?>("WaivedTasksOperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("waived_tasks_operation_id");
 
                     b.HasKey("Id");
 
@@ -1105,6 +1214,10 @@ namespace HR.Modules.Recruitment.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<Guid?>("EmploymentTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employment_type_id");
 
                     b.Property<Guid>("HiringManagerId")
                         .HasColumnType("uuid")

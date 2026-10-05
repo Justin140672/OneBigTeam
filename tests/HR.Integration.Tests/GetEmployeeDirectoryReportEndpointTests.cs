@@ -108,7 +108,7 @@ public class GetEmployeeDirectoryReportEndpointTests
         Assert.Equal(1, payload!.TotalCount);
         var item = Assert.Single(payload.Items);
         Assert.Equal("Alice Smith", item.Name);
-        Assert.Equal("Draft", item.Status);
+        Assert.Equal("Active", item.Status);
     }
 
     [Fact]

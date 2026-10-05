@@ -57,10 +57,45 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle),
             $"Expected the new vacancy '{vacancyTitle}' to appear in the list after creation");
+    }
+
+    [Fact]
+    public async Task CreateVacancy_WithoutEmploymentType_ShowsRequiredError_AndDoesNotSave()
+    {
+        var vacancyTitle = $"E2E Vacancy {Guid.NewGuid().ToString("N")[..8]}";
+
+        var login         = new LoginPage(_page, _fixture.WebBaseUrl);
+        var vacancyList   = new VacancyListPage(_page, _fixture.WebBaseUrl);
+        var vacancyDetail = new VacancyDetailPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(MarcusEmail);
+
+        var profileTitle = await PositionProfileTestHelpers.CreateUniquePositionProfileAsync(
+            _page, _fixture.WebBaseUrl, AcmeId, login, LauraEmail, MarcusEmail);
+
+        await vacancyList.GoToAsync(AcmeId);
+        await vacancyList.ClickNewVacancyAsync();
+
+        await vacancyDetail.FillTitleAsync(vacancyTitle);
+        await vacancyDetail.SelectPositionProfileAsync(profileTitle);
+        await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.ClickSaveButtonAsync();
+
+        await Assertions.Expect(_page.Locator("#vacancy-employment-type-error"))
+            .ToContainTextAsync("Employment type is required", new() { Timeout = 10_000 });
+        Assert.Contains("/vacancies/new", _page.Url);
+
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
+        await vacancyDetail.SaveNewVacancyAsync();
+
+        Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle),
+            $"Expected the vacancy '{vacancyTitle}' to appear in the list once an employment type was chosen");
     }
 
     /// <summary>
@@ -105,6 +140,7 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
 
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
 
         await _page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
 
@@ -150,6 +186,7 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyList.ClickNewVacancyAsync();
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         Assert.True(await vacancyList.HasVacancyAsync(profileTitle),
@@ -209,6 +246,7 @@ public sealed class VacancyManagementTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);

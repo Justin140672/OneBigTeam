@@ -7,7 +7,7 @@ namespace HR.Modules.Employees.Features.GetMyTeamRoster;
 /// Active-only, attendance-focused HR.Modules.Employees.Features.GetMyTeam (the dashboard preview
 /// widget's own data source, kept separately scoped — see that feature's own remarks). Includes
 /// every status GetEmployeeTeamViewHandler still authorizes a manager to view
-/// (Draft/Active/Suspended/Leaving) so every employee reachable via /team-view is also
+/// (Active/Suspended/Leaving) so every employee reachable via /team-view is also
 /// discoverable here; FormerEmployee is excluded on both sides deliberately.
 /// </summary>
 internal sealed record GetMyTeamRosterResponse(IReadOnlyList<TeamRosterItem> Items);

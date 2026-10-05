@@ -135,6 +135,7 @@ public sealed class VacancyEditConcurrencyConflictTests(RecruiterPersonaFixture 
         await vacancyDetail.FillTitleAsync(title);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(title);

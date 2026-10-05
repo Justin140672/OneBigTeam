@@ -41,6 +41,15 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
+    public Task SelectEmploymentTypeAsync(string typeName) =>
+        DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Employment Type" }).First, typeName);
+
+    public async Task<string?> GetEmploymentTypeFieldErrorAsync() =>
+        (await page.Locator("#vacancy-employment-type-error").First.TextContentAsync())?.Trim();
+
+    public Task<bool> IsLegacyEmploymentTypeRequiredBannerVisibleAsync() =>
+        page.Locator("[data-testid='vacancy-employment-type-required']").IsVisibleAsync();
+
     public Task SelectHiringManagerAsync(string nameFragment) =>
         DropDownSelector.SelectAsync(page, page.Locator(".col-md-4").Filter(new() { HasText = "Hiring Manager" }).First, nameFragment);
 
@@ -758,6 +767,28 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ToHaveTextAsync("Application withdrawn.", new() { Timeout = 10_000 });
     }
 
+    public async Task ReachAcceptedOfferAsync(string candidateNameFragment, string interviewerFragment = "James")
+    {
+        await ClickScheduleInterviewForAsync(candidateNameFragment);
+        await WaitForScheduleDialogAsync();
+        await SelectInterviewerAsync(interviewerFragment);
+        await FillScheduledAtAsync("01/09/2099 10:00");
+        await SubmitScheduleInterviewAsync();
+
+        await OpenInterviewsTabAsync();
+        await ClickRecordOutcomeForAsync(candidateNameFragment);
+        await WaitForOutcomeDialogAsync();
+        await SelectOutcomeAsync("Passed");
+        await SubmitOutcomeAsync();
+
+        await OpenApplicationsTabAsync();
+        await ClickOfferForAsync(candidateNameFragment);
+
+        await OpenRecordOfferResponseDialogAsync(candidateNameFragment);
+        await SelectOfferResponseStatusAsync("Accepted");
+        await SubmitOfferResponseAsync();
+    }
+
     public async Task ClickHireForAsync(string candidateNameFragment)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
@@ -838,8 +869,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         var dialog = page.Locator(".hire-candidate-dialog");
         var field = dialog.GetByPlaceholder("e.g. EMP-001");
-        var autoAssignedMessage = dialog.Locator("p")
-            .Filter(new() { HasText = "An employee number will be assigned automatically" });
+        var autoAssignedMessage = dialog.Locator(".hire-derived-value")
+            .Filter(new() { HasText = "Assigned automatically" });
 
         await field.Or(autoAssignedMessage).First.WaitForAsync(
             new() { State = WaitForSelectorState.Visible, Timeout = 20_000 });
@@ -849,6 +880,53 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             await field.FillAsync(value);
             await page.Keyboard.PressAsync("Tab");
         }
+    }
+
+    public async Task FillHireAddressAsync(string addressLine1, string city, string postCode)
+    {
+        await FillHireTextAsync("hire-address-line-1", addressLine1);
+        await FillHireTextAsync("hire-city", city);
+        await FillHireTextAsync("hire-post-code", postCode);
+    }
+
+    public async Task FillHireTextAsync(string fieldId, string value)
+    {
+        var input = page.Locator($".hire-candidate-dialog #{fieldId}");
+        await input.FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public Task<string?> GetHireFieldAriaRequiredAsync(string fieldId) =>
+        page.Locator($".hire-candidate-dialog #{fieldId}").GetAttributeAsync("aria-required");
+
+    public async Task<string?> GetHireFieldErrorAsync(string fieldId) =>
+        (await page.Locator($".hire-candidate-dialog #{fieldId}-error").First.TextContentAsync())?.Trim();
+
+    public async Task<string?> GetHireDerivedEmploymentTypeTextAsync() =>
+        (await page.Locator("[data-testid='hire-derived-employment-type']").TextContentAsync())?.Trim();
+
+    public Task<bool> IsHireEmploymentTypeRequiredVisibleAsync() =>
+        page.Locator("[data-testid='hire-employment-type-required']").IsVisibleAsync();
+
+    public async Task<string?> GetHireManagerHelpTextAsync() =>
+        (await page.Locator("[data-testid='hire-manager-help']").TextContentAsync())?.Trim();
+
+    public async Task<string?> GetSelectedHireManagerTextAsync()
+    {
+        var group = page.Locator(".hire-candidate-dialog .col-md-6").Filter(new() { Has = page.Locator("#hire-manager-label") }).First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
+    public Task SelectHireManagerAsync(string optionText) =>
+        DropDownSelector.SelectAsync(
+            page,
+            page.Locator(".hire-candidate-dialog .col-md-6").Filter(new() { Has = page.Locator("#hire-manager-label") }).First,
+            optionText);
+
+    public async Task<string?> GetSelectedHireNationalityTextAsync()
+    {
+        var group = page.Locator(".hire-candidate-dialog .col-md-6").Filter(new() { HasText = "Nationality" }).First;
+        return await group.Locator(".e-input-group input").First.InputValueAsync();
     }
 
     public Task SelectHireDropdownAsync(string labelText, string optionText) =>

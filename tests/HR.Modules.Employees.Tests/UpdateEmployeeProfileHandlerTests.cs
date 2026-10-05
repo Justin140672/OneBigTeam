@@ -29,6 +29,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -75,6 +76,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -125,6 +127,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -160,6 +163,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -184,6 +188,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 Id = Guid.NewGuid(),
                 FirstName = "Alice",
@@ -213,6 +218,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -245,6 +251,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = emp1.Id,
                 ExpectedVersion = 1,
@@ -276,6 +283,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -307,6 +315,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -342,6 +351,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -377,6 +387,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -419,6 +430,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -454,6 +466,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -491,6 +504,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -525,6 +539,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -557,6 +572,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -589,6 +605,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,
@@ -621,6 +638,7 @@ public class UpdateEmployeeProfileHandlerTests
         var result = await handler.HandleAsync(
             new UpdateEmployeeProfileRequest
             {
+                AddressLine1 = "1 High Street", City = "London",
                 CompanyId = companyId,
                 Id = employee.Id,
                 ExpectedVersion = 1,

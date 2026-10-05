@@ -254,10 +254,8 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
 
     private async Task<Guid> CreateEmployeeAsync(Guid companyId)
     {
-        var hrAdminId = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator, companyId);
         using var adminClient = _factory.CreateClient();
-        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, hrAdminId.ToString());
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var depId = Guid.Parse("10000000-0000-0000-0000-000000000001");
@@ -276,6 +274,9 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
                 startDate = "2026-01-01",
                 dateOfBirth = "1990-01-01",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Male",
                 employeeNumber = $"TEST-{unique}",
                 employmentTypeId = empTypeId,
@@ -294,10 +295,8 @@ public class DepartureFinaliserEndpointEnabledModeSecurityTests
     {
         var employeeId = await CreateEmployeeAsync(companyId);
 
-        var hrAdminId = Guid.NewGuid();
-        await TestRoleSeeder.AssignRoleAsync(_factory, hrAdminId, SystemRoles.HrAdministrator, companyId);
         using var adminClient = _factory.CreateClient();
-        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, hrAdminId.ToString());
+        adminClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, HrAdminUserId.ToString());
         adminClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
 
         var leavingDate = DateOnly.FromDateTime(DateTime.Now.AddDays(-1));

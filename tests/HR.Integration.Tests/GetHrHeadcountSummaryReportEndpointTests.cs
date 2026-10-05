@@ -27,16 +27,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         return client;
     }
 
-    private async Task ActivateEmployeesAsync(Guid companyId)
-    {
-        using var scope = _factory.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
-        var drafts = db.Employees.Where(e => e.CompanyId == companyId && e.Status == EmploymentStatus.Draft).ToList();
-        foreach (var draft in drafts)
-            draft.Activate(DateTimeOffset.UtcNow);
-        await db.SaveChangesAsync();
-    }
-
     private async Task AddCompensationAsync(HttpClient client, Guid companyId, Guid employeeId, decimal fte, string effectiveFrom = "2026-01-01")
     {
         var response = await client.PostAsJsonAsync($"/api/companies/{companyId}/employees/{employeeId}/compensation", new
@@ -73,7 +63,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Manager, companyId);
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -90,7 +79,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         await TestRoleSeeder.AssignRoleAsync(_factory, userId, SystemRoles.Recruiter, companyId);
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -104,7 +92,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(userId, companyId);
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -148,7 +135,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
         emp3Response.EnsureSuccessStatusCode();
         // Carl deliberately has no Compensation record seeded.
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -191,7 +177,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
             await db.SaveChangesAsync();
         }
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -204,7 +189,7 @@ public class GetHrHeadcountSummaryReportEndpointTests
     }
 
     [Fact]
-    public async Task Get_HrHeadcountSummary_Excludes_Draft_And_Categories_Reconcile_To_Total()
+    public async Task Get_HrHeadcountSummary_Counts_Future_Starters_And_Categories_Reconcile_To_Total()
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
@@ -220,22 +205,22 @@ public class GetHrHeadcountSummaryReportEndpointTests
             created.EnsureSuccessStatusCode();
         }
 
-        await ActivateEmployeesAsync(companyId);
-
-        var draftResponse = await client.PostAsJsonAsync(
+        var futureStarterResponse = await client.PostAsJsonAsync(
             $"/api/companies/{companyId}/employees",
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
-                companyId, refData, "Draft", "Person", $"draft.{Guid.NewGuid():N}@example.com"));
-        draftResponse.EnsureSuccessStatusCode();
+                companyId, refData, "Future", "Person", $"future.{Guid.NewGuid():N}@example.com",
+                startDate: new DateOnly(2099, 1, 1)));
+        futureStarterResponse.EnsureSuccessStatusCode();
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var payload = await response.Content.ReadFromJsonAsync<ReportPayload>();
         Assert.NotNull(payload);
-        Assert.Equal(2, payload!.TotalHeadcount);
-        Assert.Equal(2, payload.Items.Count);
-        Assert.DoesNotContain(payload.Items, i => i.EmployeeName.StartsWith("Draft"));
+        Assert.Equal(3, payload!.TotalHeadcount);
+        Assert.Equal(2, payload.ActiveEmployees);
+        Assert.Equal(1, payload.FutureStarters);
+        Assert.Equal(3, payload.Items.Count);
         Assert.Equal(
             payload.TotalHeadcount,
             payload.ActiveEmployees + payload.FutureStarters + payload.Leavers + payload.OtherEmployees);
@@ -262,7 +247,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
                 companyId, refDataB, "InDept", "B", $"b.{Guid.NewGuid():N}@example.com"));
         empBResponse.EnsureSuccessStatusCode();
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync(
             $"/api/companies/{companyId}/reporting/hr-headcount-summary?departmentId={refDataA.DepartmentId}");
@@ -295,7 +279,6 @@ public class GetHrHeadcountSummaryReportEndpointTests
             await db.SaveChangesAsync();
         }
 
-        await ActivateEmployeesAsync(companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 

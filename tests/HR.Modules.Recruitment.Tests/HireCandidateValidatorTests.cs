@@ -16,8 +16,64 @@ public class HireCandidateValidatorTests
         Nationality       = "British",
         Gender            = "Female",
         EmployeeNumber    = "EMP-0001",
-        EmploymentTypeId  = Guid.NewGuid(),
+        AddressLine1      = "1 High Street",
+        City              = "London",
+        PostCode          = "SW1A 1AA",
     };
+
+    [Theory]
+    [InlineData(nameof(HireCandidateRequest.AddressLine1))]
+    [InlineData(nameof(HireCandidateRequest.City))]
+    [InlineData(nameof(HireCandidateRequest.PostCode))]
+    public void Validate_Fails_When_Required_Address_Field_Is_Null_Empty_Or_Whitespace(string property)
+    {
+        foreach (var blank in new string?[] { null, string.Empty, "   " })
+        {
+            var request = property switch
+            {
+                nameof(HireCandidateRequest.AddressLine1) => ValidRequest() with { AddressLine1 = blank },
+                nameof(HireCandidateRequest.City) => ValidRequest() with { City = blank },
+                _ => ValidRequest() with { PostCode = blank },
+            };
+
+            var result = _validator.Validate(request);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Errors, e => e.PropertyName == property);
+        }
+    }
+
+    [Fact]
+    public void Validate_Passes_When_Optional_Address_Fields_Are_Blank()
+    {
+        var result = _validator.Validate(ValidRequest() with { AddressLine2 = null, County = "  " });
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_Address_Fields_Exceed_Max_Length()
+    {
+        var result = _validator.Validate(ValidRequest() with
+        {
+            AddressLine1 = new string('a', 201),
+            City = new string('b', 101),
+            PostCode = new string('c', 21),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(HireCandidateRequest.AddressLine1));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(HireCandidateRequest.City));
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(HireCandidateRequest.PostCode));
+    }
+
+    [Fact]
+    public void Validate_Passes_With_No_Manager_Override_And_Null_ManagerId()
+    {
+        var result = _validator.Validate(ValidRequest() with { OverrideManager = true, ManagerId = null });
+
+        Assert.True(result.IsValid);
+    }
 
     [Fact]
     public void Validate_Passes_For_Valid_Request()

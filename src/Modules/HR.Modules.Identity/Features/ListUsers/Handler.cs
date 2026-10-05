@@ -20,7 +20,7 @@ internal sealed class ListUsersHandler(
         // never routed through the invite flow, e.g. dev-seeded personas created directly in
         // IdentityModule's seed data. GetAllEmployeeIdsAsync (not GetEligibleEmployeeIdsAsync,
         // which is Active-only and built for document-audience matching) is used deliberately here
-        // — a Draft/Suspended employee can still have or need a user account.
+        // — a Suspended employee can still have or need a user account.
         var employeeIds = await employeeAudienceReader.GetAllEmployeeIdsAsync(request.CompanyId, cancellationToken);
 
         var invites = await db.UserInvites

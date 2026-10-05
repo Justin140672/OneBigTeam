@@ -15,4 +15,5 @@ internal sealed record CreateVacancyResponse(
     DateOnly? OpenedAt,
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? EmploymentTypeId = null);

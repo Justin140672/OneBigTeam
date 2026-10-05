@@ -596,24 +596,21 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         var seeded = SeededE2eEmployees.OffboardingConfirmation[3];
         await empEdit.GoToAsync(AcmeId, seeded.EmployeeId);
 
-        var receivedToday = DateOnly.FromDateTime(DateTime.Today).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        var futureLeavingDate = DateOnly.FromDateTime(DateTime.Today).AddDays(30).ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
 
         await dialog.OpenAsync();
-        await dialog.FillResignationReceivedDateAsync(receivedToday);
+        await dialog.FillResignationReceivedDateAsync("01/12/2023");
         await dialog.ClickNextAsync();
 
         var autoDate = await dialog.GetLeavingDateTextAsync();
         Assert.False(string.IsNullOrWhiteSpace(autoDate));
-        Assert.False(await dialog.IsBackdatedConfirmationVisibleAsync(),
-            "Expected no backdating checkbox for a future-dated leaving date");
+
+        await dialog.FillLeavingDateAsync(futureLeavingDate);
+        await dialog.ExpectBackdatedConfirmationHiddenAsync();
 
         await dialog.FillLeavingDateAsync("01/01/2024");
         Assert.True(await dialog.IsBackdatedConfirmationVisibleAsync(),
             "Expected the backdating checkbox to appear once the leaving date is in the past");
-
-        await dialog.ClickBackAsync();
-        await dialog.FillResignationReceivedDateAsync("01/12/2023");
-        await dialog.ClickNextAsync();
         Assert.Equal("01/01/2024", await dialog.GetLeavingDateTextAsync());
 
         await dialog.ClickNextAsync();

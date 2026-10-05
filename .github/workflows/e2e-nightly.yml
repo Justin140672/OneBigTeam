@@ -49,10 +49,15 @@ jobs:
           pwsh "$pw" install --with-deps chromium
 
       - name: Run E2E tests
-        run: >
-          dotnet test tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj
-          -c Release --no-build
-          --logger "trx;LogFileName=e2e.trx"
+        shell: bash
+        env:
+          E2E_DIAG_DIR: ${{ github.workspace }}/e2e-diag
+        run: |
+          mkdir -p "$E2E_DIAG_DIR"
+          dotnet test tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj \
+            -c Release --no-build \
+            --logger "trx;LogFileName=e2e.trx" \
+            --logger "console;verbosity=detailed" 2>&1 | tee "$E2E_DIAG_DIR/dotnet-test-console.log"
 
       - name: Upload results
         if: always()
@@ -60,4 +65,14 @@ jobs:
         with:
           name: e2e-results
           path: "**/TestResults/**/*.trx"
+          if-no-files-found: ignore
+
+      # E2eDiag output, readiness/startup-migrations responses, Aspire resource state and logs,
+      # resource sampling and the full test console log. Runs on success, failure and cancel.
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-diagnostics
+          path: e2e-diag/
           if-no-files-found: ignore

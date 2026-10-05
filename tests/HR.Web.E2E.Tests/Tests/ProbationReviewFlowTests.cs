@@ -40,10 +40,16 @@ public sealed class ProbationReviewFlowTests(CrossUserFixture fixture) : RoleE2E
 
         await login.SwitchAccountAsync(LauraEmail);
 
-        await empEdit.GoToAsync(AcmeId, SophieLaurent);
-        await empEdit.OpenProbationTabAsync();
+        string? reviewStatus = null;
+        for (var attempt = 0; attempt < 8 && reviewStatus != "Completed"; attempt++)
+        {
+            if (attempt > 0)
+                await _page.WaitForTimeoutAsync(2_000);
 
-        var reviewStatus = await empEdit.GetReviewStatusInGridAsync("Manager Check-in");
+            await empEdit.GoToAsync(AcmeId, SophieLaurent);
+            await empEdit.OpenProbationTabAsync();
+            reviewStatus = await empEdit.GetReviewStatusInGridAsync("Manager Check-in");
+        }
 
         Assert.Equal("Completed", reviewStatus);
     }

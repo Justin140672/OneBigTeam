@@ -176,19 +176,19 @@ else
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-start-date">Start Date <span class="text-danger" aria-hidden="true">*</span></label>
-                                <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-start-date", "StartDate", true, label: "Start Date")" />
+                                <HrDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-start-date", "StartDate", true, label: "Start Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-continuous-service-date">Continuous Service Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-continuous-service-date", "ContinuousServiceDate", label: "Continuous Service Date")" />
+                                <HrDatePicker TValue="DateOnly?" @bind-Value="Model.ContinuousServiceDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-continuous-service-date", "ContinuousServiceDate", label: "Continuous Service Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-probation-end-date">Probation End Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-probation-end-date", "ProbationEndDate", label: "Probation End Date")" />
+                                <HrDatePicker TValue="DateOnly?" @bind-Value="Model.ProbationEndDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("emp-employment-probation-end-date", "ProbationEndDate", label: "Probation End Date")" />
                             </div>
                             <div class="col-md-6">
                                 <label class="form-label" for="emp-employment-leaving-date">Leaving Date</label>
-                                <SfDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" HtmlAttributes="@Aria("emp-employment-leaving-date", "LeavingDate", label: "Leaving Date")" />
+                                <HrDatePicker TValue="DateOnly?" @bind-Value="Model.LeavingDate" Format="dd/MM/yyyy" ShowClearButton="true" Enabled="false" HtmlAttributes="@Aria("emp-employment-leaving-date", "LeavingDate", label: "Leaving Date")" />
                                 <div class="form-text">Handled via Start Leaving Process.</div>
                             </div>
                         </div>
@@ -423,7 +423,6 @@ else
 
     private List<Option> _statusOptions =
     [
-        new("Draft",          "Draft"),
         new("Active",         "Active"),
         new("Suspended",      "Suspended"),
         new("FormerEmployee", "Former Employee"),
@@ -434,7 +433,6 @@ else
         var hasLeavingDate = _employee?.LeavingDate is not null;
         var options = new List<Option>
         {
-            new("Draft",          "Draft"),
             new("Active",         "Active"),
             new("Suspended",      "Suspended"),
         };
@@ -487,7 +485,7 @@ else
         }
 
         _managerOptions = ((await empListTask)?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .ToList();
 
@@ -508,7 +506,7 @@ else
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -520,7 +518,7 @@ else
     {
         Model.EmployeeNumber        = e.EmployeeNumber ?? string.Empty;
         Model.EmploymentTypeId      = e.EmploymentTypeId;
-        Model.Status                = e.Status is "Draft" or "Active" or "Suspended" or "Leaving" or "FormerEmployee"
+        Model.Status                = e.Status is "Active" or "Suspended" or "Leaving" or "FormerEmployee"
                                            ? e.Status
                                            : "Active";
         Model.DepartmentId          = e.DepartmentId;

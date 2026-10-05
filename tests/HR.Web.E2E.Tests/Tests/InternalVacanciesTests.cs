@@ -223,6 +223,7 @@ public sealed class InternalVacanciesTests(CrossUserFixture fixture) : RoleE2ETe
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);

@@ -11,6 +11,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.Empty,
             FirstName = "Alice",
             LastName = "Smith",
@@ -29,6 +32,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = string.Empty,
             LastName = "Smith",
@@ -47,6 +53,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.Empty,
             LocationId = Guid.NewGuid(),
@@ -72,6 +81,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.Empty,
@@ -97,6 +109,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -122,6 +137,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -147,6 +165,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -174,6 +195,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = firstName,
             LastName = "Smith",
@@ -195,6 +219,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = new string('A', 101),
             LastName = "Smith",
@@ -216,6 +243,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -240,6 +270,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = new string('A', 101),
@@ -263,6 +296,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = lastName,
@@ -281,6 +317,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -299,6 +338,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -317,6 +359,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -337,6 +382,9 @@ public class CreateEmployeeValidatorTests
         var localPart = new string('a', 310);
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -356,6 +404,9 @@ public class CreateEmployeeValidatorTests
         var localPart = new string('a', 310);
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -375,6 +426,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -394,6 +448,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -419,6 +476,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -440,6 +500,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -461,6 +524,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -482,6 +548,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -503,6 +572,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -524,6 +596,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -552,6 +627,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -584,6 +662,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -613,6 +694,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -635,6 +719,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             FirstName = "Alice",
             LastName = "Smith",
@@ -657,6 +744,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),
@@ -682,6 +772,9 @@ public class CreateEmployeeValidatorTests
 
         var result = validator.Validate(new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = Guid.NewGuid(),
             DepartmentId = Guid.NewGuid(),
             LocationId = Guid.NewGuid(),

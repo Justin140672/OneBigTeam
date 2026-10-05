@@ -77,15 +77,13 @@ public class CompleteTaskIdempotentReplayEndpointTests
         public void Dispose()
         {
             client.Dispose();
-            factory.Dispose();
         }
     }
 
     private async Task<Scenario> NewScenarioAsync()
     {
         var action = new CountingWorkflowAction();
-        var factory = _factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<ITaskCompletionAction>(action)));
+        var factory = RoutedCompletionActionHost.For(_factory).Factory;
 
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
@@ -93,6 +91,8 @@ public class CompleteTaskIdempotentReplayEndpointTests
             _factory, companyId, "Record feedback", "private description", assignedEmployeeId: employeeId);
 
         await TestRoleSeeder.AssignRoleAsync(_factory, employeeId, SystemRoles.Employee, companyId);
+
+        RoutedCompletionActionHost.For(_factory).Register(taskId, action);
         var client = factory.CreateClient();
         client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeId.ToString());
         client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());

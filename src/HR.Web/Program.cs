@@ -165,6 +165,10 @@ if (!app.Environment.IsDevelopment())
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHrWebContentSecurityPolicy(cspSettings);
 app.UseHttpsRedirection();
+app.UseRequestLocalization(new RequestLocalizationOptions()
+    .SetDefaultCulture("en-GB")
+    .AddSupportedCultures("en-GB")
+    .AddSupportedUICultures("en-GB"));
 
 // Required: any endpoint carrying authorization metadata — [Authorize] (Components/Pages/
 // _Imports.razor) or even just [AllowAnonymous] (Login.razor, NotFound.razor) — needs

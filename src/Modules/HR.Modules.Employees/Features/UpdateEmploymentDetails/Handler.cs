@@ -149,10 +149,6 @@ internal sealed class UpdateEmploymentDetailsHandler
             }
         }
 
-        if (request.Status == EmploymentStatus.Draft && employee.Status != EmploymentStatus.Draft)
-            return Result.Failure<UpdateEmploymentDetailsResponse>(
-                Error.Validation("Cannot set employment status to Draft."));
-
         if (request.Status == EmploymentStatus.FormerEmployee && employee.Status != request.Status)
             return Result.Failure<UpdateEmploymentDetailsResponse>(
                 Error.Validation("Cannot set employment status to Former Employee directly."));

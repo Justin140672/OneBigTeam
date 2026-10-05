@@ -61,8 +61,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         switch (status)
         {
-            case EmploymentStatus.Draft:
-                break;
             case EmploymentStatus.Active:
                 employee.Activate(Now);
                 break;
@@ -93,7 +91,6 @@ public class GetManagerTeamStatusSummaryHandlerTests
         var active = AddEmployee(context, companyId, "Anna", "Active");
         var startsToday = AddEmployee(context, companyId, "Sam", "StartsToday", startDate: Today);
         var leavesToday = AddEmployee(context, companyId, "Lee", "LeavesToday", leavingDate: Today);
-        var draft = AddEmployee(context, companyId, "Dan", "Draft", status: EmploymentStatus.Draft);
         var suspended = AddEmployee(context, companyId, "Sue", "Suspended", status: EmploymentStatus.Suspended);
         var leaving = AddEmployee(context, companyId, "Liz", "Leaving", status: EmploymentStatus.Leaving);
         var former = AddEmployee(context, companyId, "Fred", "Former", status: EmploymentStatus.FormerEmployee);
@@ -103,7 +100,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         var subtree = new[]
         {
-            active.Id, startsToday.Id, leavesToday.Id, draft.Id, suspended.Id,
+            active.Id, startsToday.Id, leavesToday.Id, suspended.Id,
             leaving.Id, former.Id, future.Id, alreadyLeft.Id,
         };
         var handler = BuildHandler(context, subtree);
@@ -141,10 +138,10 @@ public class GetManagerTeamStatusSummaryHandlerTests
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
-        var draft = AddEmployee(context, companyId, status: EmploymentStatus.Draft);
+        var excluded = AddEmployee(context, companyId, status: EmploymentStatus.Suspended);
         await context.SaveChangesAsync();
 
-        var handler = BuildHandler(context, [draft.Id]);
+        var handler = BuildHandler(context, [excluded.Id]);
         var result = await handler.HandleAsync(companyId, Guid.NewGuid(), CancellationToken.None);
 
         Assert.Equal(0, result.TeamSize);
@@ -331,7 +328,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var counted = AddEmployee(context, companyId, "In", "Scope");
-        var draft = AddEmployee(context, companyId, "Out", "Scope", status: EmploymentStatus.Draft);
+        var excluded = AddEmployee(context, companyId, "Out", "Scope", status: EmploymentStatus.Suspended);
         await context.SaveChangesAsync();
 
         var leave = new FakeEmployeeLeaveStatusReader();
@@ -339,7 +336,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
         var probation = new FakeEmployeesInProbationReader();
         var fitNotes = new FakeEmployeesMissingFitNoteReader();
 
-        var handler = BuildHandler(context, [counted.Id, draft.Id], leave, sick, probation, fitNotes);
+        var handler = BuildHandler(context, [counted.Id, excluded.Id], leave, sick, probation, fitNotes);
         await handler.HandleAsync(companyId, Guid.NewGuid(), CancellationToken.None);
 
         foreach (var requested in new[]

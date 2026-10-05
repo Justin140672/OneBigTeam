@@ -46,6 +46,7 @@ public class UpdateEmployeeProfileAndEmploymentHandlerTests
         string firstName = "Alicia", string? notes = "combined-note", Guid? correlationId = null)
         => new()
         {
+            AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
             CompanyId = companyId,
             Id = id,
             FirstName = firstName,

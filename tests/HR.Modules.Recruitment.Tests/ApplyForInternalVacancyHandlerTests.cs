@@ -328,7 +328,6 @@ public class ApplyForInternalVacancyHandlerTests
 
 
     [Theory]
-    [InlineData(nameof(EmployeeApplicantEmploymentState.Draft))]
     [InlineData(nameof(EmployeeApplicantEmploymentState.Suspended))]
     [InlineData(nameof(EmployeeApplicantEmploymentState.Leaving))]
     [InlineData(nameof(EmployeeApplicantEmploymentState.Former))]

@@ -152,7 +152,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
 
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(
-            _factory, companyId, now, positionProfileId: referenceData.PositionProfileId);
+            _factory, companyId, now, positionProfileId: referenceData.PositionProfileId, employmentTypeId: referenceData.EmploymentTypeId);
 
         var keyHire = $"idem-hire-{Guid.NewGuid():N}";
         var keyReject = $"idem-reject-{Guid.NewGuid():N}";
@@ -167,7 +167,10 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = referenceData.EmploymentTypeId,
+            overrideManager = true,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         };
 
         var hireRequest = BuildIdempotentPostRequest(
@@ -410,7 +413,7 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
 
         var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         var seeded = await RecruitmentTestSeeder.SeedApplicationAsync(
-            _factory, companyId, now, positionProfileId: referenceData.PositionProfileId);
+            _factory, companyId, now, positionProfileId: referenceData.PositionProfileId, employmentTypeId: referenceData.EmploymentTypeId);
         var sourceReference = $"recruitment:application:{seeded.ApplicationId}";
 
         var keyHire = $"idem-hire-retry-{Guid.NewGuid():N}";
@@ -426,7 +429,10 @@ public class IdempotentApplicationTransitionConcurrencyEndpointTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = referenceData.EmploymentTypeId,
+            overrideManager = true,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         };
 
         var hireRequest = BuildIdempotentPostRequest(

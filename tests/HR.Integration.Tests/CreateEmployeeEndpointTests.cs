@@ -105,7 +105,7 @@ public class CreateEmployeeEndpointTests
     }
 
     [Fact]
-    public async Task Post_Employees_Creates_Employee_With_Draft_Status()
+    public async Task Post_Employees_Creates_Employee_With_Active_Status()
     {
         using var client = _factory.CreateClient();
         var companyId = Guid.NewGuid();
@@ -129,7 +129,7 @@ public class CreateEmployeeEndpointTests
         Assert.Equal(companyId, payload.CompanyId);
         Assert.Equal("Alice", payload.FirstName);
         Assert.Equal("Smith", payload.LastName);
-        Assert.Equal("Draft", payload.Status);
+        Assert.Equal("Active", payload.Status);
         Assert.Equal(refData.DepartmentId, payload.DepartmentId);
         Assert.Equal(refData.LocationId, payload.LocationId);
         Assert.Equal(refData.PositionProfileId, payload.PositionProfileId);
@@ -199,6 +199,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -260,6 +263,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -292,6 +298,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -327,6 +336,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -359,6 +371,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -391,6 +406,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -445,6 +463,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
 
@@ -487,6 +508,9 @@ public class CreateEmployeeEndpointTests
                 startDate = "2026-07-01",
                 dateOfBirth = "1990-05-20",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Female"
             });
             Assert.Equal(HttpStatusCode.Created, response.StatusCode);
@@ -534,6 +558,9 @@ public class CreateEmployeeEndpointTests
                 startDate = "2026-07-01",
                 dateOfBirth = "1990-05-20",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Female"
             });
         }).ToArray();
@@ -583,6 +610,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Female"
         });
         Assert.Equal(HttpStatusCode.Created, responseA1.StatusCode);
@@ -602,6 +632,9 @@ public class CreateEmployeeEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-05-20",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Male"
         });
         Assert.Equal(HttpStatusCode.Created, responseB1.StatusCode);

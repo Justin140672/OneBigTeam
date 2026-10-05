@@ -44,10 +44,6 @@ public class GetOrganisationChartEndpointTests
         var reportId = await CreateEmployeeAsync(
             client, companyId, "Rick", "Report", departmentId, locationId, positionProfileId, employmentTypeId, "ORG-REP", managerId);
 
-        await CreateEmployeeAsync(
-            client, companyId, "Dana", "Draft", departmentId, locationId, positionProfileId, employmentTypeId, "ORG-DRAFT",
-            activate: false);
-
         var otherCompanyId = Guid.NewGuid();
         using var otherClient = await AdminClient(otherCompanyId);
         var (otherDeptId, otherLocId, otherProfileId, otherTypeId) = await CreateReferenceDataAsync(otherClient, otherCompanyId);
@@ -122,6 +118,9 @@ public class GetOrganisationChartEndpointTests
             startDate = "2026-01-01",
             dateOfBirth = "1990-01-01",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Prefer not to say",
             employeeNumber,
             employmentTypeId,

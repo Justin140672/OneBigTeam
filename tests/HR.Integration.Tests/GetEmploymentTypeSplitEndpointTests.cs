@@ -74,7 +74,6 @@ public class GetEmploymentTypeSplitEndpointTests
             AddEmployee(db, companyId, refData.EmploymentTypeId, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, refData.EmploymentTypeId, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, secondType.Id, refData, EmploymentStatus.Active);
-            AddEmployee(db, companyId, refData.EmploymentTypeId, refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, refData.EmploymentTypeId, refData, EmploymentStatus.Suspended);
             AddEmployee(db, companyId, refData.EmploymentTypeId, refData, EmploymentStatus.FormerEmployee);
         });
@@ -137,8 +136,6 @@ public class GetEmploymentTypeSplitEndpointTests
 
         switch (status)
         {
-            case EmploymentStatus.Draft:
-                break;
             case EmploymentStatus.Active:
                 employee.Activate(now);
                 break;

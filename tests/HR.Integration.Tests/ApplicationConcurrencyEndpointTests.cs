@@ -63,6 +63,7 @@ public class ApplicationConcurrencyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Engineer",
             hiringManagerId = Guid.NewGuid(),
         })).Content.ReadFromJsonAsync<Payload>();
@@ -93,7 +94,10 @@ public class ApplicationConcurrencyEndpointTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = referenceData.EmploymentTypeId,
+            overrideManager = true,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         };
 
         object RejectBody() => new { companyId, rejectionReason = "Role filled by another candidate" };

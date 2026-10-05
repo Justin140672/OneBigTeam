@@ -61,7 +61,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label" for="ecd-dob">Date of Birth <span class="text-danger">*</span></label>
-                            <SfDatePicker ID="ecd-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy"
+                            <HrDatePicker ID="ecd-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy"
                                           HtmlAttributes="@_ariaRequired" />
                             <ValidationMessage For="@(() => Model.DateOfBirth)" />
                         </div>

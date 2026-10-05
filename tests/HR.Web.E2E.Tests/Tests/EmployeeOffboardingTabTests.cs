@@ -141,6 +141,7 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         Assert.False(await waiveDialog.IsVisibleAsync(),
             "Expected the Waive Obligation dialog to close after a successful waive");
 
+        await offboarding.ExpectChecklistTaskStatusAsync(task, "Waived");
         var status = await offboarding.GetChecklistTaskStatusAsync(task);
         Assert.Equal("Waived", status);
 

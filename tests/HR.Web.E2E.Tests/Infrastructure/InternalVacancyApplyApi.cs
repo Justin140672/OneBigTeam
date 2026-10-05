@@ -13,7 +13,7 @@ internal static class InternalVacancyApplyApi
     private static readonly Guid DepartmentId      = Guid.Parse("10000000-0000-0000-0000-000000000001");
     private static readonly Guid LocationId        = Guid.Parse("70000000-0000-0000-0000-000000000001");
     private static readonly Guid PositionProfileId = Guid.Parse("20000000-0000-0000-0000-00000000000B");
-    private static readonly Guid EmploymentTypeId  = Guid.Parse("40000000-0000-0000-0000-000000000001");
+    internal static readonly Guid EmploymentTypeId  = Guid.Parse("40000000-0000-0000-0000-000000000001");
     private static readonly Guid DefaultLeavePolicyId = Guid.Parse("C0000000-0000-0000-0000-000000000001");
 
     public sealed record FreshEmployee(Guid Id, string FirstName, string LastName, string WorkEmail)
@@ -75,6 +75,9 @@ internal static class InternalVacancyApplyApi
                 startDate = "2026-03-01",
                 dateOfBirth = "1990-06-15",
                 nationality = "British",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 gender = "Male",
                 employeeNumber,
                 employmentTypeId = EmploymentTypeId,
@@ -173,6 +176,7 @@ internal static class InternalVacancyApplyApi
                 advertDescription = $"Internal apply E2E vacancy {unique}.",
                 hiringManagerId = JamesId,
                 isAdvertisedInternally = true,
+                employmentTypeId = EmploymentTypeId,
             });
         Assert.True(vacancyResponse.IsSuccessStatusCode,
             $"Create vacancy failed with {vacancyResponse.StatusCode}: {await vacancyResponse.Content.ReadAsStringAsync()}");

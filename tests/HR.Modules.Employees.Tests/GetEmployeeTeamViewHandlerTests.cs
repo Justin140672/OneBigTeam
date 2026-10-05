@@ -131,7 +131,7 @@ public class GetEmployeeTeamViewHandlerTests
         Assert.Equal("Smith", value.LastName);
         Assert.Equal("alice@example.com", value.WorkEmail);
         Assert.Equal(StartDate, value.StartDate);
-        Assert.Equal(EmploymentStatus.Draft, value.Status);
+        Assert.Equal(EmploymentStatus.Active, value.Status);
         Assert.Equal("EMP-0001", value.EmployeeNumber);
     }
 

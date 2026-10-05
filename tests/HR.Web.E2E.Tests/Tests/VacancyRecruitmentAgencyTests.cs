@@ -44,6 +44,7 @@ public sealed class VacancyRecruitmentAgencyTests(RecruiterPersonaFixture fixtur
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SelectRecruitmentAgencyAsync(agencyName);
         await vacancyDetail.SaveNewVacancyAsync();
 

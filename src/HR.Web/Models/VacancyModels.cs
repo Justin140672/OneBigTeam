@@ -55,7 +55,8 @@ public record GetVacancyResponse(
     bool CanChangePositionProfile,
     bool IsAdvertisedInternally = false,
     // Ticket 2: optimistic-concurrency token.
-    int Version = 0);
+    int Version = 0,
+    Guid? EmploymentTypeId = null);
 
 
 public record CreateVacancyRequest(
@@ -65,7 +66,8 @@ public record CreateVacancyRequest(
     string? AdvertDescription,
     Guid HiringManagerId,
     Guid? AssignedRecruiterId = null,
-    bool IsAdvertisedInternally = false);
+    bool IsAdvertisedInternally = false,
+    Guid? EmploymentTypeId = null);
 
 public record CreateVacancyResponse(
     Guid Id,
@@ -94,7 +96,8 @@ public record UpdateVacancyRequest(
     string? CorrectionReason = null,
     bool IsAdvertisedInternally = false,
     // Ticket 2: optimistic-concurrency token loaded before editing.
-    int? ExpectedVersion = null);
+    int? ExpectedVersion = null,
+    Guid? EmploymentTypeId = null);
 
 public record UpdateVacancyResponse(
     Guid Id,
@@ -154,6 +157,9 @@ public sealed class VacancyEditModel : IHasVersion
     public Guid? PositionProfileId { get; set; }
     [Required(ErrorMessage = "Hiring manager is required.")]
     public Guid? HiringManagerId { get; set; }
+
+    [Required(ErrorMessage = "Employment type is required.")]
+    public Guid? EmploymentTypeId { get; set; }
 
     // Optional external recruitment agency (ExternalRecruiter) assigned to run this vacancy — see
     // Vacancy.AssignedRecruiterId's remarks for the ticket #81 scope-correction history (previously an

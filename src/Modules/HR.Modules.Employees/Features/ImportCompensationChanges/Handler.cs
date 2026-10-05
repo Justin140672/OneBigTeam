@@ -113,9 +113,13 @@ internal sealed class ImportCompensationChangesHandler(
 
             var reason = default(CompensationChangeReason);
             var hasReason = !string.IsNullOrWhiteSpace(row.Reason) &&
-                             Enum.TryParse(row.Reason, ignoreCase: true, out reason);
+                             Enum.TryParse(
+                                 row.Reason.Replace(" ", string.Empty).Replace("_", string.Empty).Replace("-", string.Empty),
+                                 ignoreCase: true,
+                                 out reason);
             if (!hasReason)
-                errors.Add($"Reason must be one of: {string.Join(", ", Enum.GetNames<CompensationChangeReason>())}.");
+                errors.Add(
+                    $"Reason must be one of: {string.Join(", ", Enum.GetNames<CompensationChangeReason>().Select(SplitPascalCase))}.");
 
             if (errors.Count == 0 && row.EffectiveDate is not null)
             {
@@ -216,4 +220,7 @@ internal sealed class ImportCompensationChangesHandler(
 
         return ImportCompensationChangesOutcome.Success(new ImportCompensationChangesResponse(importBatchId, items));
     }
+
+    private static string SplitPascalCase(string name) =>
+        System.Text.RegularExpressions.Regex.Replace(name, "(?<=[a-z])(?=[A-Z])", " ");
 }

@@ -45,7 +45,7 @@ public class CompleteInitialEmployeeSetupHandlerTests
             null, null, null, CompensationChangeReason.NewHire, employeeId, now);
 
     [Fact]
-    public async Task HandleAsync_Completes_Setup_And_Activates_Employee_On_Happy_Path()
+    public async Task HandleAsync_Completes_Setup_And_Leaves_Employee_Active_On_Happy_Path()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();

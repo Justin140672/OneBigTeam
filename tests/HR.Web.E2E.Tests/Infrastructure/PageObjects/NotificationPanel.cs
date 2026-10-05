@@ -12,6 +12,19 @@ public sealed class NotificationPanel(IPage page)
         return text == "99+" ? 99 : int.TryParse(text, out var n) ? n : 0;
     }
 
+    public async Task<int> WaitForUnreadAsync(int timeoutMs = 30_000)
+    {
+        try
+        {
+            await page.Locator(".notif-badge").WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = timeoutMs });
+        }
+        catch (TimeoutException)
+        {
+        }
+
+        return await GetUnreadCountAsync();
+    }
+
     public async Task OpenAsync()
     {
         await page.Locator(".notif-btn").ClickAsync();

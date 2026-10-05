@@ -69,7 +69,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label" for="emp-date-of-birth">Date of Birth <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" HtmlAttributes="@Aria("emp-date-of-birth", "DateOfBirth", true, label: "Date of Birth")" />
+                                    <HrDatePicker TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" HtmlAttributes="@Aria("emp-date-of-birth", "DateOfBirth", true, label: "Date of Birth")" />
                                     <ValidationMessage For="@(() => Model.DateOfBirth)" id="emp-date-of-birth-error" />
                                 </div>
                                 <div class="col-md-6">
@@ -113,7 +113,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="emp-start-date">Start Date <span class="text-danger" aria-hidden="true">*</span></label>
-                                    <SfDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" HtmlAttributes="@Aria("emp-start-date", "StartDate", true, label: "Start Date")" />
+                                    <HrDatePicker TValue="DateOnly" @bind-Value="Model.StartDate" HtmlAttributes="@Aria("emp-start-date", "StartDate", true, label: "Start Date")" />
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="emp-employee-number">
@@ -235,24 +235,26 @@
                         <div class="card-body">
                             <div class="row g-3">
                                 <div class="col-12">
-                                    <label class="form-label" for="emp-address-line-1">Address Line 1</label>
-                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1", label: "Address Line 1")" />
+                                    <label class="form-label" for="emp-address-line-1">Address Line 1 <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1", true, label: "Address Line 1")" />
+                                    <ValidationMessage For="@(() => Model.AddressLine1)" id="emp-address-line-1-error" />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label" for="emp-address-line-2">Address Line 2</label>
                                     <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." HtmlAttributes="@Aria("emp-address-line-2", "AddressLine2", label: "Address Line 2")" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="emp-city">City</label>
-                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" HtmlAttributes="@Aria("emp-city", "City", label: "City")" />
+                                    <label class="form-label" for="emp-city">City <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" HtmlAttributes="@Aria("emp-city", "City", true, label: "City")" />
+                                    <ValidationMessage For="@(() => Model.City)" id="emp-city-error" />
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label" for="emp-county-state">County / State</label>
                                     <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" HtmlAttributes="@Aria("emp-county-state", "County", label: "County / State")" />
                                 </div>
                                 <div class="col-md-4">
-                                    <label class="form-label" for="emp-post-code">Post Code</label>
-                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" HtmlAttributes="@Aria("emp-post-code", "PostCode", label: "Post Code")" />
+                                    <label class="form-label" for="emp-post-code">Post Code <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" HtmlAttributes="@Aria("emp-post-code", "PostCode", true, label: "Post Code")" />
                                     <ValidationMessage For="@(() => Model.PostCode)" id="emp-post-code-error" />
                                 </div>
                                 <div class="col-12">
@@ -266,6 +268,38 @@
                                     <ValidationMessage For="@(() => Model.HomePhone)" id="emp-home-phone-error" />
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <div class="card mb-4" data-testid="add-employee-compensation-card">
+                        <div class="card-header">
+                            <h5 class="mb-0">Compensation</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" for="emp-salary-type">Salary Type <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <SfDropDownList TValue="string"
+                                                    TItem="AddCompensationDialog.SalaryTypeChoice"
+                                                    DataSource="@AddCompensationDialog.SalaryTypeOptions"
+                                                    @bind-Value="Model.SalaryType"
+                                                    HtmlAttributes="@Aria("emp-salary-type", "SalaryType", true, label: "Salary Type")">
+                                        <DropDownListFieldSettings Value="Value" Text="Label" />
+                                    </SfDropDownList>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="emp-salary">Salary <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <SfNumericTextBox TValue="decimal?" @bind-Value="Model.Salary" Min="0" ShowSpinButton="false" Format="#,##0.##"
+                                                      Placeholder="e.g. 45000" HtmlAttributes="@Aria("emp-salary", "Salary", true, label: "Salary")" />
+                                    <ValidationMessage For="@(() => Model.Salary)" id="emp-salary-error" />
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label" for="emp-currency">Currency <span class="text-danger" aria-hidden="true">*</span></label>
+                                    <HrTextBox @bind-Value="Model.Currency" Placeholder="e.g. GBP" HtmlAttributes="@Aria("emp-currency", "Currency", true, label: "Currency")" />
+                                    <ValidationMessage For="@(() => Model.Currency)" id="emp-currency-error" />
+                                </div>
+                            </div>
+                            <p class="text-muted small mt-2 mb-0">Effective from the employee's start date.</p>
                         </div>
                     </div>
 
@@ -421,7 +455,7 @@
                                                 </div>
                                                 <div class="col-md-6">
                                                     <label class="form-label" for="employee-dob">Date of Birth <span class="text-danger" aria-hidden="true">*</span></label>
-                                                    <SfDatePicker ID="employee-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("employee-dob", "DateOfBirth", true, false, label: "Date of Birth")" />
+                                                    <HrDatePicker ID="employee-dob" TValue="DateOnly?" @bind-Value="Model.DateOfBirth" Placeholder="dd/mm/yyyy" Format="dd/MM/yyyy" Enabled="@(!IsViewMode)" HtmlAttributes="@Aria("employee-dob", "DateOfBirth", true, false, label: "Date of Birth")" />
                                                     <ValidationMessage For="@(() => Model.DateOfBirth)" id="employee-dob-error" />
                                                 </div>
                                                 <div class="col-md-6">
@@ -478,24 +512,26 @@
                                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                                             <div class="row g-3">
                                                 <div class="col-12">
-                                                    <label class="form-label" for="emp-address-line-1">Address Line 1</label>
-                                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1", label: "Address Line 1")" />
+                                                    <label class="form-label" for="emp-address-line-1">Address Line 1 <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.AddressLine1" Placeholder="Street address" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-address-line-1", "AddressLine1", true, label: "Address Line 1")" />
+                                                    <ValidationMessage For="@(() => Model.AddressLine1)" id="emp-address-line-1-error" />
                                                 </div>
                                                 <div class="col-12">
                                                     <label class="form-label" for="emp-address-line-2">Address Line 2</label>
                                                     <HrTextBox @bind-Value="Model.AddressLine2" Placeholder="Apartment, suite, etc." ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-address-line-2", "AddressLine2", label: "Address Line 2")" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label" for="emp-city">City</label>
-                                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-city", "City", label: "City")" />
+                                                    <label class="form-label" for="emp-city">City <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.City" Placeholder="e.g. London" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-city", "City", true, label: "City")" />
+                                                    <ValidationMessage For="@(() => Model.City)" id="emp-city-error" />
                                                 </div>
                                                 <div class="col-md-4">
                                                     <label class="form-label" for="emp-county-state">County / State</label>
                                                     <HrTextBox @bind-Value="Model.County" Placeholder="e.g. Greater London" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-county-state", "County", label: "County / State")" />
                                                 </div>
                                                 <div class="col-md-4">
-                                                    <label class="form-label" for="emp-post-code">Post Code</label>
-                                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-post-code", "PostCode", label: "Post Code")" />
+                                                    <label class="form-label" for="emp-post-code">Post Code <span class="text-danger" aria-hidden="true">*</span></label>
+                                                    <HrTextBox @bind-Value="Model.PostCode" Placeholder="e.g. SW1A 1AA" ReadOnly="@IsViewMode" HtmlAttributes="@Aria("emp-post-code", "PostCode", true, label: "Post Code")" />
                                                     <ValidationMessage For="@(() => Model.PostCode)" id="emp-post-code-error" />
                                                 </div>
                                                 <div class="col-12">
@@ -997,6 +1033,8 @@
         var natResult = await EmployeeService.ListNationalitiesAsync();
         _nationalities = natResult?.Items.ToList() ?? [];
 
+        Model.AddressRequired = true;
+        Model.CompensationRequired = IsNew;
         Model.PostcodeRegexPattern = Session.PostcodeRegex;
         Model.TelephoneRegexPattern = Session.TelephoneRegex;
         Model.MobileRegexPattern = Session.MobileRegex;
@@ -1026,13 +1064,14 @@
         {
             Model.StartDate = DateOnly.FromDateTime(DateTime.Today);
 
+
             var hrSettings = await CompanyService.GetHrSettingsAsync(CompanyId);
             _companyEmployeeNumberMode = hrSettings?.EmployeeNumberMode ?? EmployeeNumberMode.Manual;
             Model.EmployeeNumberAutoAssigned = _companyEmployeeNumberMode == EmployeeNumberMode.Automatic;
 
             var managerResult = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
             _managerOptions = (managerResult?.Items ?? [])
-                .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+                .Where(e => e.Status != "FormerEmployee")
                 .Select(e => new ManagerOption(e.Id, e.FullName))
                 .OrderBy(e => e.Name)
                 .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -1194,7 +1233,7 @@
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         _managerOptions = (result?.Items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -1279,14 +1318,17 @@
                 Model.EmploymentTypeId!.Value,
                 FormText.Optional(Model.PhoneNumber),
                 FormText.Optional(Model.HomePhone),
-                FormText.Optional(Model.AddressLine1),
+                FormText.Required(Model.AddressLine1),
                 FormText.Optional(Model.AddressLine2),
-                FormText.Optional(Model.City),
+                FormText.Required(Model.City),
                 FormText.Optional(Model.County),
-                FormText.Optional(Model.PostCode),
+                FormText.Required(Model.PostCode),
                 FormText.Optional(Model.Country),
                 Model.HasSystemAccess,
-                Model.ManagerId == Guid.Empty ? null : Model.ManagerId);
+                Model.ManagerId == Guid.Empty ? null : Model.ManagerId,
+                Model.Salary,
+                Model.SalaryType,
+                FormText.Required(Model.Currency).ToUpperInvariant());
 
             var (created, error) = await EmployeeService.CreateEmployeeAsync(CompanyId, request);
 
@@ -1318,11 +1360,11 @@
                 FormText.Optional(Model.GenderOther),
                 FormText.Optional(Model.PhoneNumber),
                 FormText.Optional(Model.HomePhone),
-                FormText.Optional(Model.AddressLine1),
+                FormText.Required(Model.AddressLine1),
                 FormText.Optional(Model.AddressLine2),
-                FormText.Optional(Model.City),
+                FormText.Required(Model.City),
                 FormText.Optional(Model.County),
-                FormText.Optional(Model.PostCode),
+                FormText.Required(Model.PostCode),
                 FormText.Optional(Model.Country),
                 Model.HasSystemAccess,
                 // Ticket 2 follow-up: when the Employment tab has been loaded this session

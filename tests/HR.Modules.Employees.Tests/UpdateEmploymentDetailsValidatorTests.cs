@@ -103,10 +103,30 @@ public class UpdateEmploymentDetailsValidatorTests
         Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.EmploymentTypeId));
     }
 
-    // Status == Draft is deliberately NOT rejected here — see UpdateEmploymentDetailsHandlerTests
-    // for the Draft-transition check, which needs the employee's *current* status (only available
-    // in the handler, not the request-shape-only validator) to tell "still Draft, unrelated edit"
-    // apart from "actively reverting back to Draft".
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(99)]
+    public void Validate_Fails_When_Status_Is_Not_A_Defined_Employment_Status(int rawStatus)
+    {
+        var result = _validator.Validate(ValidRequest() with { Status = (EmploymentStatus)rawStatus });
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.PropertyName == nameof(UpdateEmploymentDetailsRequest.Status));
+    }
+
+    [Fact]
+    public void Draft_Cannot_Be_Deserialized_As_An_Employment_Status()
+    {
+        var options = new System.Text.Json.JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+            Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() },
+        };
+
+        Assert.Throws<System.Text.Json.JsonException>(() =>
+            System.Text.Json.JsonSerializer.Deserialize<UpdateEmploymentDetailsRequest>("{\"status\":\"Draft\"}", options));
+    }
 
     [Fact]
     public void Validate_Fails_When_CompanyId_Is_Empty()

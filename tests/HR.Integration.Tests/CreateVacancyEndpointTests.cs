@@ -59,6 +59,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             advertDescription = "Own the payments platform",
             hiringManagerId = Guid.NewGuid()
@@ -86,6 +87,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = Guid.NewGuid(),
+            employmentTypeId = Guid.NewGuid(),
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });
@@ -106,6 +108,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = otherCompanyReferenceData.PositionProfileId,
+            employmentTypeId = otherCompanyReferenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });
@@ -178,6 +181,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             hiringManagerId = Guid.NewGuid()
         });
 
@@ -208,6 +212,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });
@@ -233,6 +238,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             departmentId = Guid.NewGuid(),
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
@@ -254,6 +260,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle,
             advertDescription,
             hiringManagerId = Guid.NewGuid()
@@ -296,6 +303,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid(),
             assignedRecruiterId = recruiterId
@@ -319,6 +327,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid(),
             assignedRecruiterId = recruiterId
@@ -343,6 +352,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid(),
             assignedRecruiterId = recruiterId
@@ -362,6 +372,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });
@@ -383,6 +394,7 @@ public class CreateVacancyEndpointTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid(),
             isAdvertisedInternally = true

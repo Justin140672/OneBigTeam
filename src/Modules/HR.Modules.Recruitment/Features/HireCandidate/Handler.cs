@@ -122,6 +122,12 @@ internal sealed class HireCandidateHandler(
             return Result.Failure<HireCandidateResponse>(
                 Error.Conflict("This candidate is already linked to an employee."));
 
+        if (vacancy.EmploymentTypeId is not { } employmentTypeId)
+            return Result.Failure<HireCandidateResponse>(
+                Error.Validation("Employment type required. Set an employment type on the vacancy before hiring."));
+
+        var managerId = request.OverrideManager ? request.ManagerId : vacancy.HiringManagerId;
+
         var positionProfileSummary = await positionProfileReader.GetSummaryAsync(
             request.CompanyId, vacancy.PositionProfileId, cancellationToken);
 
@@ -155,14 +161,14 @@ internal sealed class HireCandidateHandler(
                 request.Nationality,
                 request.Gender,
                 request.EmployeeNumber,
-                request.EmploymentTypeId,
+                employmentTypeId,
                 positionProfileSummary.DepartmentId.Value,
                 positionProfileSummary.LocationId.Value,
                 vacancy.PositionProfileId,
                 request.GenderOther,
                 PersonalEmail: null,
                 candidate.Phone,
-                request.ManagerId,
+                managerId,
                 request.AddressLine1,
                 request.AddressLine2,
                 request.City,

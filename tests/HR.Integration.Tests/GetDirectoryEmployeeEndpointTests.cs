@@ -59,14 +59,9 @@ public class GetDirectoryEmployeeEndpointTests
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
         var refData = await EmployeeReferenceDataSeeder.SeedAsync(db, companyId);
         var now = DateTimeOffset.UtcNow;
-
         var employee = MakeEmployee(companyId, refData, "Dana", "Directory", $"dana.{Guid.NewGuid():N}@example.com");
-        if (status != EmploymentStatus.Draft)
-        {
-            employee.Activate(now);
-            if (status != EmploymentStatus.Active)
-                employee.SetStatusForTesting(status, now);
-        }
+        if (status != EmploymentStatus.Active)
+            employee.SetStatusForTesting(status, now);
 
         db.Employees.Add(employee);
         await db.SaveChangesAsync();

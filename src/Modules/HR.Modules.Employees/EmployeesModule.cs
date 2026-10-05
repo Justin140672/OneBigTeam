@@ -448,6 +448,7 @@ public static class EmployeesModule
         services.AddScoped<IPositionProfileDocumentsReader, PositionProfileDocumentsReader>();
         services.AddScoped<IPositionProfileAssetsReader, PositionProfileAssetsReader>();
         services.AddScoped<IPositionProfileReader, PositionProfileReader>();
+        services.AddScoped<IEmploymentTypeReader, EmploymentTypeReader>();
         services.AddScoped<ICurrentEmployeeReader, CurrentEmployeeReader>();
         services.AddScoped<IEmployeeApplicantReader, EmployeeApplicantReader>();
         services.AddScoped<IOnboardingTemplateReader, OnboardingTemplateReader>();

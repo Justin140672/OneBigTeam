@@ -1,4 +1,5 @@
 using FluentValidation;
+using HR.Modules.Employees.Domain;
 
 namespace HR.Modules.Employees.Features.CreateEmployee;
 
@@ -71,5 +72,35 @@ internal sealed class CreateEmployeeValidator : AbstractValidator<CreateEmployee
         RuleFor(r => r.Gender)
             .NotEmpty().WithMessage("Gender is required.")
             .MaximumLength(50);
+
+        RuleFor(r => r.AddressLine1)
+            .NotEmpty().WithMessage("Address line 1 is required.")
+            .MaximumLength(200);
+
+        RuleFor(r => r.AddressLine2).MaximumLength(200);
+
+        RuleFor(r => r.City)
+            .NotEmpty().WithMessage("City is required.")
+            .MaximumLength(100);
+
+        RuleFor(r => r.County).MaximumLength(100);
+
+        RuleFor(r => r.PostCode)
+            .NotEmpty().WithMessage("Postcode is required.")
+            .MaximumLength(20);
+
+        RuleFor(r => r.Salary)
+            .NotNull().WithMessage("Salary is required.")
+            .GreaterThan(0m).WithMessage("Salary must be greater than 0.");
+
+        RuleFor(r => r.SalaryFrequency)
+            .Cascade(CascadeMode.Stop)
+            .NotEmpty().WithMessage("Salary type is required.")
+            .Must(value => Enum.TryParse<SalaryType>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed))
+                .WithMessage("Salary type must be Annual, Hourly or Daily.");
+
+        RuleFor(r => r.Currency)
+            .NotEmpty().WithMessage("Currency is required.")
+            .Length(3).WithMessage("Currency must be a 3-letter ISO 4217 code (e.g. GBP).");
     }
 }

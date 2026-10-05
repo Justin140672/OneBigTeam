@@ -50,7 +50,8 @@ internal static class RecruitmentTestSeeder
         // IPositionProfileReader.GetSummaryAsync and returns NotFound for a made-up id. Callers that
         // never hire from this application can leave this null and get the previous random-id
         // behaviour, unchanged.
-        Guid? positionProfileId = null)
+        Guid? positionProfileId = null,
+        Guid? employmentTypeId = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
@@ -77,7 +78,7 @@ internal static class RecruitmentTestSeeder
         var rejectedStageId = stages.Single(s => s.Name == "Rejected").Id;
 
         var vacancy = Vacancy.Create(
-            Guid.NewGuid(), companyId, positionProfileId ?? Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), now);
+            Guid.NewGuid(), companyId, positionProfileId ?? Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), now, employmentTypeId: employmentTypeId);
         var candidate = Candidate.Create(
             Guid.NewGuid(), companyId, candidateFirstName, candidateLastName,
             $"{candidateFirstName.ToLowerInvariant()}.{Guid.NewGuid():N}@example.com", null, now);

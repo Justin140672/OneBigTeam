@@ -41,6 +41,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
     private static readonly Guid AcmeId = InternalVacancyApplyApi.AcmeId;
 
     private const string InitialStage = "Application Received";
+    private const string InterviewStage = "Interview";
     private const string OfferStage = "Offer";
     private const string HiredStage = "Hired";
 
@@ -217,7 +218,7 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await vacancyDetail.SelectInterviewerAsync(InterviewerName);
         await vacancyDetail.FillScheduledAtAsync(interviewAt);
         await vacancyDetail.SubmitScheduleInterviewAsync();
-        await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, InitialStage);
+        await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, InterviewStage);
 
         await vacancyDetail.OpenInterviewsTabAsync();
         Assert.Equal("Pending", await vacancyDetail.GetInterviewOutcomeAsync(applicant.LastName));
@@ -230,6 +231,10 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await vacancyDetail.OpenApplicationsTabAsync();
         await vacancyDetail.ClickOfferForAsync(applicant.LastName);
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, OfferStage);
+
+        await vacancyDetail.OpenRecordOfferResponseDialogAsync(applicant.LastName);
+        await vacancyDetail.SelectOfferResponseStatusAsync("Accepted");
+        await vacancyDetail.SubmitOfferResponseAsync();
 
         await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(applicant.LastName, "Appoint");
         await vacancyDetail.ExpectToolbarItemDisabledAsync("Hire");

@@ -15,17 +15,7 @@ internal sealed class UpdateEmploymentDetailsValidator : AbstractValidator<Updat
         RuleFor(r => r.Id).NotEmpty();
         RuleFor(r => r.StartDate).NotEmpty();
 
-        // Draft is deliberately not one of the selectable options on the Employment tab's status
-        // dropdown (see EmployeeEmploymentTab.razor's _statusOptions) — it's a new-employee-only
-        // starting state, not something a user picks. But a request-shape rule can't tell "this
-        // employee is still Draft and this edit doesn't touch status" apart from "someone is
-        // actively reverting an Active employee back to Draft" — it only sees the submitted value,
-        // not the employee's current one. Rejecting Status == Draft outright therefore also
-        // rejected every legitimate edit (e.g. assigning a manager) made before a brand-new
-        // employee's first Activate, since the form round-trips their still-Draft status
-        // unchanged. That check now lives in the handler, which has the employee's current status
-        // to compare against and can distinguish an actual attempted transition into Draft from a
-        // Draft employee simply staying Draft.
+        RuleFor(r => r.Status).IsInEnum();
 
         // Same format rule Wave 1 applied to CreateEmployee — an employee number changed here is a
         // genuine administrative correction, so it must satisfy the same constraints a brand-new

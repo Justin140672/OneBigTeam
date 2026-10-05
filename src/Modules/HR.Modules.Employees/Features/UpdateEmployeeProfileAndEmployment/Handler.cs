@@ -52,6 +52,13 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
         Result<UpdateEmployeeProfileAndEmploymentResponse> Fail(Error error) =>
             Result.Failure<UpdateEmployeeProfileAndEmploymentResponse>(error);
 
+        if (string.IsNullOrWhiteSpace(request.AddressLine1))
+            return Fail(Error.Validation("Address line 1 is required."));
+        if (string.IsNullOrWhiteSpace(request.City))
+            return Fail(Error.Validation("City is required."));
+        if (string.IsNullOrWhiteSpace(request.PostCode))
+            return Fail(Error.Validation("Postcode is required."));
+
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(request.PostCode) &&
@@ -164,9 +171,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
                 return Fail(Error.NotFound($"Employment type '{request.EmploymentTypeId}' was not found or is inactive."));
         }
 
-        if (request.Status == EmploymentStatus.Draft && employee.Status != EmploymentStatus.Draft)
-            return Fail(Error.Validation("Cannot set employment status to Draft."));
-
         if (request.Status == EmploymentStatus.FormerEmployee && employee.Status != request.Status)
             return Fail(Error.Validation("Cannot set employment status to Former Employee directly."));
 
@@ -243,9 +247,6 @@ internal sealed class UpdateEmployeeProfileAndEmploymentHandler
             now);
 
         employee.SetWorkingPattern(request.WorkingDaysOverride, request.HoursPerDayOverride, now);
-
-        if (employee.IsInitialCompanyAdmin && employee.Status == EmploymentStatus.Draft)
-            employee.Activate(now);
 
         // Ticket 6 follow-up: stage the position-change integration event in the SAME transaction as
         // the business write, instead of publishing after commit — see UpdateEmploymentDetails

@@ -55,7 +55,7 @@ public class HrHeadcountSummaryReaderTests
     }
 
     [Fact]
-    public async Task GetHeadcountSummaryAsync_Excludes_Draft_And_Categories_Reconcile_To_Total()
+    public async Task GetHeadcountSummaryAsync_Counts_Every_Record_And_Categories_Reconcile_To_Total()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -75,15 +75,15 @@ public class HrHeadcountSummaryReaderTests
         suspended.Activate(Now);
         suspended.Suspend(Now);
 
-        SeedEmployee(db, companyId, Today.AddDays(-5), activate: false);
+        SeedEmployee(db, companyId, Today.AddDays(-5));
 
         await db.SaveChangesAsync();
 
         var reader = new HrHeadcountSummaryReader(db);
         var result = await reader.GetHeadcountSummaryAsync(companyId, new ReportFilterCriteria(), CancellationToken.None);
 
-        Assert.Equal(4, result.TotalHeadcount);
-        Assert.Equal(1, result.ActiveEmployees);
+        Assert.Equal(5, result.TotalHeadcount);
+        Assert.Equal(2, result.ActiveEmployees);
         Assert.Equal(1, result.FutureStarters);
         Assert.Equal(1, result.Leavers);
         Assert.Equal(1, result.OtherEmployees);
@@ -91,23 +91,6 @@ public class HrHeadcountSummaryReaderTests
             result.TotalHeadcount,
             result.ActiveEmployees + result.FutureStarters + result.Leavers + result.OtherEmployees);
         Assert.Equal(result.TotalHeadcount, result.Items.Count);
-        Assert.DoesNotContain(result.Items, i => i.Status == nameof(EmploymentStatus.Draft));
-    }
-
-    [Fact]
-    public async Task GetHeadcountSummaryAsync_Draft_Status_Filter_Returns_Nothing()
-    {
-        await using var db = BuildContext();
-        var companyId = Guid.NewGuid();
-        SeedEmployee(db, companyId, Today.AddDays(-5), activate: false);
-        await db.SaveChangesAsync();
-
-        var reader = new HrHeadcountSummaryReader(db);
-        var result = await reader.GetHeadcountSummaryAsync(
-            companyId, new ReportFilterCriteria(EmployeeStatus: "Draft"), CancellationToken.None);
-
-        Assert.Equal(0, result.TotalHeadcount);
-        Assert.Empty(result.Items);
     }
 
     [Fact]
@@ -132,7 +115,7 @@ public class HrHeadcountSummaryReaderTests
         var byEmploymentType = await new HR.Modules.Employees.Features.GetEmploymentTypeSplit.GetEmploymentTypeSplitHandler(db)
             .HandleAsync(new HR.Modules.Employees.Features.GetEmploymentTypeSplit.GetEmploymentTypeSplitRequest(companyId), CancellationToken.None);
 
-        Assert.Equal(1, report.ActiveEmployees);
+        Assert.Equal(2, report.ActiveEmployees);
         Assert.Equal(report.ActiveEmployees, byDepartment.Items.Sum(i => i.EmployeeCount));
         Assert.Equal(report.ActiveEmployees, byEmploymentType.Items.Sum(i => i.EmployeeCount));
     }
@@ -332,7 +315,8 @@ public class HrHeadcountSummaryReaderTests
         var active = SeedEmployee(db, companyId, Today);
         active.Activate(Now);
 
-        var draft = SeedEmployee(db, companyId, Today, activate: false);
+        var suspended = SeedEmployee(db, companyId, Today);
+        suspended.Suspend(Now);
 
         await db.SaveChangesAsync();
 
@@ -342,7 +326,7 @@ public class HrHeadcountSummaryReaderTests
 
         var item = Assert.Single(result.Items);
         Assert.Equal(active.Id, item.EmployeeId);
-        Assert.DoesNotContain(result.Items, i => i.EmployeeId == draft.Id);
+        Assert.DoesNotContain(result.Items, i => i.EmployeeId == suspended.Id);
     }
 
     [Fact]

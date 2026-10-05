@@ -17,15 +17,14 @@ internal sealed record HireCandidateRequest
     public string Gender { get; init; } = string.Empty;
     public string? GenderOther { get; init; }
     public string EmployeeNumber { get; init; } = string.Empty;
-    public Guid EmploymentTypeId { get; init; }
 
-    // DepartmentId, LocationId and PositionProfileId are deliberately NOT independent client-supplied
-    // inputs here — the whole point of this story is that a hired employee is assigned to the
-    // Vacancy's linked Position Profile, not to whatever HR happened to type into this dialog. See
-    // HireCandidateHandler: it looks up the Vacancy via VacancyId, takes its (mandatory)
-    // PositionProfileId, and derives DepartmentId/LocationId from that same Position Profile via
-    // IPositionProfileReader — exactly the same pattern CreateVacancyHandler already uses for
-    // DepartmentId. Manager remains a genuinely independent choice HR makes for the new employee.
+    // DepartmentId, LocationId, PositionProfileId and EmploymentTypeId are deliberately NOT
+    // client-supplied: HireCandidateHandler derives them from the Vacancy (and its Position Profile),
+    // so the hired employee cannot be assigned something other than what the vacancy specifies.
+    //
+    // Manager defaults to Vacancy.HiringManagerId. Set OverrideManager to replace it with ManagerId;
+    // OverrideManager with a null ManagerId is an explicit "No manager".
+    public bool OverrideManager { get; init; }
     public Guid? ManagerId { get; init; }
 
     public string? AddressLine1 { get; init; }

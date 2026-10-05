@@ -26,13 +26,11 @@ The system shall:
 
 ## Employee States
 
-### Draft
-
-Employee record has been created but is incomplete.
 
 ### Active
 
-Employee is currently employed.
+Employees are created Active (Hire Candidate, Add Employee, import, initial administrator provisioning and automated provisioning). There is no Draft status; the former numeric value 0 is retired and reserved. A future starter is an Active employee whose start date is in the future and is identified by start date, not status.
+
 
 ### On Leave
 

@@ -29,6 +29,7 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.GoToAsync(AcmeId);
@@ -60,6 +61,7 @@ public sealed class VacancyPublishTests(RecruiterPersonaFixture fixture) : RoleE
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.GoToAsync(AcmeId);

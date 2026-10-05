@@ -37,6 +37,6 @@ internal sealed class EmployeeApplicantReader(EmployeesDbContext dbContext) : IE
         EmploymentStatus.Suspended => EmployeeApplicantEmploymentState.Suspended,
         EmploymentStatus.Leaving => EmployeeApplicantEmploymentState.Leaving,
         EmploymentStatus.FormerEmployee => EmployeeApplicantEmploymentState.Former,
-        _ => EmployeeApplicantEmploymentState.Draft,
+        _ => throw new ArgumentOutOfRangeException(nameof(status), status, "Unsupported employment status."),
     };
 }

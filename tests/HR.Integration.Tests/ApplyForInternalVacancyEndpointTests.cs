@@ -45,7 +45,6 @@ public class ApplyForInternalVacancyEndpointTests
     private static readonly Guid MissingCvUser        = new("cc00cf50-0000-0000-0000-000000000007");
     private static readonly Guid BadFileUser          = new("cc00cf50-0000-0000-0000-000000000008");
     private static readonly Guid LeavingUser          = new("cc00cf50-0000-0000-0000-000000000009");
-    private static readonly Guid DraftUser            = new("cc00cf50-0000-0000-0000-00000000000a");
     private static readonly Guid NoEmployeeRowUser    = new("cc00cf50-0000-0000-0000-00000000000b");
     private static readonly Guid EmailInUseUser       = new("cc00cf50-0000-0000-0000-00000000000c");
     private static readonly Guid HasAppliedUser       = new("cc00cf50-0000-0000-0000-00000000000d");
@@ -56,7 +55,7 @@ public class ApplyForInternalVacancyEndpointTests
     private static readonly Guid[] PlainEmployees =
     [
         HappyPathUser, AppliesTwiceUser, TwoVacanciesUser, CrossCompanyUser, ForeignVacancyUser,
-        HiddenVacanciesUser, MissingCvUser, BadFileUser, LeavingUser, DraftUser, NoEmployeeRowUser,
+        HiddenVacanciesUser, MissingCvUser, BadFileUser, LeavingUser, NoEmployeeRowUser,
         EmailInUseUser, HasAppliedUser, SuspendedUser, FormerUser,
     ];
 
@@ -131,7 +130,7 @@ public class ApplyForInternalVacancyEndpointTests
 
         if (status == EmploymentStatus.Active)
             employee.Activate(now);
-        else if (status != EmploymentStatus.Draft)
+        else
             employee.SetStatusForTesting(status, now);
 
         db.Employees.Add(employee);
@@ -415,20 +414,6 @@ public class ApplyForInternalVacancyEndpointTests
         await SeedEmployeeAsync(LeavingUser, companyId, UniqueWorkEmail(), EmploymentStatus.Leaving);
         var vacancyId = await SeedVacancyAsync(companyId, "Role");
         using var client = await ClientAs(LeavingUser, companyId);
-
-        var response = await client.PostAsync(ApplyUrl(companyId, vacancyId), BuildForm(PdfCv()));
-
-        await AssertCodedRefusalAsync(response, HttpStatusCode.Forbidden, "not_eligible_to_apply");
-        await AssertNothingCreatedAsync(companyId);
-    }
-
-    [Fact]
-    public async Task Post_By_Draft_Employee_Returns_Forbidden_Not_Eligible()
-    {
-        var companyId = Guid.NewGuid();
-        await SeedEmployeeAsync(DraftUser, companyId, UniqueWorkEmail(), EmploymentStatus.Draft);
-        var vacancyId = await SeedVacancyAsync(companyId, "Role");
-        using var client = await ClientAs(DraftUser, companyId);
 
         var response = await client.PostAsync(ApplyUrl(companyId, vacancyId), BuildForm(PdfCv()));
 

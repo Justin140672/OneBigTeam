@@ -451,8 +451,56 @@ public class CreateVacancyHandlerTests
         Assert.True(saved.IsAdvertisedInternally);
     }
 
-    private static CreateVacancyHandler handler(RecruitmentDbContext db, HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new HR.Modules.Recruitment.Services.RecruitmentStageSeeder(db));
+    [Fact]
+    public async Task HandleAsync_Persists_EmploymentType_When_Active_And_Same_Company()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employmentTypeId = Guid.NewGuid();
+
+        var result = await handler(db, employmentTypeReader: FakeEmploymentTypeReader.Active((companyId, employmentTypeId))).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = companyId,
+                PositionProfileId = Guid.NewGuid(),
+                HiringManagerId   = Guid.NewGuid(),
+                EmploymentTypeId  = employmentTypeId,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employmentTypeId, result.Value!.EmploymentTypeId);
+        Assert.Equal(employmentTypeId, (await db.Vacancies.SingleAsync()).EmploymentTypeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_NotFound_When_EmploymentType_Is_Inactive_Missing_Or_CrossCompany()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var otherCompanyType = Guid.NewGuid();
+
+        var result = await handler(db, employmentTypeReader: FakeEmploymentTypeReader.Active((Guid.NewGuid(), otherCompanyType))).HandleAsync(
+            new CreateVacancyRequest
+            {
+                CompanyId         = companyId,
+                PositionProfileId = Guid.NewGuid(),
+                HiringManagerId   = Guid.NewGuid(),
+                EmploymentTypeId  = otherCompanyType,
+            },
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Empty(db.Vacancies);
+    }
+
+    private static CreateVacancyHandler handler(
+        RecruitmentDbContext db,
+        HR.Modules.Employees.Contracts.IPositionProfileReader? positionProfileReader = null,
+        HR.Modules.Employees.Contracts.IEmploymentTypeReader? employmentTypeReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new HR.Modules.Recruitment.Services.RecruitmentStageSeeder(db),
+            employmentTypeReader ?? FakeEmploymentTypeReader.Permissive());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

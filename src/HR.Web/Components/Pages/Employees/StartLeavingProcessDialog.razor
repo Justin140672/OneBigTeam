@@ -17,7 +17,7 @@
                 {
                     <div class="mb-3">
                         <label class="form-label">Resignation Received Date <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?"
+                        <HrDatePicker TValue="DateOnly?"
                                       @bind-Value="_model.ResignationReceivedDate"
                                       Format="dd/MM/yyyy"
                                       Placeholder="dd/mm/yyyy" />
@@ -32,7 +32,7 @@
                     </p>
                     <div class="mb-3">
                         <label class="form-label">Leaving Date <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?"
+                        <HrDatePicker TValue="DateOnly?"
                                       Value="_model.LeavingDate"
                                       ValueChanged="OnLeavingDateChanged"
                                       Format="dd/MM/yyyy"
@@ -54,7 +54,7 @@
                 {
                     <div class="mb-3">
                         <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
-                        <SfDatePicker TValue="DateOnly?"
+                        <HrDatePicker TValue="DateOnly?"
                                       @bind-Value="_model.LastWorkingDay"
                                       Format="dd/MM/yyyy"
                                       Placeholder="dd/mm/yyyy" />

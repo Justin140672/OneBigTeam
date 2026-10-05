@@ -69,7 +69,6 @@ public class GetDirectoryEmployeeHandlerTests
     }
 
     [Theory]
-    [InlineData("Draft")]
     [InlineData("Suspended")]
     [InlineData("Leaving")]
     [InlineData("FormerEmployee")]

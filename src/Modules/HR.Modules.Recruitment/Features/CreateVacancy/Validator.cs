@@ -22,5 +22,8 @@ internal sealed class CreateVacancyValidator : AbstractValidator<CreateVacancyRe
 
         RuleFor(r => r.HiringManagerId)
             .NotEmpty();
+
+        RuleFor(r => r.EmploymentTypeId)
+            .NotEmpty().WithMessage("Employment type is required.");
     }
 }

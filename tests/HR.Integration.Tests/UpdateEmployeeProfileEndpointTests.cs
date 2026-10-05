@@ -21,6 +21,7 @@ public class UpdateEmployeeProfileEndpointTests
         Task.Run(async () =>
         {
             await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser1, SystemRoles.HrAdministrator);
+            await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser1, SystemRoles.Employee);
             await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser2, SystemRoles.HrAdministrator);
             await TestRoleSeeder.AssignRoleAsync(factory, UpdEmpUser3, SystemRoles.HrAdministrator);
         }).GetAwaiter().GetResult();
@@ -33,9 +34,39 @@ public class UpdateEmployeeProfileEndpointTests
 
         var response = await client.PutAsJsonAsync(
             $"/api/companies/{Guid.NewGuid()}/employees/{Guid.NewGuid()}/profile",
-            new { firstName = "Alice", lastName = "Smith", workEmail = "alice@example.com", startDate = "2026-07-01", expectedVersion = 1 });
+            new { firstName = "Alice", lastName = "Smith", workEmail = "alice@example.com", startDate = "2026-07-01", addressLine1 = "1 Test Street", city = "London", postCode = "SW1A 1AA", expectedVersion = 1 });
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("addressLine1", null)]
+    [InlineData("addressLine1", "   ")]
+    [InlineData("city", "")]
+    [InlineData("city", "   ")]
+    [InlineData("postCode", null)]
+    [InlineData("postCode", "   ")]
+    public async Task Put_Employee_Profile_Rejects_Blank_Required_Address_Fields(string field, string? value)
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, UpdEmpUser1.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, UpdEmpUser1, SystemRoles.HrAdministrator, companyId);
+        var created = await CreateEmployeeAsync(client, companyId, "Alice", "Smith", $"alice.{Guid.NewGuid():N}@example.com");
+
+        var body = new Dictionary<string, object?>
+        {
+            ["firstName"] = "Alicia", ["lastName"] = "Smith", ["workEmail"] = $"alicia.{Guid.NewGuid():N}@example.com",
+            ["startDate"] = "2026-07-01", ["addressLine1"] = "1 Test Street", ["city"] = "London",
+            ["postCode"] = "SW1A 1AA", ["expectedVersion"] = 1,
+        };
+        body[field] = value;
+
+        var response = await client.PutAsJsonAsync($"/api/companies/{companyId}/employees/{created.Id}/profile", body);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Contains(field, await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -58,6 +89,9 @@ public class UpdateEmployeeProfileEndpointTests
                 firstName = "Alicia",
                 lastName = "Jones",
                 workEmail = $"alicia.jones.{Guid.NewGuid():N}@example.com",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 personalEmail = "alicia@gmail.com",
                 startDate = "2026-08-01",
                 expectedVersion = await GetVersionAsync(client, companyId, created.Id)
@@ -94,6 +128,9 @@ public class UpdateEmployeeProfileEndpointTests
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = emp2.WorkEmail,
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 startDate = "2026-07-01",
                 expectedVersion = await GetVersionAsync(client, companyId, emp1.Id)
             });
@@ -119,6 +156,9 @@ public class UpdateEmployeeProfileEndpointTests
                 firstName = "Alice",
                 lastName = "Smith",
                 workEmail = "alice@example.com",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 startDate = "2026-07-01",
                 expectedVersion = 1
             });
@@ -182,6 +222,9 @@ public class UpdateEmployeeProfileEndpointTests
             startDate = "2026-07-01",
             dateOfBirth = "1990-01-01",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Male",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             employmentTypeId = refData.EmploymentTypeId,

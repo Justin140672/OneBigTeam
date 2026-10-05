@@ -182,9 +182,16 @@ public sealed class InternalAppointmentDialog(IPage page)
 
     public async Task FillCompensationNotesAsync(string value)
     {
-        await CompensationNotesInput.ClickAsync();
-        await CompensationNotesInput.PressSequentiallyAsync(value, new() { Delay = 10 });
-        await page.Keyboard.PressAsync("Tab");
+        for (var attempt = 1; ; attempt++)
+        {
+            await CompensationNotesInput.ClickAsync();
+            await CompensationNotesInput.FillAsync(value);
+            await page.Keyboard.PressAsync("Tab");
+            await page.WaitForTimeoutAsync(300);
+            if (await CompensationNotesInput.InputValueAsync() == value || attempt == 3)
+                break;
+        }
+
         await Assertions.Expect(CompensationNotesInput).ToHaveValueAsync(value, new() { Timeout = 10_000 });
     }
 

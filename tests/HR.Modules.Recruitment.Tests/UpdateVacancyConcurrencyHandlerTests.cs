@@ -40,7 +40,7 @@ public class UpdateVacancyConcurrencyHandlerTests
         };
 
     private static UpdateVacancyHandler Handler(RecruitmentDbContext db, FakeAuditPublisher audit)
-        => new(db, new FakeClock(FixedUtcNow), audit, new FakePositionProfileReader());
+        => new(db, new FakeClock(FixedUtcNow), audit, new FakePositionProfileReader(), FakeEmploymentTypeReader.Permissive());
 
     [Fact]
     public async Task Matching_ExpectedVersion_Succeeds_And_Bumps_Version()

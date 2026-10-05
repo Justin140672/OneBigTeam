@@ -81,14 +81,12 @@ public class GetEmploymentTypeSplitHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Draft_Suspended_And_Terminated_Employees()
+    public async Task HandleAsync_Excludes_Suspended_And_Former_Employees()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var employmentType = EmploymentType.Create(Guid.NewGuid(), companyId, "Full-Time", null, Now);
         context.EmploymentTypes.Add(employmentType);
-
-        var draft = NewEmployee(companyId, "Draft", "Employee", employmentType.Id);
 
         var suspended = NewEmployee(companyId, "Suspended", "Employee", employmentType.Id);
         suspended.Activate(Now);
@@ -101,7 +99,7 @@ public class GetEmploymentTypeSplitHandlerTests
         var active = NewEmployee(companyId, "Active", "Employee", employmentType.Id);
         active.Activate(Now);
 
-        context.Employees.AddRange(draft, suspended, terminated, active);
+        context.Employees.AddRange(suspended, terminated, active);
         await context.SaveChangesAsync();
 
         var handler = new GetEmploymentTypeSplitHandler(context);

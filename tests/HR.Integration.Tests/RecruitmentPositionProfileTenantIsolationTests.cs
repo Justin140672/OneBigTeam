@@ -112,7 +112,10 @@ public class RecruitmentPositionProfileTenantIsolationTests
                 nationality = "British",
                 gender = "Prefer not to say",
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
-                employmentTypeId = Guid.NewGuid(),
+                overrideManager = true,
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
             });
         Assert.Equal(HttpStatusCode.NotFound, hireResponse.StatusCode);
     }

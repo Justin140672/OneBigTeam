@@ -59,6 +59,7 @@ public class ApiWebApplicationFactory : WebApplicationFactory<Program>, IAsyncLi
                 ["Infrastructure:SensitiveDataProtection:ActiveKeyId"] = "test",
                 ["Infrastructure:SensitiveDataProtection:Keys:test"] = TestSensitiveDataKey,
                 ["SupportSession:SigningKey"] = "test-support-session-signing-key-not-a-real-secret",
+                ["Dashboards:SummaryTimeoutSeconds"] = "60",
                 ["Identity:RateLimits:identity-login:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-signup:PermitLimit"] = "1000",
                 ["Identity:RateLimits:identity-forgot-password:PermitLimit"] = "1000",

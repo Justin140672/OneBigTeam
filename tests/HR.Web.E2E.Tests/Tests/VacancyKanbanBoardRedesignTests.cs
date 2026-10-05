@@ -122,7 +122,7 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
     }
 
     [Fact]
-    public async Task MoveToStageMenu_OnTerminalStageCard_IsRejectedByServer_AndSurfacesTheSameErrorBannerAsDrag()
+    public async Task MoveToStageMenu_IsNotOffered_OnTerminalStageCard()
     {
         var (candidateLast, kanban) = await ArrangeAppliedApplicationAsync();
 
@@ -131,30 +131,24 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         await vacancyDetail.GoToAsync(AcmeId, vacancyId);
         await vacancyDetail.OpenApplicationsTabAsync();
 
+        await vacancyDetail.ReachAcceptedOfferAsync(candidateLast);
         await vacancyDetail.ClickHireForAsync(candidateLast);
         await vacancyDetail.WaitForHireDialogAsync();
         await vacancyDetail.FillHireStartDateAsync("01/10/2026");
         await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
-        await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
+        await vacancyDetail.FillHireAddressAsync("1 Test Street", "London", "SW1A 1AA");
         await vacancyDetail.SubmitHireAsync();
 
         Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
 
         await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
         Assert.True(await kanban.IsCardInColumnAsync(candidateLast, TerminalHired),
-            $"Sanity check: expected the Hire workflow to land the card on '{TerminalHired}' before attempting a further move");
+            $"Expected the Hire workflow to land the card on '{TerminalHired}'");
 
-        await kanban.MoveToStageViaKeyboardAsync(candidateLast, SecondStage);
-
-        Assert.True(await kanban.IsErrorVisibleAsync(),
-            "Expected attempting to move a terminal-stage application via the keyboard menu to surface the same error banner the drag path uses");
-
-        // And the card must still be reported on the terminal stage — the rejected move must not
-        // have silently taken effect client-side.
-        Assert.True(await kanban.IsCardInColumnAsync(candidateLast, TerminalHired),
-            $"Expected the card to remain on '{TerminalHired}' after the server rejected the further move");
+        var card = _page.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateLast });
+        await Assertions.Expect(card.Locator("[data-testid='kanban-card-move-stage-btn']")).ToHaveCountAsync(0);
     }
 
     [Fact]
@@ -234,6 +228,7 @@ public sealed class VacancyKanbanBoardRedesignTests(RecruiterPersonaFixture fixt
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);

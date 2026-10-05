@@ -45,6 +45,7 @@ public class EmployeeConcurrencyHandlerTests
     private static UpdateEmployeeProfileRequest ProfileRequest(Guid companyId, Guid id, int? expectedVersion, string firstName = "Alicia")
         => new()
         {
+            AddressLine1 = "1 High Street", City = "London", PostCode = "SW1A 1AA",
             CompanyId = companyId,
             Id = id,
             FirstName = firstName,
@@ -339,7 +340,7 @@ public class EmployeeConcurrencyHandlerTests
         await using var verify = new EmployeesDbContext(Options(dbName));
         var saved = await verify.Employees.SingleAsync();
         Assert.Equal("AdminEdited", saved.FirstName);
-        Assert.Null(saved.City);
+        Assert.Equal("London", saved.City);
         Assert.Equal(2, saved.Version);
     }
 

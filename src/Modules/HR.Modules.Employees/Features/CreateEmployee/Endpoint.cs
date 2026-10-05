@@ -5,7 +5,8 @@ using Microsoft.AspNetCore.Http;
 namespace HR.Modules.Employees.Features.CreateEmployee;
 
 internal sealed class Endpoint(
-    CreateEmployeeHandler handler) : Endpoint<CreateEmployeeRequest, CreateEmployeeResponse>
+    CreateEmployeeHandler handler,
+    ICurrentUser currentUser) : Endpoint<CreateEmployeeRequest, CreateEmployeeResponse>
 {
     public override void Configure()
     {
@@ -20,7 +21,12 @@ internal sealed class Endpoint(
         var idempotencyKey = HttpContext.Request.Headers["Idempotency-Key"].ToString();
 
         var result = await handler.HandleAsync(
-            request with { IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey },
+            request with
+            {
+                IsInitialCompanyAdmin = false,
+                IdempotencyKey = string.IsNullOrWhiteSpace(idempotencyKey) ? null : idempotencyKey,
+                ActorEmployeeId = currentUser.UserId
+            },
             cancellationToken);
 
         if (result.IsFailure)

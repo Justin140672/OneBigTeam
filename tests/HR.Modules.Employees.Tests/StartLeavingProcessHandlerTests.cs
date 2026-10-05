@@ -325,7 +325,7 @@ public class StartLeavingProcessHandlerTests
         Assert.Equal(0, await context.EmployeeLeavingProcesses.CountAsync());
 
         var savedEmployee = await context.Employees.SingleAsync();
-        Assert.Equal(EmploymentStatus.Draft, savedEmployee.Status);
+        Assert.Equal(EmploymentStatus.Active, savedEmployee.Status);
     }
 
     [Fact]

@@ -7,6 +7,7 @@
 @inject EmployeeService EmployeeService
 @inject PositionProfileService PositionProfileService
 @inject LocationService LocationService
+@inject EmploymentTypeService EmploymentTypeService
 @inject ExternalRecruiterService ExternalRecruiterService
 @inject AppSession Session
 @inject IJSRuntime JS
@@ -63,7 +64,7 @@
             <div class="vacancy-header-actions">
                 @if (CanPublish)
                 {
-                    <SfButton IsPrimary="true" OnClick="PublishVacancyAsync" Disabled="@(_publishing || Session.IsReadOnly)">
+                    <SfButton IsPrimary="true" OnClick="PublishVacancyAsync" Disabled="@(_publishing || Session.IsReadOnly || LegacyMissingEmploymentType)">
                         @if (_publishing)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -99,6 +100,12 @@
         @if (!string.IsNullOrEmpty(_publishError))
         {
             <div class="alert alert-danger mb-3" role="alert">@_publishError</div>
+        }
+        @if (LegacyMissingEmploymentType && _vacancy!.Status is not ("Closed" or "Cancelled"))
+        {
+            <div class="alert alert-warning mb-3" role="status" data-testid="vacancy-employment-type-required">
+                Employment type required. Set an employment type and save before opening this vacancy or hiring from it.
+            </div>
         }
 
         <SfTab @bind-SelectedItem="_selectedTabIndex">
@@ -213,6 +220,8 @@
 
     private bool CanClose => _vacancy is not null && _vacancy.Status is not ("Closed" or "Cancelled") && !IsViewMode;
     private bool CanPublish => _vacancy is not null && _vacancy.Status is "Draft" or "OnHold" && !IsViewMode;
+    private bool LegacyMissingEmploymentType => _vacancy is not null && _vacancy.EmploymentTypeId is null && Model.EmploymentTypeId is null;
+    private List<EmploymentTypeListItemModel> _employmentTypes = [];
 
     // Locked (CanChangePositionProfile == false) unless the user is requesting an authorised
     // correction — gated behind the same Recruiter role that already owns UpdateVacancy
@@ -262,6 +271,10 @@
                 .ToList();
         }
 
+        var employmentTypeResult = await EmploymentTypeService.ListEmploymentTypesAsync(CompanyId, includeInactive: true);
+        var allEmploymentTypes = employmentTypeResult?.Items ?? [];
+        _employmentTypes = allEmploymentTypes.Where(t => t.IsActive).OrderBy(t => t.Name).ToList();
+
         var recruitersResult = await ExternalRecruiterService.ListExternalRecruitersAsync(CompanyId, isActive: true, pageSize: 200);
         _externalRecruiters = (recruitersResult?.Items.ToList() ?? [])
             .OrderBy(r => r.AgencyName)
@@ -271,6 +284,13 @@
         if (!IsNew)
         {
             _vacancy = await VacancyService.GetVacancyAsync(CompanyId, Id!.Value);
+
+            if (_vacancy?.EmploymentTypeId is { } currentTypeId && _employmentTypes.All(t => t.Id != currentTypeId))
+            {
+                var currentType = allEmploymentTypes.FirstOrDefault(t => t.Id == currentTypeId);
+                if (currentType is not null)
+                    _employmentTypes = _employmentTypes.Append(currentType).OrderBy(t => t.Name).ToList();
+            }
 
             if (string.Equals(Tab, "applications", StringComparison.OrdinalIgnoreCase) && _vacancy is { Status: not "Draft" })
                 _selectedTabIndex = 1;
@@ -596,6 +616,17 @@
                                              ValueField="Id" TextField="AgencyName"
                                              Placeholder="Not assigned"
                                              Disabled="@IsViewMode" />
+                        </div>
+                        <div class="col-md-4">
+                            <HrDropDownField TValue="Guid?" TItem="EmploymentTypeListItemModel"
+                                             Label="Employment Type" Required="true" Id="vacancy-employment-type"
+                                             DataSource="@_employmentTypes"
+                                             @bind-Value="Model.EmploymentTypeId"
+                                             ValueField="Id" TextField="Name"
+                                             Placeholder="Select employment type"
+                                             AllowFiltering="false"
+                                             Disabled="@IsViewMode"
+                                             HelpText="@(LegacyMissingEmploymentType ? "Employment type required" : "Used for the employee record when a candidate is hired.")" />
                         </div>
                         <div class="col-12">
                             <HrTextField Label="Advert Description" Id="vacancy-advert-description"

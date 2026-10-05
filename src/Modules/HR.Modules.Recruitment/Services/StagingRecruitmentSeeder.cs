@@ -23,6 +23,8 @@ internal static class StagingRecruitmentSeeder
             "Join the platform engineering team to build and maintain core product features."),
     ];
 
+    private static readonly Guid PermanentEmploymentTypeId = new("5A000004-0000-0000-0000-000000000001");
+
     public static Guid VacancyId(int number) => new($"5A0000E0-0000-0000-0000-{number:D12}");
 
     public static async Task SeedAsync(
@@ -61,7 +63,8 @@ internal static class StagingRecruitmentSeeder
             var vacancy = Vacancy.Create(
                 VacancyId(definition.Number), companyId, positionProfileId,
                 definition.AdvertTitle, definition.AdvertDescription, hiringManagerId, now,
-                isAdvertisedInternally: true);
+                isAdvertisedInternally: true,
+                employmentTypeId: PermanentEmploymentTypeId);
             vacancy.Open(now, openedAt);
             db.Vacancies.Add(vacancy);
         }

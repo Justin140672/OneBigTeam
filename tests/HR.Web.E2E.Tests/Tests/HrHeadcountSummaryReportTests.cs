@@ -55,7 +55,7 @@ public sealed class HrHeadcountSummaryReportTests(HrAdminPersonaFixture fixture)
 
         Assert.Equal(total, parts);
         Assert.True(await report.GetRowCountAsync() <= total);
-        Assert.Contains("except Drafts", await report.GetHeadcountDefinitionAsync());
+        Assert.Contains("counts every employee record", await report.GetHeadcountDefinitionAsync());
     }
 
     [Fact]

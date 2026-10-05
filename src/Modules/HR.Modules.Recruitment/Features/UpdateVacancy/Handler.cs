@@ -10,7 +10,8 @@ internal sealed class UpdateVacancyHandler(
     RecruitmentDbContext db,
     IClock clock,
     IAuditEventPublisher auditPublisher,
-    IPositionProfileReader positionProfileReader)
+    IPositionProfileReader positionProfileReader,
+    IEmploymentTypeReader employmentTypeReader)
 {
     public async Task<Result<UpdateVacancyResponse>> HandleAsync(
         UpdateVacancyRequest request,
@@ -103,6 +104,16 @@ internal sealed class UpdateVacancyHandler(
                     Error.Validation($"External recruiter '{recruiter.AgencyName}' is inactive and cannot be assigned to a vacancy."));
         }
 
+        if (request.EmploymentTypeId is { } requestedEmploymentTypeId
+            && requestedEmploymentTypeId != vacancy.EmploymentTypeId)
+        {
+            if (!await employmentTypeReader.IsActiveAsync(request.CompanyId, requestedEmploymentTypeId, cancellationToken))
+                return Result.Failure<UpdateVacancyResponse>(
+                    Error.NotFound($"Employment type '{requestedEmploymentTypeId}' was not found or is inactive."));
+
+            vacancy.ChangeEmploymentType(requestedEmploymentTypeId, now);
+        }
+
         var before = new VacancyAuditSnapshot(
             vacancy.AdvertTitle,
             vacancy.AdvertDescription,
@@ -174,7 +185,8 @@ internal sealed class UpdateVacancyHandler(
             vacancy.ClosedAt,
             vacancy.CreatedAt,
             vacancy.UpdatedAt,
-            vacancy.Version));
+            vacancy.Version,
+            vacancy.EmploymentTypeId));
     }
 
     /// <summary>

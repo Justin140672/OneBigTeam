@@ -25,6 +25,7 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<InterviewTaskCleanup> InterviewTaskCleanups => Set<InterviewTaskCleanup>();
     public DbSet<InterviewTaskEffect> InterviewTaskEffects => Set<InterviewTaskEffect>();
     public DbSet<InterviewOutcomeTaskReconciliation> InterviewOutcomeTaskReconciliations => Set<InterviewOutcomeTaskReconciliation>();
+    public DbSet<InterviewOutcomeRepairAction> InterviewOutcomeRepairActions => Set<InterviewOutcomeRepairAction>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

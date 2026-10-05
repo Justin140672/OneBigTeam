@@ -50,6 +50,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillFirstNameAsync(firstName);
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
 
         await empEdit.SelectDropdownAsync("Gender", "Male");
 
@@ -68,6 +69,83 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
 
         Assert.True(await empList.HasEmployeeAsync(lastName),
             $"Expected the new employee '{lastName}' to appear in the employee list after creation");
+    }
+
+    [Fact]
+    public async Task EditEmployee_ClearingRequiredAddressFields_ShowsFieldErrors_AndDoesNotSave()
+    {
+        var login   = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empEdit.GoToAsync(AcmeId, JamesOkaforId);
+
+        foreach (var fieldId in new[] { "emp-address-line-1", "emp-city", "emp-post-code" })
+            Assert.Equal("true", await empEdit.GetAddressFieldAriaRequiredAsync(fieldId));
+
+        await empEdit.FillAddressFieldAsync("emp-address-line-1", "   ");
+        await empEdit.FillAddressFieldAsync("emp-city", "");
+        await empEdit.FillAddressFieldAsync("emp-post-code", "   ");
+        await empEdit.ClickSaveButtonAsync();
+
+        Assert.Contains("Address line 1 is required", await empEdit.GetAddressFieldErrorAsync("emp-address-line-1"));
+        Assert.Contains("City is required", await empEdit.GetAddressFieldErrorAsync("emp-city"));
+        Assert.Contains("Postcode is required", await empEdit.GetAddressFieldErrorAsync("emp-post-code"));
+    }
+
+    [Fact]
+    public async Task CreateEmployee_BlankOrWhitespaceAddress_ShowsFieldErrors_UntilRequiredAddressIsEntered()
+    {
+        var unique     = Guid.NewGuid().ToString("N")[..8];
+        var lastName   = $"Addr{unique}";
+
+        var login    = new LoginPage(_page, _fixture.WebBaseUrl);
+        var empList  = new EmployeeListPage(_page, _fixture.WebBaseUrl);
+        var empEdit  = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+
+        await login.GoToAsync();
+        await login.LoginAsync(LauraEmail);
+
+        await empList.GoToAsync(AcmeId);
+        await empList.ClickNewEmployeeAsync();
+
+        await empEdit.FillFirstNameAsync("E2E");
+        await empEdit.FillLastNameAsync(lastName);
+        await empEdit.FillWorkEmailAsync($"e2e.addr{unique}@acme.example");
+        await empEdit.SelectDropdownAsync("Gender", "Male");
+        await empEdit.SelectDropdownAsync("Nationality", "British");
+        await empEdit.FillDateOfBirthAsync("15/06/1990");
+        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillEmployeeNumberAsync($"E2E-{unique}");
+        await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
+        await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");
+
+        foreach (var fieldId in new[] { "emp-address-line-1", "emp-city", "emp-post-code" })
+            Assert.Equal("true", await empEdit.GetAddressFieldAriaRequiredAsync(fieldId));
+
+        await empEdit.ClickSaveButtonAsync();
+
+        Assert.Contains("Address line 1 is required", await empEdit.GetAddressFieldErrorAsync("emp-address-line-1"));
+        Assert.Contains("City is required", await empEdit.GetAddressFieldErrorAsync("emp-city"));
+        Assert.Contains("Postcode is required", await empEdit.GetAddressFieldErrorAsync("emp-post-code"));
+        Assert.Contains("/employees/new", _page.Url);
+
+        await empEdit.FillAddressFieldAsync("emp-address-line-1", "   ");
+        await empEdit.FillAddressFieldAsync("emp-city", "   ");
+        await empEdit.FillAddressFieldAsync("emp-post-code", "   ");
+        await empEdit.ClickSaveButtonAsync();
+
+        Assert.Contains("Address line 1 is required", await empEdit.GetAddressFieldErrorAsync("emp-address-line-1"));
+        Assert.Contains("City is required", await empEdit.GetAddressFieldErrorAsync("emp-city"));
+        Assert.Contains("Postcode is required", await empEdit.GetAddressFieldErrorAsync("emp-post-code"));
+
+        await empEdit.FillRequiredAddressAsync();
+        await empEdit.SaveNewEmployeeAsync();
+
+        Assert.True(await empList.HasEmployeeAsync(lastName),
+            $"Expected the new employee '{lastName}' to appear once the required address was entered");
     }
 
     [Fact]
@@ -162,6 +240,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillFirstNameAsync("E2E");
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -356,6 +435,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
                 await empEdit.FillFirstNameAsync("E2E");
                 await empEdit.FillLastNameAsync(lastName);
                 await empEdit.FillWorkEmailAsync(workEmail);
+                await empEdit.FillRequiredAddressAsync();
                 await empEdit.SelectDropdownAsync("Gender", "Male");
                 await empEdit.SelectDropdownAsync("Nationality", "British");
                 await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -400,6 +480,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillFirstNameAsync("E2E");
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -434,6 +515,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillFirstNameAsync("E2E");
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
@@ -518,6 +600,7 @@ public sealed class CreateEmployeeTests(HrAdminPersonaFixture fixture) : RoleE2E
         await empEdit.FillFirstNameAsync("E2E");
         await empEdit.FillLastNameAsync(lastName);
         await empEdit.FillWorkEmailAsync(workEmail);
+        await empEdit.FillRequiredAddressAsync();
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");

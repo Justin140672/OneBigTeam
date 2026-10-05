@@ -34,6 +34,10 @@ internal sealed class UpdateEmployeeProfileValidator : AbstractValidator<UpdateE
         RuleFor(r => r.StartDate)
             .NotEmpty();
 
+        RuleFor(r => r.AddressLine1).NotEmpty().WithMessage("Address line 1 is required.").MaximumLength(200);
+        RuleFor(r => r.City).NotEmpty().WithMessage("City is required.").MaximumLength(100);
+        RuleFor(r => r.PostCode).NotEmpty().WithMessage("Postcode is required.").MaximumLength(20);
+
         // Ticket 2: a loaded concurrency version is mandatory on this protected update.
         RuleFor(r => r.ExpectedVersion)
             .RequireLoadedVersion();

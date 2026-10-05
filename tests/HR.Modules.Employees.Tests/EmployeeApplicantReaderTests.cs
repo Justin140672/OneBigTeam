@@ -81,7 +81,6 @@ public class EmployeeApplicantReaderTests
     }
 
     [Theory]
-    [InlineData(nameof(EmploymentStatus.Draft), nameof(EmployeeApplicantEmploymentState.Draft))]
     [InlineData(nameof(EmploymentStatus.Active), nameof(EmployeeApplicantEmploymentState.Active))]
     [InlineData(nameof(EmploymentStatus.Suspended), nameof(EmployeeApplicantEmploymentState.Suspended))]
     [InlineData(nameof(EmploymentStatus.Leaving), nameof(EmployeeApplicantEmploymentState.Leaving))]
@@ -102,7 +101,7 @@ public class EmployeeApplicantReaderTests
     }
 
     [Fact]
-    public async Task GetApplicantAsync_Newly_Created_Employee_Is_Draft()
+    public async Task GetApplicantAsync_Newly_Created_Employee_Is_Active()
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -112,16 +111,17 @@ public class EmployeeApplicantReaderTests
         var profile = await new EmployeeApplicantReader(db).GetApplicantAsync(companyId, employee.Id, CancellationToken.None);
 
         Assert.NotNull(profile);
-        Assert.Equal(EmployeeApplicantEmploymentState.Draft, profile.EmploymentState);
+        Assert.Equal(EmployeeApplicantEmploymentState.Active, profile.EmploymentState);
     }
 
     [Theory]
+    [InlineData(0)]
     [InlineData(2)]
     [InlineData(4)]
     [InlineData(99)]
-    public void MapState_Fails_Closed_To_Draft_For_Retired_Or_Unknown_Values(int rawStatus)
+    public void MapState_Throws_For_Retired_Or_Unknown_Values(int rawStatus)
     {
-        Assert.Equal(EmployeeApplicantEmploymentState.Draft, EmployeeApplicantReader.MapState((EmploymentStatus)rawStatus));
+        Assert.Throws<ArgumentOutOfRangeException>(() => EmployeeApplicantReader.MapState((EmploymentStatus)rawStatus));
     }
 
     [Fact]

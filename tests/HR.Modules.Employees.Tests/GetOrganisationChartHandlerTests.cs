@@ -62,7 +62,7 @@ public class GetOrganisationChartHandlerTests
         var companyId = Guid.NewGuid();
         var now = new DateTimeOffset(FixedUtcNow, TimeSpan.Zero);
 
-        var draft = Employee.Create(Guid.NewGuid(), companyId, "Dana", "Draft", "dana@example.com", StartDate,
+        var newStarter = Employee.Create(Guid.NewGuid(), companyId, "Dana", "Starter", "dana@example.com", StartDate,
             hasSystemAccess: true, Dob, "British", "Female", "EMP-0001", Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), now);
 
         var active = Employee.Create(Guid.NewGuid(), companyId, "Alice", "Active", "alice@example.com", StartDate,
@@ -74,7 +74,7 @@ public class GetOrganisationChartHandlerTests
         terminated.Activate(now);
         terminated.SetStatusForTesting(EmploymentStatus.FormerEmployee, now);
 
-        context.Employees.AddRange(draft, active, terminated);
+        context.Employees.AddRange(newStarter, active, terminated);
         await context.SaveChangesAsync();
 
         var handler = new GetOrganisationChartHandler(context, new FakeProfilePhotoReader());
@@ -85,12 +85,6 @@ public class GetOrganisationChartHandlerTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value!.Items.Count);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Filters_By_Status_Active_Excludes_Draft_Employees()
-    {
-        await AssertStatusFilteredAsync(employee => { });
     }
 
     [Fact]

@@ -195,11 +195,15 @@ public sealed class EmployeeProfileEditModel
     public string PhoneNumber { get; set; } = string.Empty;
     [DynamicRegex(nameof(TelephoneRegexPattern), ErrorMessage = "Enter a valid phone number.")]
     public string HomePhone { get; set; } = string.Empty;
+    public bool AddressRequired { get; set; }
+    [RequiredWhen(nameof(AddressRequired), ErrorMessage = "Address line 1 is required.")]
     public string AddressLine1 { get; set; } = string.Empty;
     public string AddressLine2 { get; set; } = string.Empty;
+    [RequiredWhen(nameof(AddressRequired), ErrorMessage = "City is required.")]
     public string City { get; set; } = string.Empty;
     public string County { get; set; } = string.Empty;
     private string _postCode = string.Empty;
+    [RequiredWhen(nameof(AddressRequired), ErrorMessage = "Postcode is required.")]
     [DynamicRegex(nameof(PostcodeRegexPattern), ErrorMessage = "Enter a valid postcode.")]
     public string PostCode
     {
@@ -228,6 +232,15 @@ public sealed class EmployeeProfileEditModel
     public bool OverrideWorkingPattern { get; set; } = false;
     public HashSet<string> WorkingWeek { get; set; } = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
     public decimal HoursPerDay { get; set; } = 7.5m;
+
+    public bool CompensationRequired { get; set; }
+    public string SalaryType { get; set; } = "Annual";
+    [RequiredWhen(nameof(CompensationRequired), ErrorMessage = "Please enter a salary.")]
+    [Range(0.01, double.MaxValue, ErrorMessage = "Salary must be greater than 0.")]
+    public decimal? Salary { get; set; }
+    [RequiredWhen(nameof(CompensationRequired), ErrorMessage = "Please enter a currency code.")]
+    [StringLength(3, MinimumLength = 3, ErrorMessage = "Currency must be a 3-letter code (e.g. GBP).")]
+    public string Currency { get; set; } = "GBP";
 }
 
 public record UpdateEmployeeProfileRequest(
@@ -312,7 +325,10 @@ public record CreateEmployeeRequest(
     string? PostCode,
     string? Country,
     bool HasSystemAccess,
-    Guid? ManagerId = null);
+    Guid? ManagerId = null,
+    decimal? Salary = null,
+    string? SalaryFrequency = null,
+    string? Currency = null);
 
 public record CreateEmployeeResponse(
     Guid Id,

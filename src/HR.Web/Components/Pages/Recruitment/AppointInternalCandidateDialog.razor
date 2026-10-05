@@ -298,7 +298,7 @@
 
     private List<ManagerOption> BuildAppointManagerOptions(IEnumerable<EmployeeListItemModel>? employees) =>
         (employees ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Status != "FormerEmployee")
             .Where(e => e.Id != _appointEmployeeId)
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)

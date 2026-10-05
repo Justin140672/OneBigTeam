@@ -65,16 +65,6 @@ internal sealed class EmployeeImportWriter(
             request.CompanyId, positionProfile?.ProbationMonthsOverride, employee.StartDate, cancellationToken);
         employee.SetProbationEndDate(probationEndDate, now);
 
-        // Employee.Create leaves Status = Draft. Previously this unconditionally activated every
-        // imported employee regardless of start date — wrong for a future starter, and (by
-        // accident) right for one who has already started. Only activate here when the start date
-        // has already arrived; a future start date correctly stays Draft until that date arrives.
-        // Note: there is currently no scheduled job that transitions Draft -> Active once a future
-        // start date arrives for ANY employee (manually created or imported) — this only fixes
-        // import so it never leaves an already-started employee incorrectly stuck in Draft.
-        if (request.StartDate <= DateOnly.FromDateTime(now.Date))
-            employee.Activate(now);
-
         dbContext.Employees.Add(employee);
         await dbContext.SaveChangesAsync(cancellationToken);
 

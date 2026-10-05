@@ -571,7 +571,6 @@ public class AppointInternalCandidateHandlerTests
     }
 
     [Theory]
-    [InlineData(EmployeeApplicantEmploymentState.Draft)]
     [InlineData(EmployeeApplicantEmploymentState.Suspended)]
     [InlineData(EmployeeApplicantEmploymentState.Leaving)]
     [InlineData(EmployeeApplicantEmploymentState.Former)]

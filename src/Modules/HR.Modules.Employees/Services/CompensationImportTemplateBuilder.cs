@@ -19,6 +19,11 @@ internal static class CompensationImportTemplateBuilder
         "New Salary", "Effective Date", "Reason", "Notes"
     ];
 
+    private static readonly string[] ReasonOptions =
+    [
+        "New Hire", "Annual Review", "Promotion", "Market Adjustment", "Role Change", "Correction", "Other"
+    ];
+
     private static readonly XLColor HeaderBackground = XLColor.FromHtml("#2F5496");
 
     public static byte[] Build(IReadOnlyList<CompensationImportTemplateRow> rows)
@@ -64,9 +69,26 @@ internal static class CompensationImportTemplateBuilder
 
         sheet.Range(1, 5, 1, Headers.Length).Style.Protection.SetLocked(true);
 
+        const int entryRowCount = 1000;
+        var lastEntryRow = Math.Max(lastDataRow, entryRowCount + 1);
+
+        sheet.Range(2, 5, lastEntryRow, Headers.Length).Style.Protection.SetLocked(false);
+        sheet.Range(2, 6, lastEntryRow, 6).Style.DateFormat.Format = "dd/mm/yyyy";
+        sheet.Range(2, 5, lastEntryRow, 5).Style.NumberFormat.Format = "#,##0.00";
+
+        var reasonValidation = sheet.Range(2, 7, lastEntryRow, 7).CreateDataValidation();
+        reasonValidation.List($"\"{string.Join(",", ReasonOptions)}\"", true);
+        reasonValidation.IgnoreBlanks = true;
+        reasonValidation.ErrorStyle = XLErrorStyle.Stop;
+        reasonValidation.ErrorTitle = "Invalid reason";
+        reasonValidation.ErrorMessage = "Choose a reason from the list.";
+
         sheet.Protect()
             .AllowElement(XLSheetProtectionElements.SelectLockedCells)
-            .AllowElement(XLSheetProtectionElements.SelectUnlockedCells);
+            .AllowElement(XLSheetProtectionElements.SelectUnlockedCells)
+            .AllowElement(XLSheetProtectionElements.FormatCells)
+            .AllowElement(XLSheetProtectionElements.FormatColumns)
+            .AllowElement(XLSheetProtectionElements.FormatRows);
 
         AddInstructionsSheet(workbook);
 
@@ -88,8 +110,8 @@ internal static class CompensationImportTemplateBuilder
         [
             "1. Do not edit the Employee Number, Employee Name, Current Salary or Salary Frequency columns — these are reference data and are locked.",
             "2. Fill in New Salary with the employee's new gross salary. It must be greater than 0.",
-            "3. Fill in Effective Date using the format yyyy-mm-dd — the date the new salary takes effect.",
-            "4. Fill in Reason using one of: NewHire, AnnualReview, Promotion, MarketAdjustment, RoleChange, Correction, Other.",
+            "3. Fill in Effective Date as a date (dd/mm/yyyy) — the date the new salary takes effect.",
+            "4. Fill in Reason by choosing from the dropdown: New Hire, Annual Review, Promotion, Market Adjustment, Role Change, Correction, Other.",
             "5. Salary Frequency shown is the employee's current pay frequency and is for reference only — it cannot be changed via bulk import. The new salary amount always uses this same frequency.",
             "6. Notes is optional free text.",
             "7. Each employee can only appear once per import file, and the Effective Date must not overlap an existing compensation record for that employee."
@@ -122,7 +144,7 @@ internal static class CompensationImportTemplateBuilder
         sheet.Cell(row, 4).Value = "Annual";
         sheet.Cell(row, 5).Value = 56000;
         sheet.Cell(row, 6).Value = "2027-01-01";
-        sheet.Cell(row, 7).Value = "AnnualReview";
+        sheet.Cell(row, 7).Value = "Annual Review";
         sheet.Cell(row, 8).Value = "Annual pay review";
 
         row++;

@@ -7,10 +7,10 @@
 @inject EmploymentTypeService EmploymentTypeService
 @inject VacancyService VacancyService
 
-<SfDialog Width="520px" IsModal="true" @bind-Visible="_visible" Header="Hire Candidate" CssClass="hire-candidate-dialog">
+<SfDialog Width="min(900px, calc(100vw - 2rem))" IsModal="true" @bind-Visible="_visible" Header="Hire Candidate" CssClass="hire-candidate-dialog">
     <DialogTemplates>
         <Content>
-            <EditForm EditContext="_editContext">
+            <EditForm EditContext="_editContext" class="hire-form">
                 <DataAnnotationsValidator />
                 @if (_offerAccepted)
                 {
@@ -22,111 +22,145 @@
                 {
                     <div class="alert alert-warning py-2" role="alert" data-testid="hire-offer-blocked">@_offerBlockedMessage</div>
                 }
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Start Date" Required="@(!_startDateOptional)" Id="hire-start-date"
-                                     @bind-Value="_model.StartDate"
-                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "hire-start-date" })"
-                                     HelpText="@(_startDateOptional ? "Leave blank to use the accepted offer's proposed start date." : null)" />
-                    </div>
-                    <div class="col-md-6">
-                        <HrDateField TValue="DateOnly?" Label="Date of Birth" Required="true" Id="hire-date-of-birth"
-                                     @bind-Value="_model.DateOfBirth" Format="dd/MM/yyyy" />
-                    </div>
-                    <div class="col-md-6">
-                        <HrDropDownField TValue="string" TItem="NationalityListItem" Label="Nationality" Required="true" Id="hire-nationality"
-                                         DataSource="@_nationalities" @bind-Value="_model.Nationality"
-                                         ValueField="Name" TextField="Name" Placeholder="Select nationality" />
-                    </div>
-                    <div class="col-md-6">
-                        <label id="hire-gender-label" for="hire-gender" class="form-label">Gender <span class="text-danger">*</span></label>
-                        <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_model.Gender" Placeholder="Select gender"
-                                        HtmlAttributes="@Aria("hire-gender", nameof(HireCandidateFormModel.Gender), "Gender", required: true)" />
-                        <div id="hire-gender-error" role="alert">
-                            <ValidationMessage For="@(() => _model.Gender)" />
-                        </div>
-                        @if (_model.Gender == "Other")
-                        {
-                            <div class="mt-2">
-                                <HrTextField Label="Please specify gender" Id="hire-gender-other"
-                                             @bind-Value="_model.GenderOther" Placeholder="Please specify" />
-                            </div>
-                        }
-                    </div>
-                    @if (_employeeNumberMode == EmployeeNumberMode.Automatic)
-                    {
-                        <div class="col-md-6">
-                            <span class="form-label d-block">Employee Number</span>
-                            <p class="text-muted small mb-0">An employee number will be assigned automatically when this candidate is hired.</p>
-                        </div>
-                    }
-                    else
-                    {
-                        <div class="col-md-6">
-                            <HrTextField Label="Employee Number" Required="true" Id="hire-employee-number"
-                                         @bind-Value="_model.EmployeeNumber" Placeholder="e.g. EMP-001" />
-                        </div>
-                    }
-                    <div class="col-md-6">
-                        <HrDropDownField TValue="Guid?" TItem="EmploymentTypeListItemModel" Label="Employment Type" Required="true" Id="hire-employment-type"
-                                         DataSource="@_employmentTypes" @bind-Value="_model.EmploymentTypeId"
-                                         ValueField="Id" TextField="Name" Placeholder="Select type" AllowFiltering="false" />
-                    </div>
-                    <div class="col-md-6">
-                        <span id="hire-derived-position-profile-label" class="form-label d-block">Position Profile</span>
-                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-position-profile-label" aria-describedby="hire-derived-position-profile-help" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
-                        <div id="hire-derived-position-profile-help" class="form-text">Derived from the vacancy — the employee is assigned to this profile (and its department/location) automatically.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <span id="hire-derived-location-label" class="form-label d-block">Location</span>
-                        <div class="p-2 rounded border bg-light" role="group" aria-labelledby="hire-derived-location-label" aria-describedby="hire-derived-location-help" data-testid="hire-derived-location">@_derivedLocationName</div>
-                        <div id="hire-derived-location-help" class="form-text">Derived from the vacancy's position profile.</div>
-                    </div>
-                    <div class="col-md-6">
-                        <label id="hire-manager-label" for="hire-manager" class="form-label">Manager</label>
-                        <SfDropDownList @ref="_managerDropdown"
-                                        TValue="Guid?"
-                                        TItem="ManagerOption"
-                                        DataSource="@_managerOptions"
-                                        @bind-Value="_model.ManagerId"
-                                        Placeholder="None"
-                                        AllowFiltering="true"
-                                        HtmlAttributes="@Aria("hire-manager", nameof(HireCandidateFormModel.ManagerId), "Manager")">
-                            <DropDownListFieldSettings Value="Id" Text="Name" />
-                            <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
-                        </SfDropDownList>
-                    </div>
-                    <div class="col-12">
-                        <HrTextField Label="Address Line 1" Id="hire-address-line-1" Autocomplete="address-line1"
-                                     @bind-Value="_model.AddressLine1" Placeholder="Street address" />
-                    </div>
-                    <div class="col-12">
-                        <HrTextField Label="Address Line 2" Id="hire-address-line-2" Autocomplete="address-line2"
-                                     @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="City" Id="hire-city" Autocomplete="address-level2"
-                                     @bind-Value="_model.City" Placeholder="e.g. London" />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="County / State" Id="hire-county" Autocomplete="address-level1"
-                                     @bind-Value="_model.County" Placeholder="e.g. Greater London" />
-                    </div>
-                    <div class="col-md-4">
-                        <HrTextField Label="Post Code" Id="hire-post-code" Autocomplete="postal-code"
-                                     @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
-                    </div>
-                </div>
                 @if (_error is not null)
                 {
-                    <div class="alert alert-danger py-2 mt-3" role="alert">@_error</div>
+                    <div class="alert alert-danger py-2 hire-error" role="alert" aria-live="assertive">@_error</div>
                 }
+
+                <section class="card hire-section" aria-labelledby="hire-personal-heading">
+                    <div class="card-header">
+                        <h5 id="hire-personal-heading" class="mb-0">Personal Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="hire-section-description">The candidate's core employee record information.</p>
+                        <div class="row g-3">
+                        <div class="col-md-6">
+                            <HrDateField TValue="DateOnly?" Label="Start Date" Required="@(!_startDateOptional)" Id="hire-start-date"
+                                         @bind-Value="_model.StartDate"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "hire-start-date" })"
+                                         HelpText="@(_startDateOptional ? "Leave blank to use the accepted offer's proposed start date." : null)" />
+                        </div>
+                        <div class="col-md-6">
+                            <HrDateField TValue="DateOnly?" Label="Date of Birth" Required="true" Id="hire-date-of-birth"
+                                         @bind-Value="_model.DateOfBirth" Format="dd/MM/yyyy" />
+                        </div>
+                        <div class="col-md-6">
+                            <HrDropDownField TValue="string" TItem="NationalityListItem" Label="Nationality" Required="true" Id="hire-nationality"
+                                             DataSource="@_nationalities" @bind-Value="_model.Nationality"
+                                             ValueField="Name" TextField="Name" Placeholder="Select nationality" />
+                        </div>
+                        <div class="col-md-6">
+                            <label id="hire-gender-label" for="hire-gender" class="form-label">Gender <span class="text-danger">*</span></label>
+                            <SfDropDownList TValue="string" TItem="string" DataSource="@_genderOptions" @bind-Value="_model.Gender" Placeholder="Select gender"
+                                            HtmlAttributes="@Aria("hire-gender", nameof(HireCandidateFormModel.Gender), "Gender", required: true)" />
+                            <div id="hire-gender-error" role="alert"><ValidationMessage For="@(() => _model.Gender)" /></div>
+                            @if (_model.Gender == "Other")
+                            {
+                                <div class="mt-2">
+                                    <HrTextField Label="Please specify gender" Id="hire-gender-other"
+                                                 @bind-Value="_model.GenderOther" Placeholder="Please specify" />
+                                </div>
+                            }
+                        </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card hire-section" aria-labelledby="hire-employment-heading">
+                    <div class="card-header">
+                        <h5 id="hire-employment-heading" class="mb-0">Employment Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="hire-section-description">Role details come from the vacancy. Review them before creating the employee.</p>
+                        <div class="row g-3">
+                        @if (_employeeNumberMode == EmployeeNumberMode.Automatic)
+                        {
+                            <div class="col-md-6">
+                                <span class="form-label d-block">Employee Number</span>
+                                <div class="hire-derived-value">Assigned automatically</div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-md-6">
+                                <HrTextField Label="Employee Number" Required="true" Id="hire-employee-number"
+                                             @bind-Value="_model.EmployeeNumber" Placeholder="e.g. EMP-001" />
+                            </div>
+                        }
+                        <div class="col-md-6">
+                            <span id="hire-derived-employment-type-label" class="form-label d-block">Employment Type</span>
+                            @if (_vacancyEmploymentTypeId is null)
+                            {
+                                <div class="hire-derived-value hire-derived-value--warning" role="alert" aria-labelledby="hire-derived-employment-type-label" data-testid="hire-employment-type-required">Employment type required</div>
+                                <div id="hire-derived-employment-type-help" class="form-text">Set an employment type on the vacancy before hiring.</div>
+                            }
+                            else
+                            {
+                                <div class="hire-derived-value" role="group" aria-labelledby="hire-derived-employment-type-label" aria-describedby="hire-derived-employment-type-help" data-testid="hire-derived-employment-type">@_derivedEmploymentTypeName</div>
+                                <div id="hire-derived-employment-type-help" class="form-text">From the vacancy</div>
+                            }
+                        </div>
+                        <div class="col-md-6">
+                            <span id="hire-derived-position-profile-label" class="form-label d-block">Position Profile</span>
+                            <div class="hire-derived-value" role="group" aria-labelledby="hire-derived-position-profile-label" aria-describedby="hire-derived-position-profile-help" data-testid="hire-derived-position-profile">@_derivedPositionProfileName</div>
+                            <div id="hire-derived-position-profile-help" class="form-text">Includes the assigned department</div>
+                        </div>
+                        <div class="col-md-6">
+                            <span id="hire-derived-location-label" class="form-label d-block">Location</span>
+                            <div class="hire-derived-value" role="group" aria-labelledby="hire-derived-location-label" aria-describedby="hire-derived-location-help" data-testid="hire-derived-location">@_derivedLocationName</div>
+                            <div id="hire-derived-location-help" class="form-text">From the position profile</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label id="hire-manager-label" for="hire-manager" class="form-label">Manager</label>
+                            <SfDropDownList @ref="_managerDropdown" TValue="Guid?" TItem="ManagerOption"
+                                            DataSource="@_managerOptions" @bind-Value="_model.ManagerId" Placeholder="None"
+                                            AllowFiltering="true"
+                                            HtmlAttributes="@Aria("hire-manager", nameof(HireCandidateFormModel.ManagerId), "Manager")">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnHireManagerFilteringAsync" />
+                            </SfDropDownList>
+                            <div id="hire-manager-help" class="form-text" data-testid="hire-manager-help">@_managerHelpText</div>
+                        </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card hire-section hire-section--address" aria-labelledby="hire-contact-heading">
+                    <div class="card-header">
+                        <h5 id="hire-contact-heading" class="mb-0">Contact Details</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="hire-section-description">Home address required for the new employee's personal record.</p>
+                        <div class="row g-3">
+                        <div class="col-md-6">
+                            <HrTextField Label="Address Line 1" Required="true" Id="hire-address-line-1" Autocomplete="address-line1"
+                                         @bind-Value="_model.AddressLine1" Placeholder="Street address" />
+                        </div>
+                        <div class="col-md-6">
+                            <HrTextField Label="Address Line 2" Id="hire-address-line-2" Autocomplete="address-line2"
+                                         @bind-Value="_model.AddressLine2" Placeholder="Apartment, suite, etc." />
+                        </div>
+                        <div class="col-md-5">
+                            <HrTextField Label="City" Required="true" Id="hire-city" Autocomplete="address-level2"
+                                         @bind-Value="_model.City" Placeholder="e.g. London" />
+                        </div>
+                        <div class="col-md-4">
+                            <HrTextField Label="County / State" Id="hire-county" Autocomplete="address-level1"
+                                         @bind-Value="_model.County" Placeholder="e.g. Greater London" />
+                        </div>
+                        <div class="col-md-3">
+                            <HrTextField Label="Post Code" Required="true" Id="hire-post-code" Autocomplete="postal-code"
+                                         @bind-Value="_model.PostCode" Placeholder="e.g. SW1A 1AA" />
+                        </div>
+                        </div>
+                    </div>
+                </section>
             </EditForm>
         </Content>
     </DialogTemplates>
     <DialogButtons>
-        <DialogButton Content="Hire" IsPrimary="true" OnClick="ConfirmAsync" />
-        <DialogButton Content="Cancel" OnClick="() => _visible = false" />
+        <DialogButton Content="@(_isSubmitting ? "Hiring…" : "Hire employee")" IsPrimary="true" Disabled="@_isSubmitting" OnClick="ConfirmAsync" />
+        <DialogButton Content="Cancel" Disabled="@_isSubmitting" OnClick="() => _visible = false" />
     </DialogButtons>
 </SfDialog>
 
@@ -141,7 +175,10 @@
     private Guid _applicationId;
     private string? _error;
     private List<NationalityListItem> _nationalities = [];
-    private List<EmploymentTypeListItemModel> _employmentTypes = [];
+    private Guid? _vacancyEmploymentTypeId;
+    private string _derivedEmploymentTypeName = string.Empty;
+    private Guid _hiringManagerId;
+    private string _managerHelpText = string.Empty;
     private readonly HireCandidateFormModel _model = new();
     private EditContext _editContext = default!;
     private EmployeeNumberMode _employeeNumberMode = EmployeeNumberMode.Manual;
@@ -154,6 +191,7 @@
     private string? _offerBlockedMessage;
     private decimal? _offeredSalary;
     private string? _offeredSalaryFrequency;
+    private bool _isSubmitting;
 
     private sealed record ManagerOption(Guid Id, string Name);
 
@@ -162,6 +200,7 @@
     public async Task OpenAsync(Guid applicationId, string? offerResponseStatus, decimal? offeredSalary, DateOnly? offeredStartDate)
     {
         _error = null;
+        _isSubmitting = false;
         _applicationId = applicationId;
 
         _offerAccepted = offerResponseStatus == "Accepted";
@@ -182,8 +221,11 @@
         _model.Gender = null;
         _model.GenderOther = null;
         _model.EmployeeNumber = null;
-        _model.EmploymentTypeId = null;
         _model.ManagerId = Guid.Empty;
+        _vacancyEmploymentTypeId = null;
+        _derivedEmploymentTypeName = string.Empty;
+        _hiringManagerId = Guid.Empty;
+        _managerHelpText = string.Empty;
         _model.AddressLine1 = null;
         _model.AddressLine2 = null;
         _model.City = null;
@@ -213,16 +255,54 @@
         _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";
         _derivedLocationName = vacancy?.EffectiveLocation ?? "(none set)";
 
-        _employmentTypes = (await employmentTypeTask)?.Items ?? [];
+        _vacancyEmploymentTypeId = vacancy?.EmploymentTypeId;
+        if (_vacancyEmploymentTypeId is { } employmentTypeId)
+        {
+            var employmentTypes = (await employmentTypeTask)?.Items ?? [];
+            _derivedEmploymentTypeName = employmentTypes.FirstOrDefault(t => t.Id == employmentTypeId)?.Name ?? "(unknown)";
+        }
+
         _managerOptions = ToManagerOptions((await managerTask)?.Items);
+        await PreselectHiringManagerAsync(vacancy?.HiringManagerId);
 
         _visible = true;
         StateHasChanged();
     }
 
+    private async Task PreselectHiringManagerAsync(Guid? hiringManagerId)
+    {
+        if (hiringManagerId is not { } id || id == Guid.Empty)
+        {
+            _managerHelpText = "The vacancy has no hiring manager. Choose a manager or leave as No Manager.";
+            return;
+        }
+
+        _hiringManagerId = id;
+
+        var option = _managerOptions.FirstOrDefault(m => m.Id == id);
+        if (option is null)
+        {
+            var hiringManager = await EmployeeService.GetEmployeeAsync(CompanyId, id);
+            if (hiringManager is not null && hiringManager.Status != "FormerEmployee")
+            {
+                option = new ManagerOption(hiringManager.Id, hiringManager.FullName);
+                _managerOptions = _managerOptions.Append(option).ToList();
+            }
+        }
+
+        if (option is null)
+        {
+            _managerHelpText = "The vacancy's hiring manager is not an eligible manager. Choose a manager or leave as No Manager.";
+            return;
+        }
+
+        _model.ManagerId = option.Id;
+        _managerHelpText = $"Defaults to the vacancy's hiring manager ({option.Name}). Choose another manager or No Manager to override.";
+    }
+
     private static List<ManagerOption> ToManagerOptions(IEnumerable<EmployeeListItemModel>? items) =>
         (items ?? [])
-            .Where(e => e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
@@ -238,11 +318,20 @@
 
     private async Task ConfirmAsync()
     {
+        if (_isSubmitting)
+            return;
+
         var employeeNumberRequired = _employeeNumberMode != EmployeeNumberMode.Automatic;
 
         if (_offerBlockedMessage is not null)
         {
             _error = _offerBlockedMessage;
+            return;
+        }
+
+        if (_vacancyEmploymentTypeId is null)
+        {
+            _error = "Employment type required. Set an employment type on the vacancy before hiring.";
             return;
         }
 
@@ -253,28 +342,40 @@
             return;
         }
 
+        var selectedManagerId = _model.ManagerId ?? Guid.Empty;
+
         var request = new HireCandidateRequest(
             CompanyId, VacancyId, _applicationId,
             _model.StartDate, _model.DateOfBirth!.Value, _model.Nationality!, _model.Gender!,
             FormText.Optional(_model.GenderOther),
-            employeeNumberRequired ? FormText.Required(_model.EmployeeNumber!) : string.Empty, _model.EmploymentTypeId!.Value,
-            _model.ManagerId == Guid.Empty ? null : _model.ManagerId,
-            FormText.Optional(_model.AddressLine1),
-            FormText.Optional(_model.AddressLine2),
-            FormText.Optional(_model.City),
-            FormText.Optional(_model.County),
-            FormText.Optional(_model.PostCode));
+            employeeNumberRequired ? FormText.Required(_model.EmployeeNumber!) : string.Empty,
+            OverrideManager: selectedManagerId != _hiringManagerId,
+            ManagerId: selectedManagerId == Guid.Empty ? null : selectedManagerId,
+            AddressLine1: FormText.Required(_model.AddressLine1!),
+            AddressLine2: FormText.Optional(_model.AddressLine2),
+            City: FormText.Required(_model.City!),
+            County: FormText.Optional(_model.County),
+            PostCode: FormText.Required(_model.PostCode!));
 
-        var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _applicationId, request);
-
-        if (result is null)
+        _isSubmitting = true;
+        _error = null;
+        try
         {
-            _error = error;
-            return;
-        }
+            var (result, error) = await ApplicationService.HireCandidateAsync(CompanyId, VacancyId, _applicationId, request);
 
-        _visible = false;
-        await OnHired.InvokeAsync(result.EmployeeId);
+            if (result is null)
+            {
+                _error = error ?? "The employee could not be created. Please try again.";
+                return;
+            }
+
+            _visible = false;
+            await OnHired.InvokeAsync(result.EmployeeId);
+        }
+        finally
+        {
+            _isSubmitting = false;
+        }
     }
 
     private Dictionary<string, object> Aria(string id, string property, string label, bool required = false)
@@ -319,15 +420,15 @@
         [MaxLength(50)]
         public string? EmployeeNumber { get; set; }
 
-        [Required(ErrorMessage = "Please select an employment type.")]
-        public Guid? EmploymentTypeId { get; set; }
-
         public Guid? ManagerId { get; set; }
 
+        [Required(ErrorMessage = "Please enter address line 1.")]
         [MaxLength(200)] public string? AddressLine1 { get; set; }
         [MaxLength(200)] public string? AddressLine2 { get; set; }
+        [Required(ErrorMessage = "Please enter a city.")]
         [MaxLength(100)] public string? City { get; set; }
         [MaxLength(100)] public string? County { get; set; }
+        [Required(ErrorMessage = "Please enter a post code.")]
         [MaxLength(20)] public string? PostCode { get; set; }
 
         public bool EmployeeNumberRequired { get; set; }

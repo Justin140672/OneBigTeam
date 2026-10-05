@@ -16,4 +16,5 @@ internal sealed record UpdateVacancyResponse(
     DateOnly? ClosedAt,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    int Version);
+    int Version,
+    Guid? EmploymentTypeId = null);

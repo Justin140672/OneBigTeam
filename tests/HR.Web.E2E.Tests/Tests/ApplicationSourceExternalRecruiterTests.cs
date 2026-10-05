@@ -70,6 +70,7 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SelectRecruitmentAgencyAsync(agencyName);
         await vacancyDetail.SaveNewVacancyAsync();
 
@@ -135,6 +136,7 @@ public sealed class ApplicationSourceExternalRecruiterTests(RecruiterPersonaFixt
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);

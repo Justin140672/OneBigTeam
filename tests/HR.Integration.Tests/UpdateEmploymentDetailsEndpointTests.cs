@@ -79,6 +79,34 @@ public class UpdateEmploymentDetailsEndpointTests
         Assert.Equal(new DateOnly(2026, 1, 15), payload.ContinuousServiceDate);
     }
 
+    [Theory]
+    [InlineData("\"Draft\"")]
+    [InlineData("0")]
+    public async Task Put_Employment_Rejects_Draft_Status(string rawStatus)
+    {
+        using var client = _factory.CreateClient();
+        var companyId = Guid.NewGuid();
+        client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, User2.ToString());
+        client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
+        await TestRoleSeeder.AssignRoleAsync(_factory, User2, SystemRoles.HrAdministrator, companyId);
+
+        var employee = await CreateEmployeeAsync(client, companyId);
+        var version = await GetVersionAsync(client, companyId, employee.Id);
+
+        var body = $$"""
+            {"companyId":"{{companyId}}","id":"{{employee.Id}}","employeeNumber":"EMP-001","status":{{rawStatus}},"startDate":"2026-01-15","expectedVersion":{{version}}}
+            """;
+        var response = await client.PutAsync(
+            $"/api/companies/{companyId}/employees/{employee.Id}/employment",
+            new StringContent(body, System.Text.Encoding.UTF8, "application/json"));
+
+        Assert.False(response.IsSuccessStatusCode);
+        Assert.True((int)response.StatusCode is >= 400 and < 500);
+
+        var current = await client.GetFromJsonAsync<StatusPayload>($"/api/companies/{companyId}/employees/{employee.Id}");
+        Assert.Equal("Active", current!.Status);
+    }
+
     [Fact]
     public async Task Put_Employment_Returns_UnprocessableEntity_When_EmployeeNumber_Is_Missing()
     {
@@ -322,6 +350,9 @@ public class UpdateEmploymentDetailsEndpointTests
                 firstName = "Test",
                 lastName = "Employee",
                 workEmail = $"test.{Guid.NewGuid():N}@example.com",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 startDate = "2026-01-15",
                 expectedVersion = await GetVersionAsync(client, companyId, employee.Id)
             });
@@ -443,6 +474,8 @@ public class UpdateEmploymentDetailsEndpointTests
     }
 
     private sealed record VersionPayload(int Version);
+
+    private sealed record StatusPayload(string Status);
 
     private static async Task<EmployeeRef> CreateEmployeeAsync(HttpClient client, Guid companyId)
     {

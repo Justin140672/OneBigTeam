@@ -4,7 +4,6 @@ using HR.Modules.Recruitment.Services;
 using HR.Modules.Tasks.Contracts;
 using HR.SharedKernel;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace HR.Modules.Recruitment.Features.RetryInterviewOutcomeReconciliation;
 
@@ -12,13 +11,12 @@ internal sealed class RetryInterviewOutcomeReconciliationHandler(
     RecruitmentDbContext db,
     ITaskCompletionRecovery taskRecovery,
     InterviewOutcomeTaskReconciliationService reconciliationService,
-    IAuditEventPublisher auditPublisher,
-    IClock clock,
-    ILogger<RetryInterviewOutcomeReconciliationHandler> logger)
+    InterviewOutcomeRepairService repairService)
 {
     public const string StatusCompleted = "completed";
     public const string StatusOutstanding = "outstanding";
     public const string StatusBlocked = "blocked";
+    public const string StatusCompletedWaived = "completed_waived";
 
     public async Task<Result<RetryInterviewOutcomeReconciliationResponse>> HandleAsync(
         RetryInterviewOutcomeReconciliationRequest request,
@@ -50,6 +48,9 @@ internal sealed class RetryInterviewOutcomeReconciliationHandler(
                 case TaskCompletionResetOutcome.NotFound:
                     return Result.Failure<RetryInterviewOutcomeReconciliationResponse>(Error.Conflict(
                         $"Tasks completion operation '{operationId}' no longer exists; the blocked reconciliation needs manual investigation."));
+                case TaskCompletionResetOutcome.DataIntegrityFailure:
+                    return Result.Failure<RetryInterviewOutcomeReconciliationResponse>(Error.Conflict(
+                        $"Tasks completion operation '{operationId}' is a data-integrity failure; the blocked reconciliation needs manual investigation."));
                 case TaskCompletionResetOutcome.Conflict:
                     return Result.Failure<RetryInterviewOutcomeReconciliationResponse>(Error.Concurrency(
                         "The Tasks completion operation was changed by another request. Reload and try again."));
@@ -58,16 +59,11 @@ internal sealed class RetryInterviewOutcomeReconciliationHandler(
             tasksReset = reset.Outcome == TaskCompletionResetOutcome.Reset;
         }
 
-        var now = clock.UtcNowOffset();
-        record.Unblock(operatorUserId, now);
+        var action = await repairService.UnblockAsync(
+            record, operatorUserId, reason, InterviewOutcomeRepairAction.SourceOperator, cancellationToken);
 
-        try
+        if (action is null)
         {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            db.Entry(record).State = EntityState.Detached;
             var current = await db.InterviewOutcomeTaskReconciliations.AsNoTracking()
                 .SingleOrDefaultAsync(r => r.Id == request.ReconciliationId && r.CompanyId == request.CompanyId, cancellationToken);
 
@@ -77,24 +73,15 @@ internal sealed class RetryInterviewOutcomeReconciliationHandler(
                     Error.Concurrency("This reconciliation was changed by another request. Reload and try again."));
         }
 
-        logger.LogWarning(
-            "Blocked interview outcome reconciliation unblocked by operator. ReconciliationId={ReconciliationId} CompanyId={CompanyId} InterviewId={InterviewId} ApplicationId={ApplicationId} TasksOperationId={TasksOperationId} OperatorUserId={OperatorUserId} FailureCategory={FailureCategory} TasksCompletionReset={TasksCompletionReset}",
-            record.Id, record.CompanyId, record.InterviewId, record.ApplicationId, tasksOperationId, operatorUserId, category, tasksReset);
-
-        await auditPublisher.PublishAsync(
-            new InterviewOutcomeReconciliationRepairedAuditEvent(
-                record.CompanyId, record.Id, record.InterviewId, record.ApplicationId, operatorUserId,
-                category, tasksOperationId, reason, now),
-            cancellationToken);
-
         await reconciliationService.RunAsync(record, cancellationToken);
 
-        return Result.Success(ToResponse(record, wasBlocked: true, tasksReset));
+        return Result.Success(ToResponse(record, wasBlocked: true, tasksReset, action));
     }
 
     private static RetryInterviewOutcomeReconciliationResponse ToResponse(
-        InterviewOutcomeTaskReconciliation record, bool wasBlocked, bool tasksReset) =>
+        InterviewOutcomeTaskReconciliation record, bool wasBlocked, bool tasksReset,
+        InterviewOutcomeRepairAction? action = null) =>
         new(record.Id, record.InterviewId,
-            record.IsBlocked ? StatusBlocked : record.CompletedAt is not null ? StatusCompleted : StatusOutstanding,
-            wasBlocked, tasksReset);
+            record.IsBlocked ? StatusBlocked : record.IsWaived ? StatusCompletedWaived : record.CompletedAt is not null ? StatusCompleted : StatusOutstanding,
+            wasBlocked, tasksReset, action?.Id, record.RepairCount);
 }

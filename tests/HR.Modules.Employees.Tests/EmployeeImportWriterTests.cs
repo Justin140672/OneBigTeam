@@ -64,7 +64,7 @@ public class EmployeeImportWriterTests
             actorUserId ?? Guid.NewGuid());
 
     [Fact]
-    public async Task CreateEmployeeAsync_Leaves_Employee_Draft_When_StartDate_Is_In_The_Future()
+    public async Task CreateEmployeeAsync_Creates_Active_Employee_When_StartDate_Is_In_The_Future()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -79,13 +79,13 @@ public class EmployeeImportWriterTests
         Assert.Equal(StartDate.AddMonths(6), result.ProbationEndDate);
 
         var saved = await context.Employees.SingleAsync(e => e.Id == request.Id);
-        Assert.Equal(EmploymentStatus.Draft, saved.Status);
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
         Assert.Equal("alice@example.com", saved.WorkEmail);
         Assert.Equal("Alice", saved.PreferredName);
     }
 
     [Fact]
-    public async Task CreateEmployeeAsync_Activates_Employee_When_StartDate_Has_Already_Passed()
+    public async Task CreateEmployeeAsync_Creates_Active_Employee_When_StartDate_Has_Already_Passed()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -101,7 +101,7 @@ public class EmployeeImportWriterTests
     }
 
     [Fact]
-    public async Task CreateEmployeeAsync_Activates_Employee_When_StartDate_Is_Today()
+    public async Task CreateEmployeeAsync_Creates_Active_Employee_When_StartDate_Is_Today()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();

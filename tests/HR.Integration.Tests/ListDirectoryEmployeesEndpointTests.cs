@@ -38,7 +38,7 @@ public class ListDirectoryEmployeesEndpointTests
         return client;
     }
 
-    private async Task<(Guid ActiveId, Guid DraftId)> SeedEmployeesAsync(Guid companyId, Guid? otherCompanyId = null)
+    private async Task<(Guid ActiveId, Guid SuspendedId)> SeedEmployeesAsync(Guid companyId, Guid? otherCompanyId = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
@@ -48,9 +48,10 @@ public class ListDirectoryEmployeesEndpointTests
         var active = MakeEmployee(companyId, refData, "Ada", "Active", "ada.active@example.com");
         active.Activate(now);
 
-        var draft = MakeEmployee(companyId, refData, "Dan", "Draft", "dan.draft@example.com");
+        var suspended = MakeEmployee(companyId, refData, "Dan", "Suspended", "dan.suspended@example.com");
+        suspended.Suspend(now);
 
-        db.Employees.AddRange(active, draft);
+        db.Employees.AddRange(active, suspended);
 
         if (otherCompanyId is { } other)
         {
@@ -61,7 +62,7 @@ public class ListDirectoryEmployeesEndpointTests
         }
 
         await db.SaveChangesAsync();
-        return (active.Id, draft.Id);
+        return (active.Id, suspended.Id);
     }
 
     private static Employee MakeEmployee(
@@ -76,7 +77,7 @@ public class ListDirectoryEmployeesEndpointTests
     public async Task Get_Directory_Returns_Only_Active_SameCompany_Employees_For_Plain_Employee()
     {
         var companyId = Guid.NewGuid();
-        var (activeId, draftId) = await SeedEmployeesAsync(companyId, otherCompanyId: Guid.NewGuid());
+        var (activeId, suspendedId) = await SeedEmployeesAsync(companyId, otherCompanyId: Guid.NewGuid());
         using var client = await ClientFor(PlainEmployee, companyId);
 
         var response = await client.GetAsync($"/api/companies/{companyId}/employees/directory");
@@ -88,7 +89,7 @@ public class ListDirectoryEmployeesEndpointTests
         var item = Assert.Single(payload.Items);
         Assert.Equal(activeId, item.Id);
         Assert.Equal("Ada", item.FirstName);
-        Assert.DoesNotContain(payload.Items, i => i.Id == draftId);
+        Assert.DoesNotContain(payload.Items, i => i.Id == suspendedId);
     }
 
     [Fact]

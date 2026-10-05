@@ -68,7 +68,6 @@ public class GetGenderSplitEndpointTests
             AddEmployee(db, companyId, "Female", refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, "Female", refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, "Male", refData, EmploymentStatus.Active);
-            AddEmployee(db, companyId, "Female", refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, "Female", refData, EmploymentStatus.Suspended);
             AddEmployee(db, companyId, "Female", refData, EmploymentStatus.FormerEmployee);
         });
@@ -125,8 +124,6 @@ public class GetGenderSplitEndpointTests
 
         switch (status)
         {
-            case EmploymentStatus.Draft:
-                break;
             case EmploymentStatus.Active:
                 employee.Activate(now);
                 break;

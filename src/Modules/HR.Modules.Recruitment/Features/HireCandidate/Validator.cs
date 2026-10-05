@@ -42,13 +42,20 @@ internal sealed class HireCandidateValidator : AbstractValidator<HireCandidateRe
         RuleFor(r => r.EmployeeNumber)
             .MaximumLength(50);
 
-        RuleFor(r => r.EmploymentTypeId)
-            .NotEmpty().WithMessage("Employment type is required.");
+        RuleFor(r => r.ManagerId)
+            .NotEqual(Guid.Empty).WithMessage("Manager is invalid.")
+            .When(r => r.ManagerId.HasValue);
 
-        RuleFor(r => r.AddressLine1).MaximumLength(200);
+        RuleFor(r => r.AddressLine1)
+            .NotEmpty().WithMessage("Address line 1 is required.")
+            .MaximumLength(200);
         RuleFor(r => r.AddressLine2).MaximumLength(200);
-        RuleFor(r => r.City).MaximumLength(100);
+        RuleFor(r => r.City)
+            .NotEmpty().WithMessage("City is required.")
+            .MaximumLength(100);
         RuleFor(r => r.County).MaximumLength(100);
-        RuleFor(r => r.PostCode).MaximumLength(20);
+        RuleFor(r => r.PostCode)
+            .NotEmpty().WithMessage("Postcode is required.")
+            .MaximumLength(20);
     }
 }

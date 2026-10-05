@@ -863,11 +863,94 @@ public class UpdateVacancyHandlerTests
         Assert.False((await db.Vacancies.SingleAsync()).IsAdvertisedInternally);
     }
 
+    [Fact]
+    public async Task HandleAsync_Sets_EmploymentType_On_Legacy_Vacancy()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employmentTypeId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Title", null, Guid.NewGuid(), FixedUtcNow);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, employmentTypeReader: FakeEmploymentTypeReader.Active((companyId, employmentTypeId))).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId        = companyId,
+                VacancyId        = vacancy.Id,
+                ExpectedVersion  = 1,
+                AdvertTitle      = "Title",
+                HiringManagerId  = vacancy.HiringManagerId,
+                EmploymentTypeId = employmentTypeId,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employmentTypeId, result.Value!.EmploymentTypeId);
+        Assert.Equal(employmentTypeId, (await db.Vacancies.SingleAsync()).EmploymentTypeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Leaves_EmploymentType_Unchanged_When_Not_Supplied()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employmentTypeId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Title", null, Guid.NewGuid(), FixedUtcNow, employmentTypeId: employmentTypeId);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId       = companyId,
+                VacancyId       = vacancy.Id,
+                ExpectedVersion = 1,
+                AdvertTitle     = "Renamed",
+                HiringManagerId = vacancy.HiringManagerId,
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(employmentTypeId, (await db.Vacancies.SingleAsync()).EmploymentTypeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Inactive_Missing_Or_CrossCompany_EmploymentType()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Title", null, Guid.NewGuid(), FixedUtcNow);
+        db.Vacancies.Add(vacancy);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, employmentTypeReader: FakeEmploymentTypeReader.Active()).HandleAsync(
+            new UpdateVacancyRequest
+            {
+                CompanyId        = companyId,
+                VacancyId        = vacancy.Id,
+                ExpectedVersion  = 1,
+                AdvertTitle      = "Title",
+                HiringManagerId  = vacancy.HiringManagerId,
+                EmploymentTypeId = Guid.NewGuid(),
+            },
+            Guid.NewGuid(),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        Assert.Null((await db.Vacancies.SingleAsync()).EmploymentTypeId);
+    }
+
     private static UpdateVacancyHandler handler(
         RecruitmentDbContext db,
         FakeAuditPublisher? auditPublisher = null,
-        IPositionProfileReader? positionProfileReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), positionProfileReader ?? new FakePositionProfileReader());
+        IPositionProfileReader? positionProfileReader = null,
+        IEmploymentTypeReader? employmentTypeReader = null) =>
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), positionProfileReader ?? new FakePositionProfileReader(),
+            employmentTypeReader ?? FakeEmploymentTypeReader.Permissive());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

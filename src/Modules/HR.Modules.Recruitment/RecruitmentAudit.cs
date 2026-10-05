@@ -735,8 +735,10 @@ internal sealed record InterviewOutcomeReconciliationRepairedAuditEvent(
     string BlockedCategory,
     Guid? TasksOperationId,
     string Reason,
+    int RepairSequence,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    Guid IAuditEvent.EventId => Domain.InterviewOutcomeRepairAction.EventIdFor(ReconciliationId, RepairSequence);
     string IAuditEvent.EventType => "interview.outcome_reconciliation_repaired";
     string IAuditEvent.EntityType => "Interview";
     Guid IAuditEvent.EntityId => InterviewId;
@@ -747,5 +749,5 @@ internal sealed record InterviewOutcomeReconciliationRepairedAuditEvent(
     string? IAuditEvent.Summary => "Blocked interview outcome reconciliation retried by an operator";
     object? IAuditEvent.Before => new { Blocked = true, BlockedCategory };
     object? IAuditEvent.After => new { Blocked = false };
-    object? IAuditEvent.Metadata => new { ReconciliationId, ApplicationId, TasksOperationId, Reason };
+    object? IAuditEvent.Metadata => new { ReconciliationId, ApplicationId, TasksOperationId, RepairSequence, Reason };
 }

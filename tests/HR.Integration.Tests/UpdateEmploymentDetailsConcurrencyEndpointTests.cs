@@ -70,6 +70,9 @@ public class UpdateEmploymentDetailsConcurrencyEndpointTests
                 firstName = "ProfileFirst",
                 lastName = "Smith",
                 workEmail = $"pf.{Guid.NewGuid():N}@example.com",
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
                 startDate = "2026-01-15",
                 expectedVersion = version
             });

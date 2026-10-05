@@ -7,6 +7,26 @@ public class EmployeeTests
     private static readonly DateTimeOffset Now = new(new DateTime(2026, 6, 8, 10, 0, 0, DateTimeKind.Utc));
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
+    [Fact]
+    public void Create_Initialises_Status_Active_Even_When_StartDate_Is_In_The_Future()
+    {
+        var employee = CreateEmployee("EMP-001");
+
+        Assert.True(employee.StartDate > DateOnly.FromDateTime(Now.UtcDateTime));
+        Assert.Equal(EmploymentStatus.Active, employee.Status);
+    }
+
+    [Fact]
+    public void EmploymentStatus_Reserves_Retired_Values_And_Does_Not_Renumber()
+    {
+        Assert.False(Enum.IsDefined(typeof(EmploymentStatus), 0));
+        Assert.False(Enum.TryParse<EmploymentStatus>("Draft", ignoreCase: true, out _));
+        Assert.Equal(1, (int)EmploymentStatus.Active);
+        Assert.Equal(3, (int)EmploymentStatus.Suspended);
+        Assert.Equal(5, (int)EmploymentStatus.Leaving);
+        Assert.Equal(6, (int)EmploymentStatus.FormerEmployee);
+    }
+
     private static Employee CreateEmployee(string employeeNumber) => Employee.Create(
         Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", StartDate,
         hasSystemAccess: true, new DateOnly(1990, 5, 20), "British", "Female", employeeNumber,

@@ -144,7 +144,6 @@ internal sealed class CompleteInitialEmployeeSetupHandler
             now);
 
         employee.CompleteInitialSetup(now);
-        employee.Activate(now);
 
         var response = new CompleteInitialEmployeeSetupResponse(
             employee.Id,

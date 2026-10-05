@@ -132,7 +132,6 @@
 
     private static string StatusLabel(string status) => status switch
     {
-        "Draft" => "Draft",
         "Active" => "Active",
         "Suspended" => "Suspended",
         "Leaving" => "Leaving",
@@ -141,7 +140,6 @@
 
     private static string StatusBadgeClass(string status) => status switch
     {
-        "Draft" => "bg-secondary",
         "Active" => "bg-success",
         "Suspended" => "bg-warning text-dark",
         "Leaving" => "bg-warning text-dark",

@@ -36,6 +36,7 @@ public class HireCandidateRetryDoesNotDuplicateTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Engineer",
             hiringManagerId = Guid.NewGuid(),
         })).Content.ReadFromJsonAsync<Payload>();
@@ -66,7 +67,10 @@ public class HireCandidateRetryDoesNotDuplicateTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = referenceData.EmploymentTypeId,
+            overrideManager = true,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         };
 
         var firstHire = await client.PostAsJsonAsync(
@@ -106,6 +110,15 @@ public class HireCandidateRetryDoesNotDuplicateTests
         Assert.Equal(probationBefore, probationAfter);
         Assert.Equal(onboardingBefore, onboardingAfter);
         Assert.Equal(1, employeesAfter);
+
+        using (var statusScope = _factory.Services.CreateScope())
+        {
+            var statusDb = statusScope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
+            var status = (await statusDb.Database
+                .SqlQueryRaw<string>("SELECT status AS \"Value\" FROM employees.employees WHERE id = {0}", employeeId)
+                .ToListAsync()).Single();
+            Assert.Equal("Active", status);
+        }
 
         using (var scope = _factory.Services.CreateScope())
         {

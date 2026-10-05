@@ -17,8 +17,7 @@ internal sealed class HrHeadcountSummaryReader(EmployeesDbContext dbContext) : I
 
         var query = dbContext.Employees
             .AsNoTracking()
-            .Where(e => e.CompanyId == companyId)
-            .Where(HeadcountRules.CountedExpression());
+            .Where(e => e.CompanyId == companyId);
 
         if (filter.DepartmentId is not null)
             query = query.Where(e => e.DepartmentId == filter.DepartmentId);

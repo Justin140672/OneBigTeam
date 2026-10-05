@@ -43,6 +43,7 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
         {
             companyId,
             positionProfileId = referenceData.PositionProfileId,
+            employmentTypeId = referenceData.EmploymentTypeId,
             advertTitle = "Senior Software Engineer",
             hiringManagerId = Guid.NewGuid()
         });
@@ -121,7 +122,10 @@ public class HireCandidateFromVacancyPositionProfileEndToEndTests
                 nationality = "British",
                 gender = "Prefer not to say",
                 employeeNumber = $"EMP-{Guid.NewGuid():N}",
-                employmentTypeId = referenceData.EmploymentTypeId,
+                overrideManager = true,
+                addressLine1 = "1 Test Street",
+                city = "London",
+                postCode = "SW1A 1AA",
             });
         Assert.Equal(HttpStatusCode.OK, hireResponse.StatusCode);
         var hire = await hireResponse.Content.ReadFromJsonAsync<HirePayload>();

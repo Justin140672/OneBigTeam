@@ -538,7 +538,6 @@ public class EmployeeInternalAppointmentServiceTests
 
 
     [Theory]
-    [InlineData("Draft")]
     [InlineData("Suspended")]
     [InlineData("Leaving")]
     [InlineData("FormerEmployee")]

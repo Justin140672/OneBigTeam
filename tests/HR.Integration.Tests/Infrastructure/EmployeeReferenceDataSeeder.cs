@@ -109,7 +109,10 @@ internal static class EmployeeReferenceDataSeeder
         DateOnly? dateOfBirth = null,
         string nationality = "British",
         string gender = "Prefer not to say",
-        Guid? managerId = null) =>
+        Guid? managerId = null,
+        string? addressLine1 = "1 Test Street",
+        string? city = "London",
+        string? postCode = "SW1A 1AA") =>
         new
         {
             companyId,
@@ -126,6 +129,9 @@ internal static class EmployeeReferenceDataSeeder
             positionProfileId = referenceData.PositionProfileId,
             employmentTypeId = referenceData.EmploymentTypeId,
             managerId,
+            addressLine1,
+            city,
+            postCode,
         };
 
     public static async Task SetEmployeeNumberModeManualAsync(HttpClient client, Guid companyId)

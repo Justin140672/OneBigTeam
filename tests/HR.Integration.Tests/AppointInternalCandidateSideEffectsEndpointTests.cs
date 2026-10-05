@@ -92,6 +92,23 @@ public class AppointInternalCandidateSideEffectsEndpointTests
     }
 
     [Fact]
+    public async Task Appointment_Preserves_The_Employees_EmploymentType_And_Ignores_The_Vacancy_EmploymentType()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await RecruiterHrClientAsync(_factory, companyId);
+        var s = await SeedAsync(_factory, companyId);
+        Assert.NotEqual(s.World.Current.EmploymentTypeId, s.World.Target.EmploymentTypeId);
+
+        var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var employee = await scope.ServiceProvider.GetRequiredService<HR.Modules.Employees.Persistence.EmployeesDbContext>()
+            .Employees.AsNoTracking().SingleAsync(e => e.Id == s.EmployeeId);
+        Assert.Equal(s.World.Current.EmploymentTypeId, employee.EmploymentTypeId);
+    }
+
+    [Fact]
     public async Task Scheduled_Appointment_Creates_No_New_Hire_Side_Effects()
     {
         var companyId = Guid.NewGuid();
@@ -123,7 +140,9 @@ public class AppointInternalCandidateSideEffectsEndpointTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = s.World.Target.EmploymentTypeId,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -156,7 +175,9 @@ public class AppointInternalCandidateSideEffectsEndpointTests
             nationality = "British",
             gender = "Prefer not to say",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
-            employmentTypeId = s.World.Target.EmploymentTypeId,
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);

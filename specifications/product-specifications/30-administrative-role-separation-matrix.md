@@ -76,6 +76,11 @@ Legend: Y = full access · S = scoped (hierarchy / self / function) · — = den
 | Asset catalogue (view) | `asset:view` | Y | Y | — | Y | **—** |
 | Platform / admin-portal (cross-tenant) | `platform:admin` | — | — | — | — | **—** |
 
+Hiring an external candidate stays under `recruitment:manage`. The hire's employment type, position
+profile, department and location come from the vacancy, and the manager defaults to the vacancy's hiring
+manager; the recruiter's override is validated server-side against the company's employees. Hiring does
+not require `employee:manage`. See `19-recruitment.md` for the source of every hire field.
+
 Self-service (my profile, my leave, my sickness, my documents, my tasks, my emergency
 contacts, notifications) is available to every authenticated user including a Company
 Administrator who also has an employee record, and is out of scope for administrative role

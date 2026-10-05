@@ -160,6 +160,7 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             HiringManagerId = response.HiringManagerId,
             AssignedRecruiterId = response.AssignedRecruiterId ?? Guid.Empty,
             IsAdvertisedInternally = response.IsAdvertisedInternally,
+            EmploymentTypeId = response.EmploymentTypeId,
             Version = response.Version,
         };
     }
@@ -179,7 +180,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             IsAuthorisedCorrection: model.IsAuthorisedCorrection,
             CorrectionReason: FormText.Optional(model.CorrectionReason),
             IsAdvertisedInternally: model.IsAdvertisedInternally,
-            ExpectedVersion: expectedVersion);
+            ExpectedVersion: expectedVersion,
+            EmploymentTypeId: model.EmploymentTypeId);
 
         var response = await Http.PutAsJsonAsync($"api/companies/{companyId}/vacancies/{id}", request);
         var result = await ApiResponseReader.ReadJsonAsync<UpdateVacancyResponse>(response);
@@ -203,7 +205,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             FormText.Optional(model.AdvertDescription),
             model.HiringManagerId!.Value,
             model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
-            IsAdvertisedInternally: model.IsAdvertisedInternally);
+            IsAdvertisedInternally: model.IsAdvertisedInternally,
+            EmploymentTypeId: model.EmploymentTypeId);
 
         var (created, error) = await CreateVacancyAsync(companyId, request);
         return (created is null ? null : model, error);
@@ -220,7 +223,8 @@ public sealed class VacancyService(HrApiHttpClientFactory httpClientFactory)
             AssignedRecruiterId: model.AssignedRecruiterId == Guid.Empty ? null : model.AssignedRecruiterId,
             IsAuthorisedCorrection: model.IsAuthorisedCorrection,
             CorrectionReason: FormText.Optional(model.CorrectionReason),
-            IsAdvertisedInternally: model.IsAdvertisedInternally);
+            IsAdvertisedInternally: model.IsAdvertisedInternally,
+            EmploymentTypeId: model.EmploymentTypeId);
 
         var (updated, error) = await UpdateVacancyAsync(companyId, id, request);
         return (updated is null ? null : model, error);

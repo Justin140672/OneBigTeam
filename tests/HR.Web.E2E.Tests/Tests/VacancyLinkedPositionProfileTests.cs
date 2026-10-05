@@ -43,6 +43,7 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.GoToAsync(AcmeId);
@@ -114,6 +115,7 @@ public sealed class VacancyLinkedPositionProfileTests(CrossUserFixture fixture) 
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await login.SwitchAccountAsync(LauraEmail);

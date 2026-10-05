@@ -84,7 +84,6 @@ public class GetHeadcountSummaryEndpointTests
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Active);
-            AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Draft);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.Suspended);
             AddEmployee(db, companyId, department.Id, refData, EmploymentStatus.FormerEmployee);
             AddEmployee(db, companyId, null, refData, EmploymentStatus.Active);
@@ -144,8 +143,6 @@ public class GetHeadcountSummaryEndpointTests
 
         switch (status)
         {
-            case EmploymentStatus.Draft:
-                break;
             case EmploymentStatus.Active:
                 employee.Activate(now);
                 break;

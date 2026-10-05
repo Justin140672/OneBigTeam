@@ -40,9 +40,10 @@ public class RecruitmentApprovalSettingsEndToEndTests
 
     private async Task<Guid> SeedDraftVacancyAsync(Guid companyId)
     {
+        var referenceData = await EmployeeReferenceDataSeeder.SeedAsync(_factory, companyId);
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now, employmentTypeId: referenceData.EmploymentTypeId);
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();
         return vacancy.Id;

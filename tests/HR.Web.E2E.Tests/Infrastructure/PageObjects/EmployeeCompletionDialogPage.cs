@@ -63,7 +63,7 @@ public sealed class EmployeeCompletionDialogPage(IPage page)
         var input = Dialog.GetByPlaceholder("dd/mm/yyyy");
         await input.ClickAsync();
         await input.FillAsync(ddMMyyyy);
-        await page.Keyboard.PressAsync("Escape");
+        await page.Keyboard.PressAsync("Tab");
     }
 
     public Task SelectNationalityAsync(string text) =>

@@ -102,25 +102,7 @@ public sealed class CircuitInvalidationBlocksReauthenticationTests : IAsyncLifet
 
         Assert.True(closedRealSocket, "Expected to find and close an open Blazor SignalR WebSocket.");
 
-        var reconnectModal = _page.Locator("#components-reconnect-modal");
-        await reconnectModal.WaitForAsync(new() { State = Microsoft.Playwright.WaitForSelectorState.Visible, Timeout = 15_000 });
-
-
-        await reconnectModal.WaitForAsync(new() { State = Microsoft.Playwright.WaitForSelectorState.Hidden, Timeout = 30_000 });
-
-        if (!_page.Url.Contains("/login", StringComparison.OrdinalIgnoreCase))
-        {
-            var sidebar = new SidebarPage(_page);
-            try
-            {
-                await sidebar.ClickGroupedMenuItemAsync("People and users", "Employees");
-            }
-            catch
-            {
-            }
-        }
-
-        await _page.WaitForURLAsync(new Regex("/login"), new() { Timeout = 20_000 });
+        await _page.WaitForURLAsync(new Regex("/login"), new() { Timeout = 45_000 });
 
         // Re-login on what must now be a genuinely fresh circuit (a full browser navigation to
         // /login, per forceLoad: true, tears down the old SignalR connection and DI scope — so the

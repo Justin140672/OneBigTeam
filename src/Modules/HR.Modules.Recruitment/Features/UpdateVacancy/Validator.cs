@@ -20,6 +20,10 @@ internal sealed class UpdateVacancyValidator : AbstractValidator<UpdateVacancyRe
             .NotEqual(Guid.Empty)
             .When(r => r.PositionProfileId.HasValue);
 
+        RuleFor(r => r.EmploymentTypeId)
+            .NotEqual(Guid.Empty).WithMessage("Employment type is invalid.")
+            .When(r => r.EmploymentTypeId.HasValue);
+
         RuleFor(r => r.AdvertTitle)
             .MaximumLength(200)
             .When(r => !string.IsNullOrWhiteSpace(r.AdvertTitle));

@@ -14,7 +14,8 @@ internal sealed class PublishVacancyHandler(
     IClock clock,
     IAuditEventPublisher auditPublisher,
     IPositionProfileReader positionProfileReader,
-    ICompanyRecruitmentSettingsReader recruitmentSettingsReader)
+    ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
+    IEmploymentTypeReader employmentTypeReader)
 {
     public async Task<Result<PublishVacancyResponse>> HandleAsync(
         PublishVacancyRequest request,
@@ -52,6 +53,14 @@ internal sealed class PublishVacancyHandler(
         if (vacancy.Status is not (VacancyStatus.Draft or VacancyStatus.OnHold))
             return Result.Failure<PublishVacancyResponse>(
                 Error.Validation($"Cannot publish a vacancy with status '{vacancy.Status}'."));
+
+        if (vacancy.EmploymentTypeId is not { } vacancyEmploymentTypeId)
+            return Result.Failure<PublishVacancyResponse>(
+                Error.Validation("Employment type required. Set an employment type on this vacancy before opening it."));
+
+        if (!await employmentTypeReader.IsActiveAsync(request.CompanyId, vacancyEmploymentTypeId, cancellationToken))
+            return Result.Failure<PublishVacancyResponse>(
+                Error.Validation("This vacancy's employment type is no longer active. Choose an active employment type before opening it."));
 
         var recruitmentSettings = await recruitmentSettingsReader.GetRecruitmentSettingsAsync(request.CompanyId, cancellationToken);
         if (recruitmentSettings.VacancyApprovalRequired && vacancy.ApprovedAt is null)

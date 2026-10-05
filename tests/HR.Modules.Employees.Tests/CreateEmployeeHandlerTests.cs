@@ -16,7 +16,7 @@ public class CreateEmployeeHandlerTests
     private static readonly DateOnly StartDate = new(2026, 7, 1);
 
     [Fact]
-    public async Task HandleAsync_Creates_Employee_With_Draft_Status()
+    public async Task HandleAsync_Creates_Employee_With_Active_Status()
     {
         await using var context = BuildContext();
         var handler = new CreateEmployeeHandler(context, new FakeClock(FixedUtcNow), new FakeProbationDateResolver(), new FakeCompanyContactValidationReader(), new FakeCompanyEmployeeNumberSettingsReader(), new FakeEmployeeNumberGenerator());
@@ -27,6 +27,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -50,7 +53,7 @@ public class CreateEmployeeHandlerTests
         Assert.Equal("Smith", result.Value.LastName);
         Assert.Equal("alice.smith@example.com", result.Value.WorkEmail);
         Assert.Equal(StartDate, result.Value.StartDate);
-        Assert.Equal(EmploymentStatus.Draft, result.Value.Status);
+        Assert.Equal(EmploymentStatus.Active, result.Value.Status);
         Assert.Equal(departmentId, result.Value.DepartmentId);
         Assert.Equal(positionProfileId, result.Value.PositionProfileId);
         Assert.Null(result.Value.ManagerId);
@@ -71,6 +74,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -113,6 +119,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = department.Id,
                 LocationId = locationId,
@@ -156,6 +165,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = location.Id,
@@ -188,6 +200,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 LocationId = Guid.NewGuid(),
                 FirstName = "Alice",
@@ -220,6 +235,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 LocationId = location.Id,
                 FirstName = "Alice",
@@ -249,6 +267,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -279,6 +300,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyB,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -307,6 +331,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 DepartmentId = Guid.NewGuid(),
                 FirstName = "Alice",
@@ -336,6 +363,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 DepartmentId = department.Id,
                 FirstName = "Alice",
@@ -359,6 +389,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 PositionProfileId = Guid.NewGuid(),
                 FirstName = "Alice",
@@ -388,6 +421,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 PositionProfileId = profile.Id,
                 FirstName = "Alice",
@@ -411,6 +447,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 ManagerId = Guid.NewGuid(),
                 FirstName = "Alice",
@@ -442,6 +481,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 ManagerId = manager.Id,
                 FirstName = "Alice",
@@ -468,6 +510,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -500,6 +545,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -536,6 +584,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -569,6 +620,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -606,6 +660,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -642,6 +699,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -679,6 +739,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -705,6 +768,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -745,6 +811,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -779,6 +848,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -819,6 +891,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -853,6 +928,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -887,6 +965,8 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
                 CompanyId = Guid.NewGuid(),
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -911,6 +991,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -934,6 +1017,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = Guid.NewGuid(),
                 FirstName = "Alice",
                 LastName = "Smith",
@@ -960,6 +1046,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -973,7 +1062,6 @@ public class CreateEmployeeHandlerTests
                 DateOfBirth = new DateOnly(1990, 5, 20),
                 Nationality = "British",
                 Gender = "Female",
-                PostCode = "SW1A 1AA",
                 PhoneNumber = "07700 900000",
                 HomePhone = "01234 567890"
             },
@@ -999,6 +1087,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1012,7 +1103,6 @@ public class CreateEmployeeHandlerTests
                 DateOfBirth = new DateOnly(1990, 5, 20),
                 Nationality = "British",
                 Gender = "Female",
-                PostCode = null,
                 PhoneNumber = null,
                 HomePhone = null
             },
@@ -1036,6 +1126,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1072,6 +1165,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1117,6 +1213,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1153,6 +1252,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1195,6 +1297,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyId,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1239,6 +1344,9 @@ public class CreateEmployeeHandlerTests
         var result = await handler.HandleAsync(
             new CreateEmployeeRequest
             {
+                AddressLine1 = "1 High Street",
+                City = "London",
+                PostCode = "SW1A 1AA",
                 CompanyId = companyB,
                 DepartmentId = departmentId,
                 LocationId = locationId,
@@ -1264,6 +1372,9 @@ public class CreateEmployeeHandlerTests
         Guid companyId, Guid departmentId, Guid locationId, Guid positionProfileId, Guid employmentTypeId,
         decimal? salary = null, string? salaryFrequency = null) => new()
     {
+        AddressLine1 = "1 High Street",
+        City = "London",
+        PostCode = "SW1A 1AA",
         CompanyId = companyId,
         DepartmentId = departmentId,
         LocationId = locationId,
@@ -1354,6 +1465,9 @@ public class CreateEmployeeHandlerTests
 
         var request = new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = companyId,
             DepartmentId = departmentId,
             LocationId = locationId,
@@ -1391,6 +1505,9 @@ public class CreateEmployeeHandlerTests
 
         var request = new CreateEmployeeRequest
         {
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
             CompanyId = companyId,
             DepartmentId = departmentId,
             LocationId = locationId,

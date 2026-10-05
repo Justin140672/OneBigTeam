@@ -79,7 +79,7 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         await vacancyDetail.FillHireDateOfBirthAsync("15/06/1990");
         await vacancyDetail.SelectHireNationalityAsync("British");
         await vacancyDetail.SelectHireGenderAsync("Male");
-        await vacancyDetail.SelectHireDropdownAsync("Employment Type", "Permanent");
+        await vacancyDetail.FillHireAddressAsync("1 Test Street", "London", "SW1A 1AA");
         await vacancyDetail.SubmitHireAsync();
 
         Assert.Equal("Hired", await vacancyDetail.GetApplicationStatusAsync(candidate));
@@ -111,21 +111,16 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         Assert.NotNull(badge);
         Assert.Contains("Declined", badge);
 
-        await vacancyDetail.ClickHireForAsync(candidate);
-        await vacancyDetail.WaitForHireDialogAsync();
-
-        Assert.True(await vacancyDetail.IsHireOfferBlockedWarningVisibleAsync(),
-            "Expected the hire-offer-blocked warning after the candidate declined the offer");
-
-        await vacancyDetail.CancelHireDialogAsync();
+        Assert.False(await vacancyDetail.IsApplicationsToolbarButtonEnabledAsync(candidate, "Hire"),
+            "Expected Hire to be disabled after the candidate declined the offer");
     }
 
     /// <summary>
     /// Logs in as Laura to create a fresh, uniquely-titled Position Profile with a salary range
     /// (Engineering / London Office / Standard leave policy — mandatory fields), switches to Marcus
     /// ONCE to create the candidate and publish a vacancy against it, then adds
-    /// <paramref name="candidateLast"/> as an application. No interview is scheduled — "Offer" only
-    /// requires an active, non-terminal, no-pending-interview application. Returns (candidateLast,
+    /// <paramref name="candidateLast"/> as an application. Schedules an interview and records it as Passed, because "Offer"
+    /// requires every active interview stage to be passed. Returns (candidateLast,
     /// vacancyTitle).
     ///
     /// Deliberately does the Laura (HR Administrator) work FIRST and switches to Marcus (Recruiter)
@@ -180,6 +175,7 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);
@@ -190,6 +186,20 @@ public sealed class CandidateOfferDetailsAndResponseTests(CrossUserFixture fixtu
         await vacancyDetail.SubmitAddApplicationAsync();
 
         Assert.Equal("Application Received", await vacancyDetail.GetApplicationStatusAsync(candidateLast));
+
+        await vacancyDetail.ClickScheduleInterviewForAsync(candidateLast);
+        await vacancyDetail.WaitForScheduleDialogAsync();
+        await vacancyDetail.SelectInterviewerAsync("James");
+        await vacancyDetail.FillScheduledAtAsync("01/09/2099 10:00");
+        await vacancyDetail.SubmitScheduleInterviewAsync();
+
+        await vacancyDetail.OpenInterviewsTabAsync();
+        await vacancyDetail.ClickRecordOutcomeForAsync(candidateLast);
+        await vacancyDetail.WaitForOutcomeDialogAsync();
+        await vacancyDetail.SelectOutcomeAsync("Passed");
+        await vacancyDetail.SubmitOutcomeAsync();
+
+        await vacancyDetail.OpenApplicationsTabAsync();
 
         return (candidateLast, vacancyTitle);
     }

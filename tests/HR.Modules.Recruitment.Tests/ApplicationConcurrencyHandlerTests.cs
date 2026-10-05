@@ -36,7 +36,7 @@ public class ApplicationConcurrencyHandlerTests
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
         await using var seed = new RecruitmentDbContext(Options(dbName));
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         var stages = RecruitmentStageTestData.AddDefaultStages(seed, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", "+44 7700 900001", Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, currentStage(stages).Id, null, Now);

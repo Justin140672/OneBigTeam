@@ -12,6 +12,9 @@ internal sealed record UpdateVacancyRequest
 
     public bool IsAdvertisedInternally { get; init; }
 
+    // Null leaves the vacancy's current employment type unchanged.
+    public Guid? EmploymentTypeId { get; init; }
+
     // Authorised correction escape hatch: when the baseline change-control check
     // (UpdateVacancyHandler.CanChangePositionProfile) would otherwise reject a Position Profile
     // change (vacancy published and/or has applications), setting this flag together with a

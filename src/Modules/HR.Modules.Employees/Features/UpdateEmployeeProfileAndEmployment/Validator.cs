@@ -22,6 +22,10 @@ internal sealed class UpdateEmployeeProfileAndEmploymentValidator
             .When(r => !string.IsNullOrWhiteSpace(r.PersonalEmail));
 
         RuleFor(r => r.StartDate).NotEmpty();
+        RuleFor(r => r.Status).IsInEnum();
+        RuleFor(r => r.AddressLine1).NotEmpty().WithMessage("Address line 1 is required.").MaximumLength(200);
+        RuleFor(r => r.City).NotEmpty().WithMessage("City is required.").MaximumLength(100);
+        RuleFor(r => r.PostCode).NotEmpty().WithMessage("Postcode is required.").MaximumLength(20);
         RuleFor(r => r.EmployeeNumber)
             .NotEmpty().WithMessage("Employee number is required.")
             .MaximumLength(50)

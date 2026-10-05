@@ -39,6 +39,10 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
 
     public bool IsAdvertisedInternally { get; private set; }
 
+    // Owned by Employees (no FK). Nullable only for legacy vacancies created before this was
+    // required; those cannot be opened or used to hire until one is set.
+    public Guid? EmploymentTypeId { get; private set; }
+
     // The external recruitment agency (ExternalRecruiter) assigned to run this vacancy, if any.
     // Nullable — a vacancy may have no agency assigned. Per explicit product-direction scope
     // correction (ticket #81), this used to be a Guid? FK to an internal Employee (mirroring
@@ -68,8 +72,10 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
         Guid hiringManagerId,
         DateTimeOffset now,
         Guid? assignedRecruiterId = null,
-        bool isAdvertisedInternally = false) => new()
+        bool isAdvertisedInternally = false,
+        Guid? employmentTypeId = null) => new()
     {
+        EmploymentTypeId   = employmentTypeId,
         Id                 = id,
         CompanyId          = companyId,
         PositionProfileId  = positionProfileId,
@@ -98,6 +104,12 @@ internal sealed class Vacancy : HR.SharedKernel.IVersionedAggregate
         AssignedRecruiterId = assignedRecruiterId;
         IsAdvertisedInternally = isAdvertisedInternally;
         UpdatedAt          = now;
+    }
+
+    public void ChangeEmploymentType(Guid employmentTypeId, DateTimeOffset now)
+    {
+        EmploymentTypeId = employmentTypeId;
+        UpdatedAt = now;
     }
 
     public void AssignRecruiter(Guid? recruiterId, DateTimeOffset now)

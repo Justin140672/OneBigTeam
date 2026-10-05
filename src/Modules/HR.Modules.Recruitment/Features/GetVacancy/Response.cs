@@ -24,4 +24,5 @@ internal sealed record GetVacancyResponse(
     string? EffectiveLocation,
     int ApplicationCount,
     bool CanChangePositionProfile,
-    int Version);
+    int Version,
+    Guid? EmploymentTypeId = null);

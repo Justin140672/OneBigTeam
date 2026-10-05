@@ -5,4 +5,6 @@ internal sealed record RetryInterviewOutcomeReconciliationResponse(
     Guid InterviewId,
     string Status,
     bool WasBlocked,
-    bool TasksCompletionReset);
+    bool TasksCompletionReset,
+    Guid? RecoveryActionId = null,
+    int RepairCount = 0);

@@ -138,7 +138,8 @@ internal static class InternalAppointmentTestSeeder
 
         var vacancy = Vacancy.Create(
             Guid.NewGuid(), world.CompanyId, world.Target.PositionProfileId, advertTitle, "Lead the platform team.",
-            Guid.NewGuid(), now, assignedRecruiterId: null, isAdvertisedInternally: true);
+            world.NewManagerId, now, assignedRecruiterId: null, isAdvertisedInternally: true,
+            employmentTypeId: world.Target.EmploymentTypeId);
         vacancy.Open(now, DateOnly.FromDateTime(now.UtcDateTime));
         db.Vacancies.Add(vacancy);
         await db.SaveChangesAsync();

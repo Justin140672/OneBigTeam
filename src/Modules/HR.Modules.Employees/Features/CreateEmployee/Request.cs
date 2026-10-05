@@ -33,17 +33,21 @@ internal sealed record CreateEmployeeRequest
     public string? SourceReference { get; init; }
 
     /// <summary>
-    /// Ticket 2: agreed starting compensation supplied by an automated hire (accepted candidate
-    /// offer). When <see cref="Salary"/> is positive the handler creates the employee's first
-    /// Compensation record. <see cref="SalaryFrequency"/> is "Annual" | "Hourly" | "Daily"
-    /// (defaults to Annual). Null for human-initiated creation (compensation managed separately).
+    /// Starting compensation, created in the same transaction as the employee and effective from
+    /// <see cref="StartDate"/>. Mandatory on the create-employee endpoint (see the validator);
+    /// internal provisioning paths (accepted candidate offer, company sign-up) may omit it.
+    /// <see cref="SalaryFrequency"/> is "Annual" | "Hourly" | "Daily" (defaults to Annual) and
+    /// <see cref="Currency"/> is a 3-letter ISO 4217 code (defaults to GBP).
     /// </summary>
     public decimal? Salary { get; init; }
     public string? SalaryFrequency { get; init; }
+    public string? Currency { get; init; }
 
     public bool IsInitialCompanyAdmin { get; init; }
 
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1
     // follow-up). Null when the caller didn't supply one, in which case no dedup is attempted.
     internal string? IdempotencyKey { get; init; }
+
+    internal Guid? ActorEmployeeId { get; init; }
 }

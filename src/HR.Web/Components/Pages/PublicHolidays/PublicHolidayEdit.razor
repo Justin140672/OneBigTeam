@@ -43,7 +43,7 @@
                         <div class="card-body @(IsViewMode ? "view-mode" : "")">
                             <div class="mb-3">
                                 <label class="form-label">Date <span class="text-danger">*</span></label>
-                                <SfDatePicker TValue="DateTime?" @bind-Value="Model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
+                                <HrDatePicker TValue="DateTime?" @bind-Value="Model.Date" Placeholder="Select date" Format="dd/MM/yyyy" />
                                 <ValidationMessage For="@(() => Model.Date)" />
                             </div>
                             <div class="mb-3">

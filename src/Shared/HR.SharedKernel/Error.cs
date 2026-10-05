@@ -1,6 +1,6 @@
 namespace HR.SharedKernel;
 
-public sealed record Error(string Code, string Message)
+public sealed record Error(string Code, string Message, IReadOnlyDictionary<string, object?>? Details = null)
 {
     public static readonly Error None = new(string.Empty, string.Empty);
 

@@ -33,7 +33,7 @@ public class HireCandidateHandlerTests
         var positionProfileId = Guid.NewGuid();
         var departmentId = Guid.NewGuid();
         var locationId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Senior Software Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Senior Software Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
 
         var summaries = new Dictionary<Guid, PositionProfileSummary>
@@ -264,7 +264,7 @@ public class HireCandidateHandlerTests
     {
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Backend Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Zara", "Osei", "zara.osei@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
@@ -286,7 +286,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Milo", "Adeyemi", "milo.adeyemi@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
@@ -313,7 +313,7 @@ public class HireCandidateHandlerTests
         await using var db = BuildContext();
         var companyId = Guid.NewGuid();
         var positionProfileId = Guid.NewGuid();
-        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now);
+        var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Backend Engineer", null, Guid.NewGuid(), Now, employmentTypeId: Guid.NewGuid());
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Nadia", "Farouk", "nadia.farouk@example.com", null, Now);
         var application = Application.Create(Guid.NewGuid(), companyId, vacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
@@ -534,6 +534,165 @@ public class HireCandidateHandlerTests
         Assert.Null(saved.AppointmentStatus);
         Assert.Equal(linkedEmployeeId, (await db.Candidates.SingleAsync()).EmployeeId);
         Assert.Empty(await db.ApplicationStageHistoryEntries.ToListAsync());
+    }
+
+    [Fact]
+    public async Task HandleAsync_Uses_The_Vacancy_EmploymentType_When_Provisioning()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var provisioned = Assert.Single(provisioning.Requests);
+        Assert.Equal(vacancy.EmploymentTypeId, provisioned.EmploymentTypeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Rejects_Hire_When_Legacy_Vacancy_Has_No_EmploymentType()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var companyId = Guid.NewGuid();
+        var positionProfileId = Guid.NewGuid();
+        var legacyVacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Legacy", null, Guid.NewGuid(), Now);
+        var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
+        var candidate = Candidate.Create(Guid.NewGuid(), companyId, "Emma", "Clarke", "emma.clarke@example.com", null, Now);
+        var application = Application.Create(Guid.NewGuid(), companyId, legacyVacancy.Id, candidate.Id, stages.Offer.Id, null, Now);
+        db.Vacancies.Add(legacyVacancy);
+        db.Candidates.Add(candidate);
+        db.Applications.Add(application);
+        await db.SaveChangesAsync();
+
+        var summaries = new Dictionary<Guid, PositionProfileSummary>
+        {
+            [positionProfileId] = new(positionProfileId, "Legacy", Guid.NewGuid(), true, Guid.NewGuid(), "London"),
+        };
+
+        var result = await handler(db, provisioning, positionProfileReader: new FakePositionProfileReader(summaries: summaries)).HandleAsync(
+            BuildRequest(companyId, legacyVacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("validation", result.Error.Code);
+        Assert.Contains("Employment type required", result.Error.Message);
+        Assert.Empty(provisioning.Requests);
+        Assert.Null((await db.Candidates.SingleAsync()).EmployeeId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Defaults_Manager_To_Vacancy_HiringManager_When_No_Override()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(vacancy.HiringManagerId, Assert.Single(provisioning.Requests).ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Ignores_ManagerId_When_Override_Flag_Is_Not_Set()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { ManagerId = Guid.NewGuid() },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(vacancy.HiringManagerId, Assert.Single(provisioning.Requests).ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Honours_Explicit_Alternative_Manager()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+        var alternativeManagerId = Guid.NewGuid();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { OverrideManager = true, ManagerId = alternativeManagerId },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(alternativeManagerId, Assert.Single(provisioning.Requests).ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Honours_Explicit_No_Manager()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { OverrideManager = true, ManagerId = null },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(Assert.Single(provisioning.Requests).ManagerId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Forwards_Address_Fields_To_Provisioning()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService();
+        var (_, companyId, vacancy, reader, _, application, _) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with
+            {
+                AddressLine1 = "1 High Street",
+                AddressLine2 = "Flat 2",
+                City = "London",
+                County = "Greater London",
+                PostCode = "SW1A 1AA",
+            },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var provisioned = Assert.Single(provisioning.Requests);
+        Assert.Equal("1 High Street", provisioned.AddressLine1);
+        Assert.Equal("Flat 2", provisioned.AddressLine2);
+        Assert.Equal("London", provisioned.City);
+        Assert.Equal("Greater London", provisioned.County);
+        Assert.Equal("SW1A 1AA", provisioned.PostCode);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Does_Not_Hire_When_Provisioning_Rejects_The_Manager()
+    {
+        await using var db = BuildContext();
+        var provisioning = new FakeEmployeeProvisioningService(
+            Result.Failure<Guid>(Error.NotFound("Manager employee was not found.")));
+        var (_, companyId, vacancy, reader, _, application, stages) = SeedOfferStageApplication(db);
+        await db.SaveChangesAsync();
+
+        var result = await handler(db, provisioning, positionProfileReader: reader).HandleAsync(
+            BuildRequest(companyId, vacancy.Id, application.Id) with { OverrideManager = true, ManagerId = Guid.NewGuid() },
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("not_found", result.Error.Code);
+        db.ChangeTracker.Clear();
+        Assert.Equal(stages.Offer.Id, (await db.Applications.SingleAsync()).CurrentStageId);
+        Assert.Null((await db.Candidates.SingleAsync()).EmployeeId);
     }
 
     private static HireCandidateHandler handler(

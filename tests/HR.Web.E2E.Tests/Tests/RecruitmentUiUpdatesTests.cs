@@ -51,6 +51,7 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         Assert.True(await vacancyList.HasVacancyAsync(vacancyTitle));
@@ -79,6 +80,7 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.GoToAsync(AcmeId);
@@ -124,6 +126,7 @@ public sealed class RecruitmentUiUpdatesTests(RecruiterPersonaFixture fixture) :
         await vacancyDetail.FillTitleAsync(vacancyTitle);
         await vacancyDetail.SelectPositionProfileAsync(profileTitle);
         await vacancyDetail.SelectHiringManagerAsync("James");
+        await vacancyDetail.SelectEmploymentTypeAsync("Permanent");
         await vacancyDetail.SaveNewVacancyAsync();
 
         await vacancyList.ClickVacancyAsync(vacancyTitle);

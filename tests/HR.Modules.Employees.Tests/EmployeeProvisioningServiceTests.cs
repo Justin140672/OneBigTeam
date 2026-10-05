@@ -32,7 +32,8 @@ public class EmployeeProvisioningServiceTests
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
                 StartDate, DateOfBirth, "British", "Female",
-                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId,
+                AddressLine1: "1 High Street", City: "London", PostCode: "SW1A 1AA"),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -43,6 +44,7 @@ public class EmployeeProvisioningServiceTests
         Assert.Equal("Emma", saved.FirstName);
         Assert.Equal("Clarke", saved.LastName);
         Assert.Equal("emma.clarke@example.com", saved.WorkEmail);
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
     }
 
     [Fact]
@@ -61,14 +63,16 @@ public class EmployeeProvisioningServiceTests
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
                 StartDate, DateOfBirth, "British", "Female",
-                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId,
+                AddressLine1: "1 High Street", City: "London", PostCode: "SW1A 1AA"),
             CancellationToken.None);
 
         var result = await service.CreateFromCandidateAsync(
             new EmployeeProvisioningRequest(
                 companyId, "Emma", "Clarke", "emma.clarke@example.com",
                 StartDate, DateOfBirth, "British", "Female",
-                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId),
+                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId,
+                AddressLine1: "1 High Street", City: "London", PostCode: "SW1A 1AA"),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
@@ -91,7 +95,8 @@ public class EmployeeProvisioningServiceTests
             new EmployeeProvisioningRequest(
                 companyId, "Ada", "Lovelace", "ada@example.com",
                 StartDate, DateOfBirth, "British", "Female",
-                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId),
+                "EMP-0001", employmentTypeId, departmentId, locationId, positionProfileId,
+                AddressLine1: "1 High Street", City: "London", PostCode: "SW1A 1AA"),
             CancellationToken.None);
         Assert.True(created.IsSuccess);
 
@@ -100,6 +105,7 @@ public class EmployeeProvisioningServiceTests
         var saved = await context.Employees.SingleAsync(e => e.Id == created.Value);
         Assert.True(saved.IsInitialCompanyAdmin);
         Assert.True(saved.RequiresInitialSetup);
+        Assert.Equal(EmploymentStatus.Active, saved.Status);
 
         var compensation = await context.Compensations.SingleAsync(c => c.EmployeeId == created.Value);
         Assert.Equal(SalaryType.Annual, compensation.SalaryType);
@@ -124,7 +130,8 @@ public class EmployeeProvisioningServiceTests
             new EmployeeProvisioningRequest(
                 companyId, "Ada", "Lovelace", "ada2@example.com",
                 StartDate, DateOfBirth, "British", "Female",
-                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId),
+                "EMP-0002", employmentTypeId, departmentId, locationId, positionProfileId,
+                AddressLine1: "1 High Street", City: "London", PostCode: "SW1A 1AA"),
             CancellationToken.None);
         Assert.True(created.IsSuccess);
 

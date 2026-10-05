@@ -15,9 +15,26 @@ public class CreateVacancyValidatorTests
             PositionProfileId = Guid.NewGuid(),
             AdvertTitle       = "Senior Software Engineer",
             HiringManagerId   = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Validate_Fails_When_EmploymentTypeId_Is_Missing()
+    {
+        var result = _validator.Validate(new CreateVacancyRequest
+        {
+            CompanyId         = Guid.NewGuid(),
+            PositionProfileId = Guid.NewGuid(),
+            AdvertTitle       = "Senior Software Engineer",
+            HiringManagerId   = Guid.NewGuid(),
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e =>
+            e.PropertyName == nameof(CreateVacancyRequest.EmploymentTypeId) && e.ErrorMessage == "Employment type is required.");
     }
 
     [Fact]
@@ -29,6 +46,7 @@ public class CreateVacancyValidatorTests
             PositionProfileId = Guid.Empty,
             AdvertTitle       = "Senior Software Engineer",
             HiringManagerId   = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -43,6 +61,7 @@ public class CreateVacancyValidatorTests
             CompanyId       = Guid.Empty,
             AdvertTitle     = "Senior Software Engineer",
             HiringManagerId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -61,6 +80,7 @@ public class CreateVacancyValidatorTests
             PositionProfileId = Guid.NewGuid(),
             AdvertTitle       = advertTitle,
             HiringManagerId   = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.True(result.IsValid);
@@ -74,6 +94,7 @@ public class CreateVacancyValidatorTests
             CompanyId       = Guid.NewGuid(),
             AdvertTitle     = new string('A', 201),
             HiringManagerId = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -103,6 +124,7 @@ public class CreateVacancyValidatorTests
             AdvertTitle       = "Senior Software Engineer",
             AdvertDescription = new string('A', 4001),
             HiringManagerId   = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.False(result.IsValid);
@@ -119,6 +141,7 @@ public class CreateVacancyValidatorTests
             AdvertTitle       = "Senior Software Engineer",
             AdvertDescription = new string('A', 4000),
             HiringManagerId   = Guid.NewGuid(),
+            EmploymentTypeId = Guid.NewGuid(),
         });
 
         Assert.True(result.IsValid);

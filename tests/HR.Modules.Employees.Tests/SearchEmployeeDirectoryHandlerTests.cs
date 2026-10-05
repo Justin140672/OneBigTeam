@@ -216,7 +216,7 @@ public class SearchEmployeeDirectoryHandlerTests
     }
 
     [Fact]
-    public async Task Active_And_Draft_Employees_Are_Always_Returned()
+    public async Task Active_And_Future_Starter_Employees_Are_Always_Returned()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -229,7 +229,7 @@ public class SearchEmployeeDirectoryHandlerTests
         context.Employees.AddRange(active, future);
         await context.SaveChangesAsync();
 
-        Assert.Equal(EmploymentStatus.Draft, future.Status);
+        Assert.Equal(EmploymentStatus.Active, future.Status);
 
         var result = await new SearchEmployeeDirectoryHandler(context)
             .HandleAsync(Request(companyId), CancellationToken.None);

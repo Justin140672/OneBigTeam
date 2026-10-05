@@ -92,7 +92,7 @@ internal sealed class Employee : IVersionedAggregate
             LastName = lastName,
             WorkEmail = workEmail,
             StartDate = startDate,
-            Status = EmploymentStatus.Draft,
+            Status = EmploymentStatus.Active,
             HasSystemAccess = hasSystemAccess,
             RequiresInitialSetup = false,
             DateOfBirth = dateOfBirth,

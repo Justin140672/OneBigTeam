@@ -297,11 +297,8 @@ public record RespondToOfferResponse(
 // Department, Location and Position Profile are no longer independently-entered fields — the hired
 // employee is always assigned to the Vacancy's own linked Position Profile (and the Department/Location
 // derived from it), resolved server-side by HireCandidateHandler. See that handler's remarks.
-// NOTE: AddressLine1/2, City, County and PostCode below are NOT yet accepted by
-// HR.Modules.Recruitment's HireCandidate Request/Handler or by
-// HR.Modules.Employees.Contracts.EmployeeProvisioningRequest (checked 2026-08-24) — the API will
-// silently ignore these fields until the backend is extended to accept and thread them through to
-// employee provisioning. Included here so the UI is ready end-to-end once that backend work lands.
+// Employment type is also derived from the Vacancy. Manager defaults to the vacancy's hiring manager;
+// OverrideManager = true replaces it with ManagerId (null ManagerId = explicit "No manager").
 public record HireCandidateRequest(
     Guid CompanyId,
     Guid VacancyId,
@@ -312,7 +309,7 @@ public record HireCandidateRequest(
     string Gender,
     string? GenderOther,
     string EmployeeNumber,
-    Guid EmploymentTypeId,
+    bool OverrideManager,
     Guid? ManagerId,
     string? AddressLine1 = null,
     string? AddressLine2 = null,

@@ -76,7 +76,7 @@ public class EmployeeServiceTests
     public async Task CreateEmployeeAsync_Returns_Employee_When_Api_Returns_Created()
     {
         var response = new CreateEmployeeResponse(
-            Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", "Draft", DateTimeOffset.UtcNow);
+            Guid.NewGuid(), Guid.NewGuid(), "Alice", "Smith", "alice@example.com", "Active", DateTimeOffset.UtcNow);
 
         var factory = BuildFactory(new JsonResponseHandler(HttpStatusCode.Created, response));
         var service = new EmployeeService(factory);

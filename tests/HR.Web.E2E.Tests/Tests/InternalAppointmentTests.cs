@@ -36,7 +36,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
     private const string JamesFullName = "James Okafor";
 
-    private const string InitialStage = "Application Received";
+    private const string OfferStage = "Offer";
     private const string HiredStage = "Hired";
 
     private sealed class Arranged(
@@ -119,6 +119,8 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await page.GoToAsync(AcmeId, vacancy.Id);
         await page.OpenApplicationsTabAsync();
         await page.ExpectApplicationRowInternalAsync(arranged.InternalApplicationId, isInternal: true);
+        await page.ReachAcceptedOfferAsync(applicant.LastName);
+        await page.OpenApplicationsTabAsync();
 
         return (arranged, page);
     }
@@ -167,6 +169,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         using var _ = arranged;
 
         await vacancyDetail.ExpectApplicationRowTotalAsync(2);
+        await vacancyDetail.ReachAcceptedOfferAsync(arranged.ExternalLastName!);
         await vacancyDetail.ExpectApplicationRowInternalAsync(arranged.ExternalApplicationId!.Value, isInternal: false);
         await vacancyDetail.ExpectToolbarTooltipAsync("Complete internal appointment");
 
@@ -374,7 +377,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.CancelAsync();
 
         await dialog.ExpectNoSuccessBannerAsync();
-        await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, InitialStage);
+        await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, OfferStage);
         await vacancyDetail.ExpectAppointmentPendingHintAsync(arranged.InternalApplicationId, visible: false);
 
         var after = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);

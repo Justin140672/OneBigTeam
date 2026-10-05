@@ -68,15 +68,13 @@ public class GetHeadcountSummaryHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Excludes_Draft_Suspended_And_Terminated_Employees()
+    public async Task HandleAsync_Excludes_Suspended_And_Former_Employees()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
         var department = Department.Create(Guid.NewGuid(), companyId, "Engineering", null, Now);
         context.Departments.Add(department);
 
-        var draft = NewEmployee(companyId, "Draft", "Employee");
-        draft.Assign(department.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
 
         var suspended = NewEmployee(companyId, "Suspended", "Employee");
         suspended.Assign(department.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
@@ -92,7 +90,7 @@ public class GetHeadcountSummaryHandlerTests
         active.Assign(department.Id, Guid.NewGuid(), Guid.NewGuid(), null, Now);
         active.Activate(Now);
 
-        context.Employees.AddRange(draft, suspended, terminated, active);
+        context.Employees.AddRange(suspended, terminated, active);
         await context.SaveChangesAsync();
 
         var handler = new GetHeadcountSummaryHandler(context);

@@ -38,7 +38,7 @@ public sealed class NotificationMarkAllReadTests(CrossUserFixture fixture) : Rol
 
         await login.SwitchAccountAsync(JamesEmail);
 
-        var unreadBefore = await notif.GetUnreadCountAsync();
+        var unreadBefore = await notif.WaitForUnreadAsync();
         Assert.True(unreadBefore > 0,
             $"Expected James to have at least 1 unread notification before marking read, got {unreadBefore}");
 

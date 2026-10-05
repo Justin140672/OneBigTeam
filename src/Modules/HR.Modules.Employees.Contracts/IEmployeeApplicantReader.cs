@@ -2,7 +2,6 @@ namespace HR.Modules.Employees.Contracts;
 
 public enum EmployeeApplicantEmploymentState
 {
-    Draft,
     Active,
     Suspended,
     Leaving,

@@ -44,6 +44,10 @@ public sealed class EmployeeOffboardingTab(IPage page)
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
+    public Task ExpectChecklistTaskStatusAsync(string taskTitleFragment, string status) =>
+        Assertions.Expect(RowFor(taskTitleFragment).Locator(".badge").First)
+            .ToHaveTextAsync(status, new() { Timeout = 15_000 });
+
     public Task<bool> HasChecklistTaskAsync(string taskTitleFragment) =>
         RowFor(taskTitleFragment).WaitUntilVisibleAsync();
 

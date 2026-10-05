@@ -47,7 +47,7 @@ internal sealed record ApplyForInternalVacancyResult(
 ///
 /// Eligibility: the applicant is always the authenticated user (UserId == EmployeeId convention), looked
 /// up in the route company through <see cref="IEmployeeApplicantReader"/>; only an employee whose
-/// employment state is <see cref="EmployeeApplicantEmploymentState.Active"/> may apply (Draft, Suspended,
+/// employment state is <see cref="EmployeeApplicantEmploymentState.Active"/> may apply (Suspended,
 /// Leaving and Former are refused). The vacancy must belong to the same company, be Open and be
 /// advertised internally — anything else is "not found", exactly like GetInternalVacancy.
 ///

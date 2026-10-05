@@ -47,7 +47,9 @@ public class CreateEmployeeIdempotencyTests
         Assert.True(second.IsSuccess);
         Assert.Equal(first.Value!.Id, second.Value!.Id);
 
-        Assert.Single(await context.Employees.ToListAsync());
+        var onlyEmployee = Assert.Single(await context.Employees.ToListAsync());
+        Assert.Equal(EmploymentStatus.Active, onlyEmployee.Status);
+        Assert.Equal(EmploymentStatus.Active, second.Value.Status);
         // Ticket 3 (P1) follow-up item 3/5: EmployeeCreatedIntegrationEvent is staged as an outbox
         // entry atomically with the employee row now, rather than published directly - so "published
         // once" is now "exactly one outbox entry", carrying the same not-duplicated guarantee.
@@ -143,6 +145,9 @@ public class CreateEmployeeIdempotencyTests
             EmployeeNumber = employeeNumber,
             EmploymentTypeId = employmentTypeId,
             SourceReference = sourceReference,
+            AddressLine1 = "1 High Street",
+            City = "London",
+            PostCode = "SW1A 1AA",
         };
 
     private static async Task<(Guid DepartmentId, Guid LocationId, Guid EmploymentTypeId, Guid PositionProfileId)> SeedAsync(

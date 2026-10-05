@@ -83,6 +83,7 @@ internal static class InternalRecruitmentJourneyApi
                 advertDescription = $"Internal recruitment journey E2E vacancy {unique}.",
                 hiringManagerId = InternalVacancyApplyApi.JamesId,
                 isAdvertisedInternally = advertisedInternally,
+                employmentTypeId = InternalVacancyApplyApi.EmploymentTypeId,
             });
         Assert.True(vacancyResponse.IsSuccessStatusCode,
             $"Create vacancy failed with {vacancyResponse.StatusCode}: {await vacancyResponse.Content.ReadAsStringAsync()}");

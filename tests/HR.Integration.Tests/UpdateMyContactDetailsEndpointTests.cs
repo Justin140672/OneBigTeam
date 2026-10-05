@@ -91,6 +91,9 @@ public class UpdateMyContactDetailsEndpointTests
             startDate = "2026-01-01",
             dateOfBirth = "1990-06-15",
             nationality = "British",
+            addressLine1 = "1 Test Street",
+            city = "London",
+            postCode = "SW1A 1AA",
             gender = "Male",
             employeeNumber = $"EMP-{Guid.NewGuid():N}",
             employmentTypeId = refData.EmploymentTypeId,
@@ -134,7 +137,7 @@ public class UpdateMyContactDetailsEndpointTests
     }
 
     [Fact]
-    public async Task Get_Contact_Details_Returns_Work_Email_And_Nulls_Initially()
+    public async Task Get_Contact_Details_Returns_Work_Email_And_The_Address_Captured_At_Creation()
     {
         var (client, companyId, _) = await CreateEmployeeAsync(ContactUser1);
 
@@ -148,7 +151,7 @@ public class UpdateMyContactDetailsEndpointTests
         Assert.False(string.IsNullOrWhiteSpace(payload!.WorkEmail));
         Assert.Null(payload.PersonalEmail);
         Assert.Null(payload.PhoneNumber);
-        Assert.Null(payload.AddressLine1);
+        Assert.Equal("1 Test Street", payload.AddressLine1);
     }
 
     [Fact]

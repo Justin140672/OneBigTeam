@@ -8,6 +8,7 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
     : RoleE2ETestBase<RecruiterPersonaFixture>(fixture)
 {
     private const string MarcusEmail = "marcus.diallo@acme.example";
+    private const int VacancyListPageSize = 20;
 
     private static readonly string[] DrillableTiles =
     [
@@ -78,7 +79,7 @@ public sealed class RecruitmentDashboardMetricsTests(RecruiterPersonaFixture fix
 
         await Assertions.Expect(_page.Locator("[data-testid='vacancy-list-stale-banner']"))
             .ToBeVisibleAsync(new() { Timeout = 10_000 });
-        Assert.Equal(staleCount, await _page.Locator(".e-grid .e-row").CountAsync());
+        Assert.Equal(Math.Min(staleCount, VacancyListPageSize), await _page.Locator(".e-grid .e-row").CountAsync());
     }
 
     [Fact]

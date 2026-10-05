@@ -60,7 +60,7 @@ else
                 </div>
                 <div class="col-md-6">
                     <label class="form-label" for="probation-expected-end-date-input">Expected End Date <span class="text-danger">*</span></label>
-                    <SfDatePicker TValue="DateOnly?" @bind-Value="Model.ExpectedEndDate" Format="dd/MM/yyyy"
+                    <HrDatePicker TValue="DateOnly?" @bind-Value="Model.ExpectedEndDate" Format="dd/MM/yyyy"
                                   ID="probation-expected-end-date-input" />
                     <ValidationMessage For="@(() => Model.ExpectedEndDate)" />
                 </div>
@@ -110,7 +110,7 @@ else
 
         var employees = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
         _managerOptions = (employees?.Items ?? [])
-            .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != Record.EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(m => m.Name)
             .ToList();
@@ -130,7 +130,7 @@ else
         var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
         if (requestId != _managerFilterRequestId) return;
         var options = (result?.Items ?? [])
-            .Where(e => e.Id != Record.EmployeeId && e.Status != "Draft" && e.Status != "FormerEmployee")
+            .Where(e => e.Id != Record.EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(e => e.Name)
             .ToList();

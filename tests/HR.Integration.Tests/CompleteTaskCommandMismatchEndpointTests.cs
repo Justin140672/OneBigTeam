@@ -51,7 +51,7 @@ public class CompleteTaskCommandMismatchEndpointTests(ApiWebApplicationFactory f
     }
 
     private sealed class Scenario(
-        WebApplicationFactory<Program> appFactory,
+        RoutedCompletionActionHost appFactory,
         BlockingWorkflowAction action,
         Guid companyId,
         Guid employeeId,
@@ -64,7 +64,7 @@ public class CompleteTaskCommandMismatchEndpointTests(ApiWebApplicationFactory f
 
         public Task<HttpResponseMessage> SendAsync(string? key, string? decision, string? reason, Guid? userId = null)
         {
-            var client = appFactory.CreateClient();
+            var client = appFactory.Factory.CreateClient();
             client.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, (userId ?? employeeId).ToString());
             client.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
             var request = new HttpRequestMessage(HttpMethod.Post, $"/api/companies/{companyId}/tasks/{taskId}/complete")
@@ -79,21 +79,20 @@ public class CompleteTaskCommandMismatchEndpointTests(ApiWebApplicationFactory f
         public void Dispose()
         {
             action.Release();
-            appFactory.Dispose();
         }
     }
 
     private async Task<Scenario> NewScenarioAsync()
     {
         var action = new BlockingWorkflowAction();
-        var appFactory = factory.WithWebHostBuilder(builder =>
-            builder.ConfigureServices(services => services.AddSingleton<ITaskCompletionAction>(action)));
+        var appFactory = RoutedCompletionActionHost.For(factory);
 
         var companyId = Guid.NewGuid();
         var employeeId = Guid.NewGuid();
         var taskId = await TaskSeeder.SeedAsync(
             factory, companyId, PrivateTitle, PrivateDescription, assignedEmployeeId: employeeId);
         await TestRoleSeeder.AssignRoleAsync(factory, employeeId, SystemRoles.Employee, companyId);
+        appFactory.Register(taskId, action);
 
         return new Scenario(appFactory, action, companyId, employeeId, taskId);
     }

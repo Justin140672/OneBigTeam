@@ -27,18 +27,16 @@ public class ExportHrHeadcountSummaryReportEndpointTests
         return client;
     }
 
-    private async Task SeedEmployeeAsync(Guid companyId, string firstName, string lastName, bool activate = true)
+    private async Task SeedEmployeeAsync(Guid companyId, string firstName, string lastName, DateOnly? startDate = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<EmployeesDbContext>();
         var refData = await EmployeeReferenceDataSeeder.SeedAsync(db, companyId);
         var employee = Employee.Create(
             Guid.NewGuid(), companyId, firstName, lastName, $"{firstName}.{Guid.NewGuid():N}@example.com".ToLowerInvariant(),
-            new DateOnly(2026, 1, 1), hasSystemAccess: false, new DateOnly(1990, 1, 1), "British",
+            startDate ?? new DateOnly(2026, 1, 1), hasSystemAccess: false, new DateOnly(1990, 1, 1), "British",
             "Prefer not to say", $"EMP-{Guid.NewGuid():N}",
             refData.EmploymentTypeId, refData.DepartmentId, refData.LocationId, refData.PositionProfileId, DateTimeOffset.UtcNow);
-        if (activate)
-            employee.Activate(DateTimeOffset.UtcNow);
         db.Employees.Add(employee);
         await db.SaveChangesAsync();
     }
@@ -89,22 +87,22 @@ public class ExportHrHeadcountSummaryReportEndpointTests
     }
 
     [Fact]
-    public async Task Export_HrHeadcountSummary_Excludes_Draft_Employees_Like_The_Report()
+    public async Task Export_HrHeadcountSummary_Includes_Every_Employee_Like_The_Report()
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
         using var client = await ClientFor(userId, companyId);
         await SeedEmployeeAsync(companyId, "Alice", "Smith");
-        await SeedEmployeeAsync(companyId, "Dora", "Draft", activate: false);
+        await SeedEmployeeAsync(companyId, "Dora", "Future", startDate: new DateOnly(2099, 1, 1));
 
         var report = await client.GetFromJsonAsync<System.Text.Json.JsonElement>(
             $"/api/companies/{companyId}/reporting/hr-headcount-summary");
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary/export?format=Csv");
         var body = await response.Content.ReadAsStringAsync();
 
-        Assert.Equal(1, report.GetProperty("totalHeadcount").GetInt32());
+        Assert.Equal(2, report.GetProperty("totalHeadcount").GetInt32());
         Assert.Contains("Alice Smith", body);
-        Assert.DoesNotContain("Dora Draft", body);
+        Assert.Contains("Dora Future", body);
     }
 
     [Fact]

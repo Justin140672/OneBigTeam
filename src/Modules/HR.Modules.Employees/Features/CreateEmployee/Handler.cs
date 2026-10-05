@@ -68,7 +68,7 @@ internal sealed class CreateEmployeeHandler
         var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
 
         var fingerprint = request.IdempotencyKey is not null
-            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null, ActorEmployeeId = null })
             : null;
 
         if (request.IdempotencyKey is { } precheckKey)
@@ -96,6 +96,18 @@ internal sealed class CreateEmployeeHandler
 
             if (existingForSource is not null)
                 return Result.Success(MapResponse(existingForSource));
+        }
+
+        if (!request.IsInitialCompanyAdmin)
+        {
+            if (string.IsNullOrWhiteSpace(request.AddressLine1))
+                return Result.Failure<CreateEmployeeResponse>(Error.Validation("Address line 1 is required."));
+
+            if (string.IsNullOrWhiteSpace(request.City))
+                return Result.Failure<CreateEmployeeResponse>(Error.Validation("City is required."));
+
+            if (string.IsNullOrWhiteSpace(request.PostCode))
+                return Result.Failure<CreateEmployeeResponse>(Error.Validation("Postcode is required."));
         }
 
         var contactRules = await _contactValidationReader.GetContactValidationRulesAsync(request.CompanyId, cancellationToken);
@@ -306,10 +318,9 @@ internal sealed class CreateEmployeeHandler
 
         _dbContext.Employees.Add(employee);
 
-        // Ticket 2: an automated hire from an accepted candidate offer carries the agreed salary —
-        // seed the new hire's first Compensation record from it in the same transaction so HR does
-        // not have to re-key what was already agreed. Only ever set on this provisioning path
-        // (Salary is null for human-initiated creation, which manages compensation separately).
+        // The starting compensation is written in the same transaction as the employee. The endpoint
+        // validator makes it mandatory; internal provisioning paths (accepted candidate offer) supply
+        // it from the offer, and company sign-up seeds its own placeholder afterwards.
         if (request.Salary is > 0m)
         {
             var salaryType = Enum.TryParse<SalaryType>(request.SalaryFrequency, ignoreCase: true, out var parsedType)
@@ -317,20 +328,35 @@ internal sealed class CreateEmployeeHandler
                 ? parsedType
                 : SalaryType.Annual;
 
-            _dbContext.Compensations.Add(Compensation.Create(
+            var currency = string.IsNullOrWhiteSpace(request.Currency)
+                ? "GBP"
+                : request.Currency.Trim().ToUpperInvariant();
+
+            var actorEmployeeId = request.ActorEmployeeId ?? employee.Id;
+
+            var compensation = Compensation.Create(
                 Guid.NewGuid(),
                 request.CompanyId,
                 employee.Id,
                 employee.StartDate,
                 salaryType,
                 request.Salary.Value,
-                currency: "GBP",
+                currency,
                 hoursPerWeek: null,
                 fte: null,
-                notes: "Created from accepted recruitment offer.",
+                notes: request.ActorEmployeeId is null ? "Created from accepted recruitment offer." : null,
                 CompensationChangeReason.NewHire,
-                createdBy: employee.Id,
-                now));
+                createdBy: actorEmployeeId,
+                now);
+
+            _dbContext.Compensations.Add(compensation);
+
+            _dbContext.AuditOutboxEntries.EnqueueAuditOutbox(
+                new CompensationRecordCreatedAuditEvent(
+                    request.CompanyId, employee.Id, compensation.Id, actorEmployeeId, compensation.EffectiveFrom,
+                    compensation.SalaryType.ToString(), compensation.Salary, compensation.Currency,
+                    compensation.Reason.ToString(), now),
+                request.CompanyId, now, _executionContextAccessor);
         }
 
         var response = MapResponse(employee);

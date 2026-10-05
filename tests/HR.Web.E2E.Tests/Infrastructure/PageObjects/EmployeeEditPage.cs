@@ -132,6 +132,26 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         await page.Keyboard.PressAsync("Tab");
     }
 
+    public async Task FillRequiredAddressAsync(
+        string addressLine1 = "1 Test Street", string city = "London", string postCode = "SW1A 1AA")
+    {
+        await FillAddressFieldAsync("emp-address-line-1", addressLine1);
+        await FillAddressFieldAsync("emp-city", city);
+        await FillAddressFieldAsync("emp-post-code", postCode);
+    }
+
+    public async Task FillAddressFieldAsync(string fieldId, string value)
+    {
+        await page.Locator($"#{fieldId}").FillAsync(value);
+        await page.Keyboard.PressAsync("Tab");
+    }
+
+    public Task<string?> GetAddressFieldAriaRequiredAsync(string fieldId) =>
+        page.Locator($"#{fieldId}").GetAttributeAsync("aria-required");
+
+    public async Task<string?> GetAddressFieldErrorAsync(string fieldId) =>
+        (await page.Locator($"#{fieldId}-error").First.TextContentAsync())?.Trim();
+
     public async Task FillStartDateAsync(string ddMMyyyy)
     {
         var inputs = page.Locator(".e-date-wrapper input.e-input");
@@ -527,6 +547,9 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         }
     }
 
+
+    public Task ClickSaveButtonAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "Save", Exact = true }).ClickAsync();
 
     public async Task SaveNewEmployeeAsync()
     {
