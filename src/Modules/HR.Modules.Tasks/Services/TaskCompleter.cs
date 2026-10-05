@@ -135,6 +135,17 @@ internal sealed class TaskCompleter(
             case TaskCompletionOperation.StatusDispatchApplied:
                 await RemoveOpenTaskNotificationsAsync(task, cancellationToken);
                 return TaskResolutionResult.Outstanding(task.Id);
+            case TaskCompletionOperation.StatusEffectsTerminalFailure:
+            case TaskCompletionOperation.StatusDataIntegrityFailure:
+                return TaskResolutionResult.Terminal(
+                    task.Id, activeOperation!.Id, activeOperation.FailureReason,
+                    activeOperation.TerminalFailureAt, activeOperation.FailureCategory);
+            case TaskCompletionOperation.StatusEffectsVerified:
+                if (task.Status == TaskItemStatus.Completed)
+                    await RemoveOpenTaskNotificationsAsync(task, cancellationToken);
+                return TaskResolutionResult.Confirmed(task.Id, activeOperation!.Id);
+            case TaskCompletionOperation.StatusWaived:
+                return TaskResolutionResult.Waived(task.Id, activeOperation!.Id);
             case TaskCompletionOperation.StatusProcessed:
                 if (task.Status == TaskItemStatus.Completed)
                     await RemoveOpenTaskNotificationsAsync(task, cancellationToken);
@@ -220,6 +231,7 @@ internal sealed class TaskCompleter(
     private static bool ToLegacyResult(TaskResolutionResult result) => result.Status switch
     {
         TaskResolutionStatus.Confirmed => true,
+        TaskResolutionStatus.Waived => true,
         TaskResolutionStatus.Outstanding => false,
         _ => throw new TaskCompletionDispatchException(
             $"Programmatic completion of task {result.TaskId} failed permanently: {result.FailureReason}", isTerminal: true),

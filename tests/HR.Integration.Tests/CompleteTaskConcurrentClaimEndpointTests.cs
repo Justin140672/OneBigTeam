@@ -27,10 +27,12 @@ public class CompleteTaskConcurrentClaimEndpointTests(ApiWebApplicationFactory f
         private readonly TaskCompletionSource _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly TaskCompletionSource _release = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly List<Guid> _operationIds = [];
+        private readonly List<(string? Decision, string? Reason)> _outcomes = [];
 
         public TaskSource Source => TaskSource.Workflow;
         public TaskActionType ActionType => TaskActionType.Complete;
         public int Calls => _calls;
+        public IReadOnlyList<(string? Decision, string? Reason)> Outcomes { get { lock (_outcomes) return _outcomes.ToList(); } }
         public Task Entered => _entered.Task;
         public IReadOnlyList<Guid> OperationIds { get { lock (_operationIds) return _operationIds.ToList(); } }
 
@@ -41,6 +43,8 @@ public class CompleteTaskConcurrentClaimEndpointTests(ApiWebApplicationFactory f
             Interlocked.Increment(ref _calls);
             lock (_operationIds)
                 _operationIds.Add(context.DispatchOperationId);
+            lock (_outcomes)
+                _outcomes.Add((context.OutcomeDecision, context.OutcomeReason));
             _entered.TrySetResult();
             await _release.Task.WaitAsync(Timeout, cancellationToken);
             return Result.Success();
@@ -67,10 +71,13 @@ public class CompleteTaskConcurrentClaimEndpointTests(ApiWebApplicationFactory f
             return client;
         }
 
-        public Task<HttpResponseMessage> SendAsync(string? key)
+        public Task<HttpResponseMessage> SendAsync(string? key, string? decision = null, string? reason = null)
         {
             var client = NewClient();
-            var request = new HttpRequestMessage(HttpMethod.Post, Url) { Content = JsonContent.Create(new { }) };
+            var request = new HttpRequestMessage(HttpMethod.Post, Url)
+            {
+                Content = JsonContent.Create(new { outcomeDecision = decision, outcomeReason = reason }),
+            };
             if (key is not null)
                 request.Headers.Add("Idempotency-Key", key);
             return client.SendAsync(request);
@@ -176,6 +183,43 @@ public class CompleteTaskConcurrentClaimEndpointTests(ApiWebApplicationFactory f
     [Fact]
     public Task Concurrent_Requests_Without_Keys_Dispatch_Exactly_Once() =>
         RunRaceAsync(null, null, expectedIdempotencyRecords: 0);
+
+    [Theory]
+    [InlineData(" Approve ", "Approve", null, null, null)]
+    [InlineData("Approve", " Approve ", null, null, null)]
+    [InlineData("Approve", "Approve", "  same reason ", "same reason", "same reason")]
+    [InlineData("Approve", "Approve", "same reason", " same reason  ", "same reason")]
+    [InlineData("Approve", "Approve", "   ", null, null)]
+    public async Task Concurrent_Whitespace_Equivalent_Requests_Dispatch_And_Persist_Canonical_Values_Once(
+        string winnerDecision, string loserDecision, string? winnerReason, string? loserReason, string? expectedReason)
+    {
+        const string expectedDecision = "Approve";
+
+        using var scenario = await NewScenarioAsync();
+
+        var winnerRequest = scenario.SendAsync("canon-a", winnerDecision, winnerReason);
+        await scenario.Action.Entered.WaitAsync(Timeout);
+
+        var loser = await ReadAsync(await scenario.SendAsync("canon-b", loserDecision, loserReason).WaitAsync(Timeout));
+        Assert.Equal(HttpStatusCode.OK, loser.Status);
+        Assert.Equal("pending", loser.Effects);
+
+        scenario.Action.Release();
+        var winner = await ReadAsync(await winnerRequest.WaitAsync(Timeout));
+        Assert.Equal(HttpStatusCode.OK, winner.Status);
+
+        var outcome = Assert.Single(scenario.Action.Outcomes);
+        Assert.Equal(expectedDecision, outcome.Decision);
+        Assert.Equal(expectedReason, outcome.Reason);
+
+        var operation = Assert.Single(await TasksAsync(db => db.TaskCompletionOperations.AsNoTracking()
+            .Where(o => o.TaskId == scenario.TaskId && o.Status != TaskCompletionOperation.StatusRejected)
+            .ToListAsync()));
+        Assert.Equal(expectedDecision, operation.OutcomeDecision);
+        Assert.Equal(expectedReason, operation.OutcomeReason);
+        Assert.Equal(1, scenario.Action.Calls);
+        Assert.Equal(operation.Id, Assert.Single(scenario.Action.OperationIds));
+    }
 
     [Fact]
     public async Task Live_Claim_Persisted_By_Another_Worker_Blocks_Http_Dispatch_And_Reports_Pending()

@@ -43,8 +43,15 @@ internal sealed class CompleteTaskHandler(
         // The pre-check below only short-circuits sequential retries of a settled request.
         var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
 
+        var command = TaskCompletionCommand.Create(request.Id, request.OutcomeDecision, request.OutcomeReason);
+
+        if (command.Validate() is { } invalidCommand)
+            return Result.Failure<CompleteTaskResponse>(invalidCommand);
+
+        // Request fingerprint = idempotent HTTP delivery: the canonical business command plus the
+        // company scope, so whitespace-only differences are not a key-reuse conflict.
         var fingerprint = request.IdempotencyKey is not null
-            ? DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null })
+            ? DbContextIdempotencyExtensions.Fingerprint(new { request.CompanyId, Command = command.Fingerprint() })
             : null;
 
         CompleteTaskResponse? storedResponse = null;
@@ -137,6 +144,9 @@ internal sealed class CompleteTaskHandler(
             }
             else
             {
+                if (!existing.IsCommandEquivalentTo(command))
+                    return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.CommandMismatch(existing));
+
                 existingOperation = existing;
 
                 if (existing.IsTerminalFailure)
@@ -169,8 +179,7 @@ internal sealed class CompleteTaskHandler(
             if (operation is null)
             {
                 operation = TaskCompletionOperation.CreatePending(
-                    Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
-                    request.OutcomeDecision, request.OutcomeReason, now,
+                    Guid.NewGuid(), task.CompanyId, request.CompletedBy, command, now,
                     executionContextAccessor?.Current);
                 operation.Claim(workerId, now);
                 dbContext.TaskCompletionOperations.Add(operation);
@@ -184,12 +193,19 @@ internal sealed class CompleteTaskHandler(
                     ex, "ix_task_completion_operations_task_id_active"))
                 {
                     DetachOperation(operation);
-                    return await ConcurrentCompletionResponseAsync(
+                    return await ConcurrentCompletionResponseAsync(command,
                         task.CompanyId, task.Id, cancellationToken);
                 }
             }
             else
             {
+                if (!operation.IsCommandEquivalentTo(command))
+                {
+                    var conflicting = operation;
+                    DetachOperation(conflicting);
+                    return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.CommandMismatch(conflicting));
+                }
+
                 if (operation.IsTerminalFailure)
                 {
                     logger.LogError(
@@ -211,7 +227,7 @@ internal sealed class CompleteTaskHandler(
                     if (claimResult.IsFailure)
                     {
                         DetachOperation(operation);
-                        return await ConcurrentCompletionResponseAsync(
+                        return await ConcurrentCompletionResponseAsync(command,
                             task.CompanyId, task.Id, cancellationToken);
                     }
 
@@ -226,7 +242,7 @@ internal sealed class CompleteTaskHandler(
                     await dbContext.Entry(task).ReloadAsync(cancellationToken);
                     if (task.Status == TaskItemStatus.Completed)
                     {
-                        return await ConcurrentCompletionResponseAsync(
+                        return await ConcurrentCompletionResponseAsync(command,
                             task.CompanyId, task.Id, cancellationToken);
                     }
 
@@ -236,13 +252,14 @@ internal sealed class CompleteTaskHandler(
 
             if (!ownsClaim && !resumesCompletion)
             {
-                return await ConcurrentCompletionResponseAsync(
+                return await ConcurrentCompletionResponseAsync(command,
                     task.CompanyId, task.Id, cancellationToken);
             }
 
             if (ownsClaim)
             {
                 Result dispatchResult;
+                var canonical = operation.ToCommand();
                 try
                 {
                     dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
@@ -256,8 +273,8 @@ internal sealed class CompleteTaskHandler(
                         operation.CompletedBy,
                         now,
                         task.SourceEntityId,
-                        operation.OutcomeDecision,
-                        operation.OutcomeReason,
+                        canonical.Decision,
+                        canonical.Reason,
                         operation.Id), cancellationToken);
                 }
                 catch
@@ -310,7 +327,7 @@ internal sealed class CompleteTaskHandler(
                 "CompleteTaskHandler: completion of task {TaskId} (company {CompanyId}) lost an optimistic-concurrency race after dispatch; reporting the live state.",
                 task.Id, task.CompanyId);
             dbContext.ChangeTracker.Clear();
-            return await ConcurrentCompletionResponseAsync(task.CompanyId, task.Id, cancellationToken);
+            return await ConcurrentCompletionResponseAsync(command, task.CompanyId, task.Id, cancellationToken);
         }
 
         if (wasAlreadyCompleted)
@@ -427,7 +444,7 @@ internal sealed class CompleteTaskHandler(
     /// operation fresh and maps them through the live mapping. Mutates and enqueues nothing.
     /// </summary>
     private async Task<Result<CompleteTaskResponse>> ConcurrentCompletionResponseAsync(
-        Guid companyId, Guid taskId, CancellationToken cancellationToken)
+        TaskCompletionCommand command, Guid companyId, Guid taskId, CancellationToken cancellationToken)
     {
         var task = await dbContext.TaskItems.AsNoTracking()
             .SingleOrDefaultAsync(t => t.Id == taskId && t.CompanyId == companyId, cancellationToken);
@@ -442,7 +459,9 @@ internal sealed class CompleteTaskHandler(
             .FirstOrDefaultAsync(cancellationToken);
 
         if (current is not null)
-            return CompletionStatusMapper.Map(ToResponse(task, CompletionStatusMapper.EffectsPending), current);
+            return current.IsCommandEquivalentTo(command)
+                ? CompletionStatusMapper.Map(ToResponse(task, CompletionStatusMapper.EffectsPending), current)
+                : Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.CommandMismatch(current));
 
         logger.LogInformation(
             "CompleteTaskHandler: concurrent completion of task {TaskId} left no active operation.",

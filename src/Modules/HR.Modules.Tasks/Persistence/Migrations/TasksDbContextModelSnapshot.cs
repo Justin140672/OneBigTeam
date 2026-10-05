@@ -146,6 +146,12 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<int>("AdjudicationCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("adjudication_count");
+
                     b.Property<int>("AttemptCount")
                         .HasColumnType("integer")
                         .HasColumnName("attempt_count");
@@ -157,6 +163,11 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<Guid?>("ClaimedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("claimed_by");
+
+                    b.Property<string>("CommandFingerprint")
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("command_fingerprint");
 
                     b.Property<Guid>("CompanyId")
                         .HasColumnType("uuid")
@@ -174,14 +185,35 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("FailureCategory")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_category");
+
                     b.Property<string>("FailureReason")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("failure_reason");
 
+                    b.Property<DateTimeOffset?>("LastAdjudicatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_adjudicated_at");
+
+                    b.Property<Guid?>("LastAdjudicatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_adjudicated_by");
+
                     b.Property<DateTimeOffset?>("LastAttemptAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("last_attempt_at");
+
+                    b.Property<DateTimeOffset?>("LastResetAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_reset_at");
+
+                    b.Property<Guid?>("LastResetBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("last_reset_by");
 
                     b.Property<DateTimeOffset?>("LeaseExpiresAt")
                         .HasColumnType("timestamp with time zone")
@@ -190,6 +222,12 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.Property<Guid?>("MessageId")
                         .HasColumnType("uuid")
                         .HasColumnName("message_id");
+
+                    b.Property<bool>("NotificationRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("notification_required");
 
                     b.Property<string>("OutcomeDecision")
                         .HasMaxLength(200)
@@ -201,9 +239,47 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("outcome_reason");
 
+                    b.Property<string>("PreviousTaskStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_task_status");
+
                     b.Property<DateTimeOffset?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("processed_at");
+
+                    b.Property<int>("ResetCount")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("reset_count");
+
+                    b.Property<string>("ResolutionType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("resolution_type");
+
+                    b.Property<DateTimeOffset?>("ResolvedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("resolved_at");
+
+                    b.Property<Guid?>("SnapshotAssignedEmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("snapshot_assigned_employee_id");
+
+                    b.Property<DateTimeOffset?>("SnapshotCapturedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("snapshot_captured_at");
+
+                    b.Property<string>("SnapshotTaskDescription")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("snapshot_task_description");
+
+                    b.Property<string>("SnapshotTaskTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("snapshot_task_title");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -211,9 +287,17 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                         .HasColumnType("character varying(32)")
                         .HasColumnName("status");
 
+                    b.Property<DateTimeOffset?>("TaskCompletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("task_completed_at");
+
                     b.Property<Guid>("TaskId")
                         .HasColumnType("uuid")
                         .HasColumnName("task_id");
+
+                    b.Property<DateTimeOffset?>("TerminalFailureAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("terminal_failure_at");
 
                     b.Property<int>("Version")
                         .IsConcurrencyToken()
@@ -334,6 +418,122 @@ namespace HR.Modules.Tasks.Persistence.Migrations
                     b.HasIndex("CompanyId", "Status");
 
                     b.ToTable("task_items", "tasks");
+                });
+
+            modelBuilder.Entity("HR.Modules.Tasks.Domain.TaskRecoveryAction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasDefaultValue("reset")
+                        .HasColumnName("action_type");
+
+                    b.Property<int>("AuditAttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("audit_attempt_count");
+
+                    b.Property<DateTimeOffset?>("AuditDeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("audit_delivered_at");
+
+                    b.Property<DateTimeOffset?>("ClaimedUntil")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("claimed_until");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("correlation_id");
+
+                    b.Property<bool>("EvidenceSupplied")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("evidence_supplied");
+
+                    b.Property<DateTimeOffset?>("LastAuditAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_audit_attempt_at");
+
+                    b.Property<string>("LastAuditFailure")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("last_audit_failure");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("OperationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operation_id");
+
+                    b.Property<string>("OperationKind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("operation_kind");
+
+                    b.Property<Guid>("OperatorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("operator_user_id");
+
+                    b.Property<string>("PreviousStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("previous_status");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("reason");
+
+                    b.Property<string>("ResolutionType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("resolution_type");
+
+                    b.Property<string>("ResultingStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)")
+                        .HasColumnName("resulting_status");
+
+                    b.Property<int>("SequenceNumber")
+                        .HasColumnType("integer")
+                        .HasColumnName("sequence_number");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<int>("Version")
+                        .IsConcurrencyToken()
+                        .HasColumnType("integer")
+                        .HasColumnName("version");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt")
+                        .HasDatabaseName("ix_task_recovery_actions_undelivered")
+                        .HasFilter("audit_delivered_at IS NULL");
+
+                    b.HasIndex("CompanyId", "TaskId");
+
+                    b.HasIndex("OperationId", "ActionType", "SequenceNumber")
+                        .IsUnique()
+                        .HasDatabaseName("ix_task_recovery_actions_operation_sequence");
+
+                    b.ToTable("task_recovery_actions", "tasks");
                 });
 
             modelBuilder.Entity("HR.Modules.Tasks.Persistence.IdempotencyRecord", b =>

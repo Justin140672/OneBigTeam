@@ -151,6 +151,7 @@ public class TaskCompletionEffectsJobTests
         var operation = TaskCompletionOperation.CreatePending(
             Guid.NewGuid(), companyId, taskId, Guid.NewGuid(), null, null, DateTimeOffset.UtcNow);
         operation.MarkDispatchApplied(DateTimeOffset.UtcNow);
+        operation.CaptureCompletionSnapshot(null, "Task", null, "Open", DateTimeOffset.UtcNow, DateTimeOffset.UtcNow);
         context.TaskCompletionOperations.Add(operation);
         await context.SaveChangesAsync();
 

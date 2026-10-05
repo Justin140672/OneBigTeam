@@ -206,6 +206,8 @@ public class ProgrammaticCompletionRecoveryPostgresTests(TasksDatabaseFixture fi
         Assert.Equal(1, state!.ResetCount);
         Assert.False(state.IsTerminallyFailed);
         Assert.Single(h.Audit.Published.OfType<ProgrammaticTaskCompletionResetAuditEvent>());
+        await using var verifyDb = fixture.BuildContext();
+        Assert.Equal(1, await verifyDb.TaskRecoveryActions.CountAsync(a => a.OperationId == terminal.OperationId));
     }
 
     [Fact]

@@ -65,8 +65,12 @@ internal sealed class ProgrammaticCompletionHarness(Func<TasksDbContext> dbFacto
         }
     }
 
+    public TaskRecoveryAuditDelivery NewAuditDelivery(TasksDbContext db) =>
+        new(db, Audit, Audit, new FakeClock(FixedUtcNow),
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<TaskRecoveryAuditDelivery>.Instance);
+
     public TaskCompletionRecovery NewRecovery(TasksDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow), Audit,
+        new(db, new FakeClock(FixedUtcNow), NewAuditDelivery(db),
             Microsoft.Extensions.Logging.Abstractions.NullLogger<TaskCompletionRecovery>.Instance);
 
     public async Task<TaskResolutionResult> ResolveAsync(
@@ -115,7 +119,7 @@ internal sealed class ProgrammaticCompletionHarness(Func<TasksDbContext> dbFacto
         return task;
     }
 
-    public async Task AddOperationAsync(Guid taskId, string status)
+    public async Task<Guid> AddOperationAsync(Guid taskId, string status)
     {
         await using var db = NewDb();
         var operation = TaskCompletionOperation.CreatePending(
@@ -126,8 +130,26 @@ internal sealed class ProgrammaticCompletionHarness(Func<TasksDbContext> dbFacto
             operation.MarkRejected("rejected", Now);
         else if (status == TaskCompletionOperation.StatusProcessed)
             operation.MarkProcessed(Now);
+        else if (status == TaskCompletionOperation.StatusDataIntegrityFailure)
+            operation.MarkDataIntegrityFailure("integrity", Now);
+        else if (status == TaskCompletionOperation.StatusEffectsVerified)
+        {
+            operation.MarkDataIntegrityFailure("integrity", Now);
+            operation.MarkEffectsVerified(Guid.NewGuid(), Now);
+        }
+        else if (status == TaskCompletionOperation.StatusWaived)
+        {
+            operation.MarkDataIntegrityFailure("integrity", Now);
+            operation.MarkWaived(Guid.NewGuid(), Now);
+        }
+        else if (status == TaskCompletionOperation.StatusEffectsTerminalFailure)
+        {
+            operation.MarkDispatchApplied(Now);
+            operation.MarkEffectsTerminalFailure(TaskCompletionOperation.CategoryEffectsRetryLimit, "effects failed", Now);
+        }
         db.TaskCompletionOperations.Add(operation);
         await db.SaveChangesAsync();
+        return operation.Id;
     }
 
     public async Task<ProgrammaticTaskCompletion?> StateAsync(Guid taskId)

@@ -9,7 +9,9 @@ internal sealed class Endpoint(ResetProgrammaticTaskCompletionHandler handler, I
 {
     public override void Configure()
     {
-        Post("/api/companies/{companyId:guid}/tasks/programmatic-completions/{operationId:guid}/reset");
+        Post(
+            "/api/companies/{companyId:guid}/tasks/programmatic-completions/{operationId:guid}/reset",
+            "/api/companies/{companyId:guid}/tasks/completion-operations/{operationId:guid}/reset");
         Policies("company:manage");
     }
 

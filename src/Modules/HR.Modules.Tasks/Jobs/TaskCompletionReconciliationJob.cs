@@ -146,6 +146,8 @@ internal sealed class TaskCompletionReconciliationJob(
 
         if (task.Status == Domain.TaskItemStatus.Completed)
         {
+            operation.CaptureCompletionSnapshot(
+                task.AssignedEmployeeId, task.Title, task.Description, "InProgress", task.CompletedAt ?? now, now);
             operation.MarkDispatchApplied(now);
             await dbContext.SaveChangesAsync();
             return;
@@ -154,6 +156,8 @@ internal sealed class TaskCompletionReconciliationJob(
         logger.LogWarning(
             "TaskCompletionReconciliationJob: replaying abandoned pending completion operation {OperationId} for task {TaskId} (company {CompanyId}).",
             operation.Id, operation.TaskId, operation.CompanyId);
+
+        var canonical = operation.ToCommand();
 
         var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
             task.CompanyId,
@@ -166,8 +170,8 @@ internal sealed class TaskCompletionReconciliationJob(
             operation.CompletedBy,
             now,
             task.SourceEntityId,
-            operation.OutcomeDecision,
-            operation.OutcomeReason,
+            canonical.Decision,
+            canonical.Reason,
             operation.Id), CancellationToken.None);
 
         if (!dispatchResult.IsSuccess)
@@ -177,8 +181,11 @@ internal sealed class TaskCompletionReconciliationJob(
             return;
         }
 
+        var previousStatus = task.Status.ToString();
         operation.MarkDispatchApplied(now);
         task.Complete(operation.CompletedBy, now);
+        operation.CaptureCompletionSnapshot(
+            task.AssignedEmployeeId, task.Title, task.Description, previousStatus, task.CompletedAt ?? now, now);
         await dbContext.SaveChangesAsync();
 
         backgroundJobClient.Enqueue<TaskCompletionEffectsJob>(

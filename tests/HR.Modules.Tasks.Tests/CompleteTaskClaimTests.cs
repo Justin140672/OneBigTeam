@@ -86,7 +86,11 @@ public class CompleteTaskClaimTests
         }
 
         public CompleteTaskRequest Request(string? key) =>
-            new() { CompanyId = CompanyId, Id = TaskId, CompletedBy = Guid.NewGuid(), IdempotencyKey = key };
+            new()
+            {
+                CompanyId = CompanyId, Id = TaskId, CompletedBy = Guid.NewGuid(), IdempotencyKey = key,
+                OutcomeDecision = "approve", OutcomeReason = "because",
+            };
 
         public async Task<Result<CompleteTaskResponse>> CompleteAsync(CompleteTaskRequest request)
         {

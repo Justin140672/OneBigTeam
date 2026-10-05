@@ -38,6 +38,19 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
     public const string StatusDispatchApplied = "dispatch_applied";
     public const string StatusProcessed       = "processed";
     public const string StatusDataIntegrityFailure = "data_integrity_failure";
+    public const string StatusEffectsTerminalFailure = "effects_terminal_failure";
+    public const string StatusEffectsVerified = "effects_verified";
+    public const string StatusWaived = "waived";
+
+    public const string ResolutionEvidenceRetry = "evidence_retry";
+    public const string ResolutionEffectsVerified = "effects_verified";
+    public const string ResolutionWaived = "waived";
+
+    public const string CategoryEffectsRetryLimit = "effects_retry_limit";
+    public const string CategoryTaskMissing = "task_missing";
+    public const string CategoryEvidenceMissing = "evidence_missing";
+    public const string CategoryNotificationUnconfirmed = "notification_unconfirmed";
+    public const string CategoryAuditUnconfirmed = "audit_unconfirmed";
 
     /// <summary>Ticket 19 (P2): same generous-relative-to-normal-runtime lease duration as
     /// AccountDisablement.LeaseDuration — see that type's remarks for the reasoning. Both
@@ -51,6 +64,7 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
     public Guid CompletedBy { get; private set; }
     public string? OutcomeDecision { get; private set; }
     public string? OutcomeReason { get; private set; }
+    public string? CommandFingerprint { get; private set; }
     public string Status { get; private set; } = StatusPending;
     public int AttemptCount { get; private set; }
     public DateTimeOffset? LastAttemptAt { get; private set; }
@@ -71,7 +85,121 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
     public Guid? CausationId { get; private set; }
     public Guid? MessageId { get; private set; }
 
+    public DateTimeOffset? TerminalFailureAt { get; private set; }
+    public string? FailureCategory { get; private set; }
+    public int ResetCount { get; private set; }
+    public DateTimeOffset? LastResetAt { get; private set; }
+    public Guid? LastResetBy { get; private set; }
+
+    public int AdjudicationCount { get; private set; }
+    public string? ResolutionType { get; private set; }
+    public DateTimeOffset? ResolvedAt { get; private set; }
+    public DateTimeOffset? LastAdjudicatedAt { get; private set; }
+    public Guid? LastAdjudicatedBy { get; private set; }
+
+    public DateTimeOffset? SnapshotCapturedAt { get; private set; }
+    public bool NotificationRequired { get; private set; }
+    public Guid? SnapshotAssignedEmployeeId { get; private set; }
+    public string? SnapshotTaskTitle { get; private set; }
+    public string? SnapshotTaskDescription { get; private set; }
+    public string? PreviousTaskStatus { get; private set; }
+    public DateTimeOffset? TaskCompletedAt { get; private set; }
+
+    public bool HasCompletionSnapshot => SnapshotCapturedAt is not null;
+
+    /// <summary>The canonical command for this operation, rebuilt from stored values so legacy rows
+    /// persisted un-normalized still dispatch canonical decision/reason.</summary>
+    public TaskCompletionCommand ToCommand() =>
+        TaskCompletionCommand.Create(TaskId, OutcomeDecision, OutcomeReason);
+
+    public bool IsCommandEquivalentTo(TaskCompletionCommand command) =>
+        (CommandFingerprint ?? ToCommand().Fingerprint()) == command.Fingerprint();
+
+    public bool IsTerminalFailure =>
+        Status is StatusEffectsTerminalFailure or StatusDataIntegrityFailure;
+
     public void IncrementVersion() => Version++;
+
+    public void CaptureCompletionSnapshot(
+        Guid? assignedEmployeeId,
+        string title,
+        string? description,
+        string previousStatus,
+        DateTimeOffset completedAt,
+        DateTimeOffset now)
+    {
+        SnapshotCapturedAt = now;
+        NotificationRequired = assignedEmployeeId.HasValue;
+        SnapshotAssignedEmployeeId = assignedEmployeeId;
+        SnapshotTaskTitle = title.Length > 200 ? title[..200] : title;
+        SnapshotTaskDescription = description is { Length: > 500 } ? description[..500] : description;
+        PreviousTaskStatus = previousStatus;
+        TaskCompletedAt = completedAt;
+    }
+
+    public bool IsOperatorResolved => Status is StatusEffectsVerified or StatusWaived;
+
+    public void BeginEvidenceRetry(Guid operatorUserId, DateTimeOffset now)
+    {
+        Status = StatusDispatchApplied;
+        TerminalFailureAt = null;
+        FailureCategory = null;
+        FailureReason = null;
+        AttemptCount = 0;
+        ReleaseClaim();
+        RecordAdjudication(ResolutionEvidenceRetry, operatorUserId, now);
+    }
+
+    public void MarkEffectsVerified(Guid operatorUserId, DateTimeOffset now)
+    {
+        Status = StatusEffectsVerified;
+        ResolvedAt = now;
+        ReleaseClaim();
+        RecordAdjudication(ResolutionEffectsVerified, operatorUserId, now);
+    }
+
+    public void MarkWaived(Guid operatorUserId, DateTimeOffset now)
+    {
+        Status = StatusWaived;
+        ResolvedAt = now;
+        ReleaseClaim();
+        RecordAdjudication(ResolutionWaived, operatorUserId, now);
+    }
+
+    private void RecordAdjudication(string resolutionType, Guid operatorUserId, DateTimeOffset now)
+    {
+        AdjudicationCount++;
+        ResolutionType = resolutionType;
+        LastAdjudicatedAt = now;
+        LastAdjudicatedBy = operatorUserId;
+    }
+
+    public void MarkEffectsTerminalFailure(string category, string reason, DateTimeOffset now)
+    {
+        Status = StatusEffectsTerminalFailure;
+        TerminalFailureAt = now;
+        FailureCategory = category;
+        FailureReason = reason.Length > 500 ? reason[..500] : reason;
+        LastAttemptAt = now;
+        ReleaseClaim();
+    }
+
+    /// <summary>
+    /// Operator recovery: restarts only the outstanding notification/audit effects. The business
+    /// dispatch and the task completion are never re-run; confirmed effects are re-verified, not repeated.
+    /// </summary>
+    public void ResetEffectsTerminalFailure(Guid operatorUserId, DateTimeOffset now)
+    {
+        Status = StatusDispatchApplied;
+        TerminalFailureAt = null;
+        FailureCategory = null;
+        FailureReason = null;
+        AttemptCount = 0;
+        ReleaseClaim();
+        ResetCount++;
+        LastResetAt = now;
+        LastResetBy = operatorUserId;
+    }
 
     public static TaskCompletionOperation CreatePending(
         Guid id,
@@ -81,16 +209,27 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
         string? outcomeDecision,
         string? outcomeReason,
         DateTimeOffset now,
+        IExecutionContext? executionContext = null) =>
+        CreatePending(id, companyId, completedBy,
+            TaskCompletionCommand.Create(taskId, outcomeDecision, outcomeReason), now, executionContext);
+
+    public static TaskCompletionOperation CreatePending(
+        Guid id,
+        Guid companyId,
+        Guid completedBy,
+        TaskCompletionCommand command,
+        DateTimeOffset now,
         IExecutionContext? executionContext = null)
     {
         return new TaskCompletionOperation
         {
             Id = id,
             CompanyId = companyId,
-            TaskId = taskId,
+            TaskId = command.TaskId,
             CompletedBy = completedBy,
-            OutcomeDecision = outcomeDecision,
-            OutcomeReason = outcomeReason,
+            OutcomeDecision = command.Decision,
+            OutcomeReason = command.Reason,
+            CommandFingerprint = command.Fingerprint(),
             Status = StatusPending,
             AttemptCount = 0,
             CreatedAt = now,
@@ -162,9 +301,11 @@ internal sealed class TaskCompletionOperation : IVersionedAggregate
         ReleaseClaim();
     }
 
-    public void MarkDataIntegrityFailure(string reason, DateTimeOffset now)
+    public void MarkDataIntegrityFailure(string reason, DateTimeOffset now, string category = CategoryTaskMissing)
     {
         Status = StatusDataIntegrityFailure;
+        TerminalFailureAt = now;
+        FailureCategory = category;
         FailureReason = reason.Length > 500 ? reason[..500] : reason;
         LastAttemptAt = now;
         ReleaseClaim();

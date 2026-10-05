@@ -10,6 +10,9 @@ public enum TaskResolutionStatus
 
     /// <summary>The completion failed permanently and will not be retried until an operator resets it.</summary>
     TerminalFailure,
+
+    /// <summary>An operator waived the unrecoverable completion effects; the effects were NOT confirmed and must never be treated as ordinary success.</summary>
+    Waived,
 }
 
 /// <summary>
@@ -21,7 +24,8 @@ public sealed record TaskResolutionResult(
     Guid? TaskId = null,
     Guid? OperationId = null,
     string? FailureReason = null,
-    DateTimeOffset? TerminalFailureAt = null)
+    DateTimeOffset? TerminalFailureAt = null,
+    string? FailureCategory = null)
 {
     public bool IsConfirmed => Status == TaskResolutionStatus.Confirmed;
 
@@ -31,7 +35,11 @@ public sealed record TaskResolutionResult(
     public static TaskResolutionResult Outstanding(Guid? taskId = null, Guid? operationId = null) =>
         new(TaskResolutionStatus.Outstanding, taskId, operationId);
 
+    public static TaskResolutionResult Waived(Guid taskId, Guid operationId) =>
+        new(TaskResolutionStatus.Waived, taskId, operationId);
+
     public static TaskResolutionResult Terminal(
-        Guid taskId, Guid operationId, string? failureReason, DateTimeOffset? terminalFailureAt) =>
-        new(TaskResolutionStatus.TerminalFailure, taskId, operationId, failureReason, terminalFailureAt);
+        Guid taskId, Guid operationId, string? failureReason, DateTimeOffset? terminalFailureAt,
+        string? failureCategory = null) =>
+        new(TaskResolutionStatus.TerminalFailure, taskId, operationId, failureReason, terminalFailureAt, failureCategory);
 }

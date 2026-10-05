@@ -16,11 +16,14 @@ internal sealed class ResetProgrammaticTaskCompletionHandler(ITaskCompletionReco
         return result.Outcome switch
         {
             TaskCompletionResetOutcome.NotFound => Result.Failure<ResetProgrammaticTaskCompletionResponse>(
-                Error.NotFound($"Programmatic task completion '{request.OperationId}' was not found.")),
+                Error.NotFound($"Task completion operation '{request.OperationId}' was not found.")),
             TaskCompletionResetOutcome.Conflict => Result.Failure<ResetProgrammaticTaskCompletionResponse>(
-                Error.Concurrency("This programmatic task completion was changed by another request. Reload and try again.")),
+                Error.Concurrency("This task completion operation was changed by another request. Reload and try again.")),
+            TaskCompletionResetOutcome.DataIntegrityFailure => Result.Failure<ResetProgrammaticTaskCompletionResponse>(
+                Error.Conflict($"Task completion operation '{request.OperationId}' is a data-integrity failure and needs investigation; it cannot be reset.")),
             _ => Result.Success(new ResetProgrammaticTaskCompletionResponse(
-                result.OperationId, result.TaskId, result.Outcome == TaskCompletionResetOutcome.Reset)),
+                result.OperationId, result.TaskId, result.Outcome == TaskCompletionResetOutcome.Reset,
+                result.RecoveryActionId, result.ResetCount, result.OperationKind)),
         };
     }
 }

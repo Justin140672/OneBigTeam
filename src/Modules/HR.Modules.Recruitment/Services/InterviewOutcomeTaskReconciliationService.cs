@@ -114,10 +114,21 @@ internal sealed class InterviewOutcomeTaskReconciliationService(
             if (auditFailure is not null)
                 throw auditFailure;
 
-            if (completion.Status != TaskResolutionStatus.Confirmed || !cancelled)
+            if ((completion.Status is not (TaskResolutionStatus.Confirmed or TaskResolutionStatus.Waived)) || !cancelled)
                 throw new InvalidOperationException("Task effects are not yet confirmed.");
 
-            record.MarkCompleted(clock.UtcNowOffset());
+            if (completion.Status == TaskResolutionStatus.Waived)
+            {
+                record.MarkCompletedWaived(completion.OperationId ?? Guid.Empty, clock.UtcNowOffset());
+                logger.LogWarning(
+                    "Interview outcome reconciliation closed because its Tasks completion was operator-waived; the Tasks effects were not confirmed. ReconciliationId={ReconciliationId} CompanyId={CompanyId} InterviewId={InterviewId} TasksOperationId={TasksOperationId}",
+                    record.Id, record.CompanyId, record.InterviewId, completion.OperationId);
+            }
+            else
+            {
+                record.MarkCompleted(clock.UtcNowOffset());
+            }
+
             await db.SaveChangesAsync(cancellationToken);
             return true;
         }

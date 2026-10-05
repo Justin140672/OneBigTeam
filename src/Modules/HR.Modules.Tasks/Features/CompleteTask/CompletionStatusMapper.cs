@@ -30,6 +30,19 @@ internal static class CompletionStatusMapper
         });
     }
 
+    public const string CommandMismatchCode = "conflict.task_completion_command_mismatch";
+
+    public static Error CommandMismatch(TaskCompletionOperation operation) => new(
+        CommandMismatchCode,
+        "Another completion decision already owns or completed this task. Refresh to see the current state.",
+        new Dictionary<string, object?>
+        {
+            ["taskId"] = operation.TaskId,
+            ["operationId"] = operation.Id,
+            ["status"] = operation.Status,
+            ["refresh"] = true,
+        });
+
     public static Error TerminalConflict(TaskCompletionOperation operation)
     {
         var integrity = operation.Status == TaskCompletionOperation.StatusDataIntegrityFailure;

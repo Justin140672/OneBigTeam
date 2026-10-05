@@ -1,4 +1,5 @@
 using FastEndpoints;
+using HR.Modules.Tasks.Domain;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
 
@@ -43,6 +44,12 @@ internal sealed class Endpoint(CompleteTaskHandler handler, ICurrentUser current
             if (result.Error.Code == "forbidden")
             {
                 await Send.ResultAsync(TypedResults.Forbid());
+                return;
+            }
+
+            if (result.Error.Code == TaskCompletionCommand.InvalidCommandCode)
+            {
+                await Send.ResultAsync(TypedResults.BadRequest(businessError));
                 return;
             }
 

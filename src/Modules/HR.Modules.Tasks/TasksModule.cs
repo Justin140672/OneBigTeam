@@ -50,8 +50,16 @@ public static class TasksModule
         services.AddScoped<ITaskCanceller>(sp => sp.GetRequiredService<TaskCanceller>());
         services.AddScoped<ITaskResolution, TaskResolution>();
         services.AddScoped<TaskCompletionAuditDelivery>();
+        services.AddScoped<TaskRecoveryAuditDelivery>();
+        services.AddScoped<Jobs.TaskRecoveryAuditDeliveryJob>();
+        services.AddScoped<ITaskCompletionOperationStateReader, TaskCompletionOperationStateReader>();
         services.AddScoped<ITaskCompletionRecovery, TaskCompletionRecovery>();
         services.AddScoped<ResetProgrammaticTaskCompletionHandler>();
+        services.AddScoped<TaskCompletionAdjudicator>();
+        services.AddScoped<Features.AdjudicateTaskCompletionOperation.AdjudicateTaskCompletionOperationHandler>();
+        services.AddScoped<IValidator<Features.AdjudicateTaskCompletionOperation.AdjudicateTaskCompletionOperationRequest>, Features.AdjudicateTaskCompletionOperation.AdjudicateTaskCompletionOperationValidator>();
+        services.AddScoped<Features.ListTaskCompletionOperationsRequiringIntervention.ListTaskCompletionOperationsRequiringInterventionHandler>();
+        services.AddScoped<IValidator<Features.ListTaskCompletionOperationsRequiringIntervention.ListTaskCompletionOperationsRequiringInterventionRequest>, Features.ListTaskCompletionOperationsRequiringIntervention.ListTaskCompletionOperationsRequiringInterventionValidator>();
         services.AddScoped<IValidator<ResetProgrammaticTaskCompletionRequest>, ResetProgrammaticTaskCompletionValidator>();
         services.AddScoped<Jobs.ProgrammaticTaskCompletionReconciliationJob>();
         services.AddScoped<ITaskRescheduler, TaskRescheduler>();
@@ -104,6 +112,10 @@ public static class TasksModule
             "tasks-completion-reconciliation",
             job => job.ExecuteAsync(),
             "*/10 * * * *");
+        jobManager.AddOrUpdate<Jobs.TaskRecoveryAuditDeliveryJob>(
+            "tasks-recovery-audit-delivery",
+            job => job.ExecuteAsync(),
+            "*/2 * * * *");
         jobManager.AddOrUpdate<Jobs.ProgrammaticTaskCompletionReconciliationJob>(
             "tasks-programmatic-completion-reconciliation",
             job => job.ExecuteAsync(),

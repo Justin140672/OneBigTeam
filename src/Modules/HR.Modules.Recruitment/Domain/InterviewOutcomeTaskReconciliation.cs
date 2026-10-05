@@ -32,6 +32,11 @@ internal sealed class InterviewOutcomeTaskReconciliation
     public DateTimeOffset? LastRepairedAt { get; private set; }
     public Guid? LastRepairedBy { get; private set; }
 
+    /// <summary>Set when the Tasks completion was operator-waived: the reconciliation is closed but its Tasks effects were never confirmed.</summary>
+    public DateTimeOffset? WaivedAt { get; private set; }
+    public Guid? WaivedTasksOperationId { get; private set; }
+
+    public bool IsWaived => WaivedAt is not null;
     public bool IsBlocked => BlockedAt is not null;
 
     public void MarkAuditDelivered(DateTimeOffset now) => AuditDeliveredAt = now;
@@ -65,6 +70,13 @@ internal sealed class InterviewOutcomeTaskReconciliation
         CompletedAt = now;
         ClaimedUntil = null;
         FailureReason = null;
+    }
+
+    public void MarkCompletedWaived(Guid tasksOperationId, DateTimeOffset now)
+    {
+        MarkCompleted(now);
+        WaivedAt = now;
+        WaivedTasksOperationId = tasksOperationId;
     }
 
     public void MarkFailed(string reason, DateTimeOffset now)

@@ -57,34 +57,35 @@ internal sealed class TaskCompletionEffectsJob(
                 $"TaskCompletionOperation {operationId} does not belong to company {companyId}.");
         }
 
-        if (operation.Status == TaskCompletionOperation.StatusProcessed)
-            return;
+        switch (operation.Status)
+        {
+            case TaskCompletionOperation.StatusProcessed:
+            case TaskCompletionOperation.StatusEffectsVerified:
+            case TaskCompletionOperation.StatusWaived:
+                return;
+            case TaskCompletionOperation.StatusEffectsTerminalFailure:
+            case TaskCompletionOperation.StatusDataIntegrityFailure:
+                logger.LogInformation(
+                    "TaskCompletionEffectsJob: completion operation {OperationId} (task {TaskId}, company {CompanyId}) is terminal ({Status}, FailureCategory={FailureCategory}) and awaits operator action — skipping.",
+                    operationId, operation.TaskId, companyId, operation.Status, operation.FailureCategory);
+                return;
+        }
 
         var task = await dbContext.TaskItems.SingleOrDefaultAsync(t => t.Id == operation.TaskId);
         if (task is null)
         {
-            if (await auditDelivery.ExistsAsync(operation.TaskId, CancellationToken.None))
-            {
-                logger.LogWarning(
-                    "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists but its completion audit event is confirmed — marking processed.",
-                    operation.TaskId, operationId, companyId);
-                operation.MarkProcessed(clock.UtcNowOffset());
-            }
-            else
-            {
-                logger.LogError(
-                    "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists and its completion audit event was never confirmed. Terminal=true FailureCategory=task_missing; the operation is flagged for investigation and will not be retried.",
-                    operation.TaskId, operationId, companyId);
-                operation.MarkDataIntegrityFailure(
-                    "Data integrity failure: the completed task no longer exists and its completion audit event is missing.",
-                    clock.UtcNowOffset());
-            }
-
-            await dbContext.SaveChangesAsync();
+            await ResolveMissingTaskAsync(operation);
             return;
         }
 
         var now = clock.UtcNowOffset();
+
+        if (!operation.HasCompletionSnapshot)
+        {
+            operation.CaptureCompletionSnapshot(
+                task.AssignedEmployeeId, task.Title, task.Description, "InProgress", task.CompletedAt ?? now, now);
+        }
+
         operation.RecordAttempt(now);
         await dbContext.SaveChangesAsync();
 
@@ -125,7 +126,7 @@ internal sealed class TaskCompletionEffectsJob(
                 task.CompanyId,
                 task.Id,
                 operation.CompletedBy,
-                "InProgress",
+                operation.PreviousTaskStatus ?? "InProgress",
                 task.AssignedEmployeeId,
                 task.CompletedAt ?? now), CancellationToken.None);
 
@@ -140,23 +141,131 @@ internal sealed class TaskCompletionEffectsJob(
         {
             var isFinalAttempt = operation.AttemptCount >= MaxAttempts;
 
+            if (isFinalAttempt)
+            {
+                operation.MarkEffectsTerminalFailure(
+                    TaskCompletionOperation.CategoryEffectsRetryLimit, ex.Message, clock.UtcNowOffset());
+                await dbContext.SaveChangesAsync();
+
+                logger.LogError(ex,
+                    "TaskCompletionEffectsJob: permanently failed to confirm completion side effects and requires operator retry; it will not be re-enqueued automatically. The task remains Completed; only notification/audit confirmation is outstanding. CompanyId={CompanyId} TaskId={TaskId} TasksOperationId={TasksOperationId} AttemptCount={AttemptCount} ResetCount={ResetCount} FailureCategory={FailureCategory} TerminalFailureAt={TerminalFailureAt} CorrelationId={CorrelationId}",
+                    companyId, task.Id, operationId, operation.AttemptCount, operation.ResetCount,
+                    operation.FailureCategory, operation.TerminalFailureAt, operation.CorrelationId);
+                return;
+            }
+
             operation.RecordFailure(ex.Message);
             await dbContext.SaveChangesAsync();
 
-            if (isFinalAttempt)
-            {
-                logger.LogError(ex,
-                    "TaskCompletionEffectsJob: permanently failed to confirm completion side effects for task {TaskId} (operation {OperationId}) after {Attempts} attempts. The task itself remains Completed; only notification/audit confirmation is outstanding.",
-                    task.Id, operationId, MaxAttempts);
-            }
-            else
-            {
-                logger.LogWarning(ex,
-                    "TaskCompletionEffectsJob: attempt {AttemptCount} failed for task {TaskId} (operation {OperationId}) — will retry.",
-                    operation.AttemptCount, task.Id, operationId);
-            }
+            logger.LogWarning(ex,
+                "TaskCompletionEffectsJob: attempt {AttemptCount} failed for task {TaskId} (operation {OperationId}) — will retry.",
+                operation.AttemptCount, task.Id, operationId);
 
             throw;
         }
+    }
+
+    private async Task DeliverFromSnapshotAsync(TaskCompletionOperation operation, DateTimeOffset now)
+    {
+        operation.RecordAttempt(now);
+        await dbContext.SaveChangesAsync();
+
+        var completedAt = operation.TaskCompletedAt ?? now;
+
+        try
+        {
+            if (operation.NotificationRequired && operation.SnapshotAssignedEmployeeId is { } employeeId
+                && !await notificationWriter.ExistsAsync(employeeId, operation.TaskId, NotificationType.TaskCompleted))
+            {
+                await notificationWriter.WriteAsync(
+                    Guid.NewGuid(), operation.CompanyId, employeeId,
+                    $"Task completed: {operation.SnapshotTaskTitle}",
+                    null,
+                    operation.TaskId,
+                    NotificationType.TaskCompleted,
+                    NotificationPriority.Normal,
+                    completedAt);
+            }
+
+            await auditDelivery.EnsureDeliveredAsync(new TaskCompletedAuditEvent(
+                operation.CompanyId,
+                operation.TaskId,
+                operation.CompletedBy,
+                operation.PreviousTaskStatus ?? "InProgress",
+                operation.SnapshotAssignedEmployeeId,
+                completedAt), CancellationToken.None);
+
+            operation.MarkProcessed(clock.UtcNowOffset());
+            await dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            if (operation.AttemptCount >= MaxAttempts)
+            {
+                operation.MarkEffectsTerminalFailure(
+                    TaskCompletionOperation.CategoryEffectsRetryLimit, ex.Message, clock.UtcNowOffset());
+                await dbContext.SaveChangesAsync();
+
+                logger.LogError(ex,
+                    "TaskCompletionEffectsJob: adjudicated retry could not confirm effects from the supplied evidence and requires operator retry. CompanyId={CompanyId} TaskId={TaskId} TasksOperationId={TasksOperationId} FailureCategory={FailureCategory}",
+                    operation.CompanyId, operation.TaskId, operation.Id, operation.FailureCategory);
+                return;
+            }
+
+            operation.RecordFailure(ex.Message);
+            await dbContext.SaveChangesAsync();
+            throw;
+        }
+    }
+
+    private async Task ResolveMissingTaskAsync(TaskCompletionOperation operation)
+    {
+        var now = clock.UtcNowOffset();
+
+        if (!operation.HasCompletionSnapshot)
+        {
+            logger.LogError(
+                "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists and the operation holds no completion evidence. Terminal=true FailureCategory={FailureCategory}; flagged for investigation, success is never inferred.",
+                operation.TaskId, operation.Id, operation.CompanyId, TaskCompletionOperation.CategoryEvidenceMissing);
+            operation.MarkDataIntegrityFailure(
+                "Data integrity failure: the completed task no longer exists and the operation holds no completion evidence.",
+                now, TaskCompletionOperation.CategoryEvidenceMissing);
+            await dbContext.SaveChangesAsync();
+            return;
+        }
+
+        if (operation.ResolutionType == TaskCompletionOperation.ResolutionEvidenceRetry)
+        {
+            await DeliverFromSnapshotAsync(operation, now);
+            return;
+        }
+
+        var auditConfirmed = await auditDelivery.ExistsAsync(operation.TaskId, CancellationToken.None);
+        var notificationConfirmed = !operation.NotificationRequired
+            || (operation.SnapshotAssignedEmployeeId is { } employeeId
+                && await notificationWriter.ExistsAsync(employeeId, operation.TaskId, NotificationType.TaskCompleted));
+
+        if (auditConfirmed && notificationConfirmed)
+        {
+            logger.LogWarning(
+                "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists but every required completion effect is confirmed from persisted evidence — marking processed.",
+                operation.TaskId, operation.Id, operation.CompanyId);
+            operation.MarkProcessed(now);
+        }
+        else
+        {
+            var category = auditConfirmed
+                ? TaskCompletionOperation.CategoryNotificationUnconfirmed
+                : TaskCompletionOperation.CategoryAuditUnconfirmed;
+
+            logger.LogError(
+                "TaskCompletionEffectsJob: TaskItem {TaskId} for completion operation {OperationId} (company {CompanyId}) no longer exists and a required completion effect is unconfirmed. Terminal=true FailureCategory={FailureCategory} AuditConfirmed={AuditConfirmed} NotificationConfirmed={NotificationConfirmed}; flagged for investigation.",
+                operation.TaskId, operation.Id, operation.CompanyId, category, auditConfirmed, notificationConfirmed);
+            operation.MarkDataIntegrityFailure(
+                $"Data integrity failure: the completed task no longer exists and its {(auditConfirmed ? "completion notification" : "completion audit event")} is missing.",
+                now, category);
+        }
+
+        await dbContext.SaveChangesAsync();
     }
 }

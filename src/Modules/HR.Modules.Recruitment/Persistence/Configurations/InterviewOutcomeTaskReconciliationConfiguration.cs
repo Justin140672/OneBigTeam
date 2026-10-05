@@ -32,6 +32,9 @@ internal sealed class InterviewOutcomeTaskReconciliationConfiguration : IEntityT
         builder.Property(r => r.RepairCount).HasColumnName("repair_count").HasDefaultValue(0);
         builder.Property(r => r.LastRepairedAt).HasColumnName("last_repaired_at");
         builder.Property(r => r.LastRepairedBy).HasColumnName("last_repaired_by");
+        builder.Property(r => r.WaivedAt).HasColumnName("waived_at");
+        builder.Property(r => r.WaivedTasksOperationId).HasColumnName("waived_tasks_operation_id");
+        builder.Ignore(r => r.IsWaived);
         builder.Ignore(r => r.IsBlocked);
 
         builder.HasIndex(r => r.InterviewId).IsUnique();

@@ -1079,7 +1079,7 @@ public class CompleteTaskHandlerTests
         var result = await BuildHandler(context, dispatcher: alwaysFailingDispatcher).HandleAsync(
             new CompleteTaskRequest
             {
-                CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid(), OutcomeDecision = "Reject",
+                CompanyId = companyId, Id = task.Id, CompletedBy = Guid.NewGuid(), OutcomeDecision = "Approve",
             },
             CancellationToken.None);
 

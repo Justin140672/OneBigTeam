@@ -77,8 +77,10 @@ internal sealed record ProgrammaticTaskCompletionResetAuditEvent(
     Guid OperationId,
     Guid OperatorUserId,
     string Reason,
+    int ResetSequence,
     DateTimeOffset OccurredAt) : IAuditEvent
 {
+    Guid IAuditEvent.EventId => Domain.TaskRecoveryAction.EventIdFor(OperationId, ResetSequence);
     string IAuditEvent.EventType => "task.completion_reset";
     string IAuditEvent.EntityType => "TaskItem";
     Guid IAuditEvent.EntityId => TaskId;
@@ -86,8 +88,35 @@ internal sealed record ProgrammaticTaskCompletionResetAuditEvent(
     Guid? IAuditEvent.ActorEmployeeId => null;
     Guid? IAuditEvent.CorrelationId => null;
     Guid? IAuditEvent.WorkflowId => OperationId;
-    string? IAuditEvent.Summary => "Terminal programmatic task completion reset by an operator";
+    string? IAuditEvent.Summary => "Terminal task completion reset by an operator";
     object? IAuditEvent.Before => new { Terminal = true };
     object? IAuditEvent.After => new { Terminal = false };
-    object? IAuditEvent.Metadata => new { OperationId, Reason };
+    object? IAuditEvent.Metadata => new { OperationId, ResetSequence, Reason };
+}
+
+internal sealed record TaskCompletionAdjudicatedAuditEvent(
+    Guid CompanyId,
+    Guid TaskId,
+    Guid OperationId,
+    Guid OperatorUserId,
+    string Reason,
+    int AdjudicationSequence,
+    string ResolutionType,
+    string PreviousStatus,
+    string ResultingStatus,
+    bool EvidenceSupplied,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    Guid IAuditEvent.EventId => Domain.TaskRecoveryAction.AdjudicationEventIdFor(OperationId, AdjudicationSequence);
+    string IAuditEvent.EventType => "task.completion_adjudicated";
+    string IAuditEvent.EntityType => "TaskItem";
+    Guid IAuditEvent.EntityId => TaskId;
+    Guid? IAuditEvent.ActorUserId => OperatorUserId;
+    Guid? IAuditEvent.ActorEmployeeId => null;
+    Guid? IAuditEvent.CorrelationId => null;
+    Guid? IAuditEvent.WorkflowId => OperationId;
+    string? IAuditEvent.Summary => "Task completion data-integrity failure adjudicated by an operator";
+    object? IAuditEvent.Before => new { Status = PreviousStatus };
+    object? IAuditEvent.After => new { Status = ResultingStatus };
+    object? IAuditEvent.Metadata => new { OperationId, AdjudicationSequence, ResolutionType, EvidenceSupplied, Reason };
 }

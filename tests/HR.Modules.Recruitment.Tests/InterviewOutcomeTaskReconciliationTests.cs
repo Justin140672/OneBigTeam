@@ -170,7 +170,9 @@ public class InterviewOutcomeTaskReconciliationTests
         var job = new InterviewTaskCleanupReconciliationJob(
             new InterviewTaskCleanupService(jobDb, canceller, new FakeClock(FixedUtcNow), NullLogger<InterviewTaskCleanupService>.Instance),
             new InterviewTaskEffectsService(jobDb, new FakeTaskCreator(), canceller, completer, new FakeClock(FixedUtcNow), NullLogger<InterviewTaskEffectsService>.Instance),
-            Service(jobDb, completer, canceller));
+            Service(jobDb, completer, canceller),
+            OutcomeWiring.Repair(jobDb, new FakeAuditPublisher(), null, FixedUtcNow),
+            OutcomeWiring.RepairDelivery(jobDb, new FakeAuditPublisher(), FixedUtcNow));
 
         await job.ExecuteAsync();
         await job.ExecuteAsync();
