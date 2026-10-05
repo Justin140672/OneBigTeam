@@ -31,13 +31,16 @@ internal sealed class CompleteTaskHandler(
         CompleteTaskRequest request,
         CancellationToken cancellationToken)
     {
-        // Ticket 3 (P1) follow-up: dedupe a retried/duplicated request before doing any business
-        // work, so a repeated delivery can't double-fire completion side effects (notification,
-        // audit, downstream dispatch). Checked ahead of the atomic insert-or-replay in
-        // SaveIdempotentAsync below, which also catches a same-key request that races in
-        // concurrently. This is a distinct concern from the existing wasAlreadyCompleted
-        // domain-state check below, which guards against a second completion of an
-        // already-Completed task regardless of key.
+        // Responsibilities, each distinct:
+        //  - Operation claim (TaskCompletionOperation ClaimedBy/LeaseExpiresAt/Version): exclusive
+        //    ownership of the business dispatch. Only the request that holds a durably committed
+        //    claim may call the dispatcher; every other request reports the live operation state.
+        //  - DispatchOperationId passed downstream: idempotency across the crash boundary where the
+        //    effect happened but the checkpoint did not.
+        //  - Idempotency record: replay of the stored response for a repeated key. It is written
+        //    after dispatch, so it cannot stop two overlapping requests from both dispatching.
+        //  - Task state: domain-state consistency (wasAlreadyCompleted guards a second completion).
+        // The pre-check below only short-circuits sequential retries of a settled request.
         var scope = new IdempotencyScope(GetType().Name, request.CompanyId, Guid.Empty);
 
         var fingerprint = request.IdempotencyKey is not null
@@ -154,6 +157,10 @@ internal sealed class CompleteTaskHandler(
             // converges a retried/racing request onto the same operation instead of an unrelated
             // second one. A task whose only prior operation was Rejected is free to get a new one,
             // since no business mutation applied for that attempt.
+            var workerId = Guid.NewGuid();
+            var ownsClaim = false;
+            var resumesCompletion = false;
+
             operation = await dbContext.TaskCompletionOperations
                 .Where(o => o.TaskId == task.Id && o.Status != TaskCompletionOperation.StatusRejected)
                 .OrderByDescending(o => o.CreatedAt)
@@ -165,50 +172,99 @@ internal sealed class CompleteTaskHandler(
                     Guid.NewGuid(), task.CompanyId, task.Id, request.CompletedBy,
                     request.OutcomeDecision, request.OutcomeReason, now,
                     executionContextAccessor?.Current);
+                operation.Claim(workerId, now);
                 dbContext.TaskCompletionOperations.Add(operation);
 
                 try
                 {
                     await dbContext.SaveChangesAsync(cancellationToken);
+                    ownsClaim = true;
                 }
                 catch (DbUpdateException ex) when (PostgresUniqueViolation.Is(
                     ex, "ix_task_completion_operations_task_id_active"))
                 {
-                    var entry = dbContext.Entry(operation);
-                    if (entry.State != EntityState.Detached)
-                        entry.State = EntityState.Detached;
+                    DetachOperation(operation);
+                    return await ConcurrentCompletionResponseAsync(
+                        task.CompanyId, task.Id, cancellationToken);
+                }
+            }
+            else
+            {
+                if (operation.IsTerminalFailure)
+                {
+                    logger.LogError(
+                        "CompleteTaskHandler: completion operation {OperationId} for task {TaskId} (company {CompanyId}) is in terminal state {Status} (FailureCategory={FailureCategory}) and requires operator action.",
+                        operation.Id, task.Id, task.CompanyId, operation.Status, operation.FailureCategory);
+                    return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.TerminalConflict(operation));
+                }
 
-                    operation = await dbContext.TaskCompletionOperations
-                        .Where(o => o.TaskId == task.Id && o.Status != TaskCompletionOperation.StatusRejected)
-                        .OrderByDescending(o => o.CreatedAt)
-                        .FirstAsync(cancellationToken);
+                if (operation.Status == TaskCompletionOperation.StatusPending && !HasLiveClaim(operation, now))
+                {
+                    var expectedVersion = operation.Version;
+                    operation.Claim(workerId, now);
+
+                    var claimResult = await dbContext.SaveChangesWithConcurrencyAsync(
+                        operation, expectedVersion,
+                        "This task completion operation was already claimed by another worker.",
+                        cancellationToken);
+
+                    if (claimResult.IsFailure)
+                    {
+                        DetachOperation(operation);
+                        return await ConcurrentCompletionResponseAsync(
+                            task.CompanyId, task.Id, cancellationToken);
+                    }
+
+                    ownsClaim = true;
+                }
+                else if (operation.Status == TaskCompletionOperation.StatusDispatchApplied
+                    && !HasLiveClaim(operation, now))
+                {
+                    // The business action already ran; only the task transition is outstanding and
+                    // no worker holds a live claim. Re-read the task so a stale view never
+                    // re-completes a task another request already completed. Never dispatches.
+                    await dbContext.Entry(task).ReloadAsync(cancellationToken);
+                    if (task.Status == TaskItemStatus.Completed)
+                    {
+                        return await ConcurrentCompletionResponseAsync(
+                            task.CompanyId, task.Id, cancellationToken);
+                    }
+
+                    resumesCompletion = true;
                 }
             }
 
-            if (operation.IsTerminalFailure)
+            if (!ownsClaim && !resumesCompletion)
             {
-                logger.LogError(
-                    "CompleteTaskHandler: completion operation {OperationId} for task {TaskId} (company {CompanyId}) is in terminal state {Status} (FailureCategory={FailureCategory}) and requires operator action.",
-                    operation.Id, task.Id, task.CompanyId, operation.Status, operation.FailureCategory);
-                return Result.Failure<CompleteTaskResponse>(CompletionStatusMapper.TerminalConflict(operation));
+                return await ConcurrentCompletionResponseAsync(
+                    task.CompanyId, task.Id, cancellationToken);
             }
 
-            if (operation.Status == TaskCompletionOperation.StatusPending)
+            if (ownsClaim)
             {
-                var dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
-                    task.CompanyId,
-                    task.Id,
-                    task.Title,
-                    task.Description,
-                    task.Source,
-                    task.ActionType,
-                    task.AssignedEmployeeId,
-                    operation.CompletedBy,
-                    now,
-                    task.SourceEntityId,
-                    operation.OutcomeDecision,
-                    operation.OutcomeReason,
-                    operation.Id), cancellationToken);
+                Result dispatchResult;
+                try
+                {
+                    dispatchResult = await dispatcher.DispatchAsync(new TaskCompletionContext(
+                        task.CompanyId,
+                        task.Id,
+                        task.Title,
+                        task.Description,
+                        task.Source,
+                        task.ActionType,
+                        task.AssignedEmployeeId,
+                        operation.CompletedBy,
+                        now,
+                        task.SourceEntityId,
+                        operation.OutcomeDecision,
+                        operation.OutcomeReason,
+                        operation.Id), cancellationToken);
+                }
+                catch
+                {
+                    await TryReleaseClaimAsync(operation);
+                    throw;
+                }
 
                 if (!dispatchResult.IsSuccess)
                 {
@@ -229,37 +285,32 @@ internal sealed class CompleteTaskHandler(
         operation?.CaptureCompletionSnapshot(
             task.AssignedEmployeeId, task.Title, task.Description, previousStatus, task.CompletedAt ?? now, now);
 
-        var response = new CompleteTaskResponse(
-            task.Id,
-            task.CompanyId,
-            task.Title,
-            task.Description,
-            task.Status.ToString(),
-            task.Priority.ToString(),
-            task.Source.ToString(),
-            task.DueDate,
-            task.AssignedEmployeeId,
-            task.AssignedUserId,
-            task.CreatedBy,
-            task.CompletedBy,
-            task.CompletedAt,
-            task.CreatedAt,
-            task.UpdatedAt,
-            CompletionStatusMapper.EffectsPending);
+        var response = ToResponse(task, CompletionStatusMapper.EffectsPending);
 
-        if (request.IdempotencyKey is { } key)
+        try
         {
-            var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
-                scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
-
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            if (request.IdempotencyKey is { } key)
             {
-                return await LiveReplayAsync(task.CompanyId, task.Id, outcome.Response!, cancellationToken);
+                var outcome = await dbContext.SaveIdempotentAsync(dbContext.IdempotencyRecords,
+                    scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+
+                if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+                {
+                    return await LiveReplayAsync(task.CompanyId, task.Id, outcome.Response!, cancellationToken);
+                }
+            }
+            else
+            {
+                await dbContext.SaveChangesAsync(cancellationToken);
             }
         }
-        else
+        catch (DbUpdateConcurrencyException ex)
         {
-            await dbContext.SaveChangesAsync(cancellationToken);
+            logger.LogWarning(ex,
+                "CompleteTaskHandler: completion of task {TaskId} (company {CompanyId}) lost an optimistic-concurrency race after dispatch; reporting the live state.",
+                task.Id, task.CompanyId);
+            dbContext.ChangeTracker.Clear();
+            return await ConcurrentCompletionResponseAsync(task.CompanyId, task.Id, cancellationToken);
         }
 
         if (wasAlreadyCompleted)
@@ -322,6 +373,85 @@ internal sealed class CompleteTaskHandler(
                 operation!.Id);
             return Result.Success(response);
         }
+    }
+
+    private static bool HasLiveClaim(TaskCompletionOperation operation, DateTimeOffset now) =>
+        operation.ClaimedBy is not null && operation.LeaseExpiresAt is { } expiresAt && expiresAt > now;
+
+    private static CompleteTaskResponse ToResponse(TaskItem task, string? effectsStatus) => new(
+        task.Id,
+        task.CompanyId,
+        task.Title,
+        task.Description,
+        task.Status.ToString(),
+        task.Priority.ToString(),
+        task.Source.ToString(),
+        task.DueDate,
+        task.AssignedEmployeeId,
+        task.AssignedUserId,
+        task.CreatedBy,
+        task.CompletedBy,
+        task.CompletedAt,
+        task.CreatedAt,
+        task.UpdatedAt,
+        effectsStatus);
+
+    private void DetachOperation(TaskCompletionOperation operation)
+    {
+        var entry = dbContext.Entry(operation);
+        if (entry.State != EntityState.Detached)
+            entry.State = EntityState.Detached;
+    }
+
+    private async Task TryReleaseClaimAsync(TaskCompletionOperation operation)
+    {
+        try
+        {
+            var expectedVersion = operation.Version;
+            operation.ReleaseClaim();
+            await dbContext.SaveChangesWithConcurrencyAsync(
+                operation, expectedVersion,
+                "The task completion operation changed while releasing its claim.",
+                CancellationToken.None);
+        }
+        catch (Exception releaseException)
+        {
+            logger.LogWarning(releaseException,
+                "CompleteTaskHandler: could not release the claim on operation {OperationId} after a failed dispatch; it will expire on its own.",
+                operation.Id);
+        }
+    }
+
+    /// <summary>
+    /// Response for a request that does not own the dispatch claim: reads the committed task and
+    /// operation fresh and maps them through the live mapping. Mutates and enqueues nothing.
+    /// </summary>
+    private async Task<Result<CompleteTaskResponse>> ConcurrentCompletionResponseAsync(
+        Guid companyId, Guid taskId, CancellationToken cancellationToken)
+    {
+        var task = await dbContext.TaskItems.AsNoTracking()
+            .SingleOrDefaultAsync(t => t.Id == taskId && t.CompanyId == companyId, cancellationToken);
+
+        if (task is null)
+            return Result.Failure<CompleteTaskResponse>(
+                Error.NotFound($"Task with id '{taskId}' was not found."));
+
+        var current = await dbContext.TaskCompletionOperations.AsNoTracking()
+            .Where(o => o.CompanyId == companyId && o.TaskId == taskId && o.Status != TaskCompletionOperation.StatusRejected)
+            .OrderByDescending(o => o.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (current is not null)
+            return CompletionStatusMapper.Map(ToResponse(task, CompletionStatusMapper.EffectsPending), current);
+
+        logger.LogInformation(
+            "CompleteTaskHandler: concurrent completion of task {TaskId} left no active operation.",
+            taskId);
+
+        return task.Status == TaskItemStatus.Completed
+            ? Result.Success(ToResponse(task, null))
+            : Result.Failure<CompleteTaskResponse>(
+                Error.Conflict("A concurrent completion attempt for this task did not complete. Please retry."));
     }
 
     private async Task<Result<CompleteTaskResponse>> LiveReplayAsync(
