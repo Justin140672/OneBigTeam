@@ -71,9 +71,9 @@ internal sealed class SignUpOperation : IVersionedAggregate
     public bool IsInProgress => Status == StatusInProgress;
 
     public bool MatchesRequest(string fingerprint, string normalizedEmail) =>
-        RequestFingerprint is null
-        || RequestFingerprint == fingerprint
-        || (RequestFingerprint == LegacyFingerprint && NormalizedEmail == normalizedEmail);
+        RequestFingerprint is not null
+        && (RequestFingerprint == fingerprint
+            || (RequestFingerprint == LegacyFingerprint && NormalizedEmail == normalizedEmail));
 
     public bool IsCompensating => Stage == StageCompensating;
 

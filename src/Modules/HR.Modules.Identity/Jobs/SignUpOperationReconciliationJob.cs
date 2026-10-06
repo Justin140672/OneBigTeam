@@ -133,6 +133,7 @@ internal sealed class SignUpOperationReconciliationJob(
             .Where(o => o.Status == SignUpOperation.StatusFailed && o.SweptAt == null
                 && (o.CompletedAt ?? o.UpdatedAt) < retentionCutoff)
             .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.IdempotencyKey, (string?)null)
                 .SetProperty(o => o.RequestFingerprint, (string?)null)
                 .SetProperty(o => o.ResponseJson, (string?)null)
                 .SetProperty(o => o.FailureMessage, (string?)null)

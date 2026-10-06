@@ -90,7 +90,7 @@ internal sealed class SignUpHandler(
 
             operation = claim.Operation!;
             ownsLease = claim.OwnsLease;
-            if (!operation.MatchesRequest(fingerprint, normalizedEmail))
+            if (key is not null && !operation.MatchesRequest(fingerprint, normalizedEmail))
             {
                 return KeyReused();
             }
