@@ -25,9 +25,17 @@ internal sealed class SignUpOperation : IVersionedAggregate
 
     public const string ProvisioningMetadataKey = "provisioning_operation_id";
 
+    public const string LegacyFingerprint = "legacy";
+
+    /// <summary>
+    /// How long a terminal (completed or failed) operation stays replayable before it is purged.
+    /// Matches the shared idempotency-record retention; long-term history lives in the audit system.
+    /// </summary>
+    public static readonly TimeSpan Retention = HR.SharedKernel.Idempotency.DbContextIdempotencyExtensions.DefaultRetention;
+
     public Guid Id { get; private set; }
     public string? IdempotencyKey { get; private set; }
-    public string RequestFingerprint { get; private set; } = string.Empty;
+    public string? RequestFingerprint { get; private set; }
     public string AdminEmail { get; private set; } = string.Empty;
     public string NormalizedEmail { get; private set; } = string.Empty;
     public Guid CompanyId { get; private set; }
@@ -50,6 +58,11 @@ internal sealed class SignUpOperation : IVersionedAggregate
 
     public bool IsInProgress => Status == StatusInProgress;
 
+    public bool MatchesRequest(string fingerprint, string normalizedEmail) =>
+        RequestFingerprint is null
+        || RequestFingerprint == fingerprint
+        || (RequestFingerprint == LegacyFingerprint && NormalizedEmail == normalizedEmail);
+
     public bool LeaseIsActive(DateTimeOffset now) => LeaseExpiresAt is { } expires && expires > now;
 
     public static SignUpOperation Claim(
@@ -59,7 +72,7 @@ internal sealed class SignUpOperation : IVersionedAggregate
         {
             Id = Guid.NewGuid(),
             IdempotencyKey = idempotencyKey,
-            RequestFingerprint = fingerprint,
+            RequestFingerprint = idempotencyKey is null ? null : fingerprint,
             AdminEmail = adminEmail,
             NormalizedEmail = Normalize(adminEmail),
             CompanyId = Guid.NewGuid(),

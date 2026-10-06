@@ -27,7 +27,8 @@ namespace HR.Modules.Identity.Features.SignUp;
 //
 // Failures leave the operation resumable (lease released) until MaxAttempts is reached; abandoned
 // operations are compensated (company deactivated, proven-owned Supabase account deleted) by the
-// retrying request itself or by SignUpOperationReconciliationJob. Passwords are never persisted.
+// retrying request itself or by SignUpOperationReconciliationJob. Passwords and password-derived values are never persisted; the request fingerprint covers
+// non-secret fields only.
 internal sealed class SignUpHandler(
     IdentityDbContext dbContext,
     ICompanyProvisioner companyProvisioner,
@@ -52,7 +53,8 @@ internal sealed class SignUpHandler(
 
     public async Task<Result<SignUpResponse>> HandleAsync(SignUpRequest request, CancellationToken cancellationToken)
     {
-        var fingerprint = DbContextIdempotencyExtensions.Fingerprint(request with { IdempotencyKey = null });
+        var fingerprint = SignUpIdempotencyMaterial.Fingerprint(request);
+        var normalizedEmail = SignUpOperation.Normalize(request.AdminEmail);
         var key = request.IdempotencyKey;
 
         SignUpOperation? operation = null;
@@ -61,7 +63,7 @@ internal sealed class SignUpHandler(
         if (key is not null)
         {
             operation = await dbContext.SignUpOperations.SingleOrDefaultAsync(o => o.IdempotencyKey == key, cancellationToken);
-            if (operation is not null && operation.RequestFingerprint != fingerprint)
+            if (operation is not null && !operation.MatchesRequest(fingerprint, normalizedEmail))
             {
                 return KeyReused();
             }
@@ -83,7 +85,7 @@ internal sealed class SignUpHandler(
 
             operation = claim.Operation!;
             ownsLease = claim.OwnsLease;
-            if (operation.RequestFingerprint != fingerprint)
+            if (!operation.MatchesRequest(fingerprint, normalizedEmail))
             {
                 return KeyReused();
             }

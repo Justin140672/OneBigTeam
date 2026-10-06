@@ -23,6 +23,7 @@ internal sealed class SignUpOperationReconciliationJob(
     internal static readonly TimeSpan StaleAfter = TimeSpan.FromMinutes(30);
     internal static readonly TimeSpan CompensationLease = TimeSpan.FromMinutes(5);
     internal const int BatchSize = 25;
+    internal const int PurgeBatchSize = 500;
 
     [DisableConcurrentExecution(timeoutInSeconds: 300)]
     public async Task ExecuteAsync()
@@ -76,5 +77,30 @@ internal sealed class SignUpOperationReconciliationJob(
         {
             logger.LogInformation("SignUpOperationReconciliationJob processed {Count} abandoned signup operations.", candidateIds.Count);
         }
+
+        await PurgeExpiredTerminalOperationsAsync(now);
+    }
+
+    private async Task PurgeExpiredTerminalOperationsAsync(DateTimeOffset now)
+    {
+        var retentionCutoff = now - SignUpOperation.Retention;
+        db.ChangeTracker.Clear();
+
+        int purged;
+        do
+        {
+            var expiredIds = await db.SignUpOperations
+                .Where(o => o.Status != SignUpOperation.StatusInProgress
+                    && (o.CompletedAt ?? o.UpdatedAt) < retentionCutoff)
+                .OrderBy(o => o.UpdatedAt)
+                .Take(PurgeBatchSize)
+                .Select(o => o.Id)
+                .ToListAsync();
+
+            purged = expiredIds.Count == 0
+                ? 0
+                : await db.SignUpOperations.Where(o => expiredIds.Contains(o.Id)).ExecuteDeleteAsync();
+        }
+        while (purged == PurgeBatchSize);
     }
 }

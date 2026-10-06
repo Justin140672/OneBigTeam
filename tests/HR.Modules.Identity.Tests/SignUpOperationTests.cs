@@ -328,6 +328,114 @@ public class SignUpOperationTests(IdentityDatabaseFixture fixture)
         Assert.DoesNotContain(request.Password, JsonSerializer.Serialize(operation));
     }
 
+    private async Task<string> LoadRawRowJsonAsync(Guid operationId)
+    {
+        await using var db = fixture.BuildContext();
+        return await db.Database
+            .SqlQuery<string>($"select row_to_json(t)::text as \"Value\" from identity.signup_operations t where t.id = {operationId}")
+            .SingleAsync();
+    }
+
+    [Fact]
+    public async Task Persisted_Operation_Holds_Neither_The_Password_Nor_An_Offline_Verifiable_Derivative()
+    {
+        var deps = SignUpHandlerFactory.BuildDependencies();
+        var request = NewRequest();
+        deps.DefaultDataSeeder.ShouldThrow = true;
+        await Handler(deps).HandleAsync(request, CancellationToken.None);
+        deps.DefaultDataSeeder.ShouldThrow = false;
+        await Handler(deps).HandleAsync(request, CancellationToken.None);
+
+        var operation = await LoadOperationAsync(request.AdminEmail);
+        var rawRow = await LoadRawRowJsonAsync(operation.Id);
+
+        Assert.DoesNotContain(request.Password, rawRow);
+
+        static string Sha256Hex(string value) =>
+            Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(value)));
+
+        var offlineCandidates = new[]
+        {
+            Sha256Hex(request.Password),
+            Sha256Hex(JsonSerializer.Serialize(request with { IdempotencyKey = null })),
+            Sha256Hex(JsonSerializer.Serialize(request)),
+        };
+        Assert.DoesNotContain(operation.RequestFingerprint, offlineCandidates);
+        Assert.Equal(SignUpIdempotencyMaterial.Fingerprint(request), operation.RequestFingerprint);
+        Assert.Equal(
+            operation.RequestFingerprint,
+            SignUpIdempotencyMaterial.Fingerprint(request with { Password = "A-completely-different-1!" }));
+    }
+
+    [Fact]
+    public async Task Unkeyed_Signup_Persists_No_Request_Fingerprint()
+    {
+        var deps = SignUpHandlerFactory.BuildDependencies();
+        var request = NewRequest() with { IdempotencyKey = null };
+
+        var result = await Handler(deps).HandleAsync(request, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var operation = await LoadOperationAsync(request.AdminEmail);
+        Assert.Null(operation.IdempotencyKey);
+        Assert.Null(operation.RequestFingerprint);
+    }
+
+    [Fact]
+    public async Task Completed_Signup_Replays_For_The_Same_Key_Regardless_Of_Password()
+    {
+        var deps = SignUpHandlerFactory.BuildDependencies();
+        var request = NewRequest();
+        var first = await Handler(deps).HandleAsync(request, CancellationToken.None);
+
+        var replay = await Handler(deps).HandleAsync(request with { Password = "Another-Passw0rd!" }, CancellationToken.None);
+
+        Assert.True(replay.IsSuccess);
+        Assert.Equal(first.Value, replay.Value);
+        Assert.Equal(1, deps.SupabaseAuthGateway.CreateUserCallCount);
+    }
+
+    [Fact]
+    public async Task Legacy_Fingerprint_Rows_Replay_Only_For_The_Same_Email()
+    {
+        var deps = SignUpHandlerFactory.BuildDependencies();
+        var request = NewRequest();
+        var first = await Handler(deps).HandleAsync(request, CancellationToken.None);
+        await using (var db = fixture.BuildContext())
+        {
+            await db.SignUpOperations
+                .Where(o => o.IdempotencyKey == request.IdempotencyKey)
+                .ExecuteUpdateAsync(s => s.SetProperty(o => o.RequestFingerprint, SignUpOperation.LegacyFingerprint));
+        }
+
+        var replay = await Handler(deps).HandleAsync(request, CancellationToken.None);
+        var otherEmail = await Handler(deps).HandleAsync(
+            request with { AdminEmail = $"other-{Guid.NewGuid():N}@example.com" }, CancellationToken.None);
+
+        Assert.Equal(first.Value, replay.Value);
+        Assert.True(otherEmail.IsFailure);
+        Assert.Equal("conflict", otherEmail.Error.Code);
+    }
+
+    [Fact]
+    public async Task Reconciliation_Job_Purges_Terminal_Operations_Only_After_The_Retention_Window()
+    {
+        var deps = SignUpHandlerFactory.BuildDependencies();
+        var completed = NewRequest();
+        await Handler(deps).HandleAsync(completed, CancellationToken.None);
+
+        await BuildJob(deps, Now + SignUpOperation.Retention - TimeSpan.FromMinutes(1)).ExecuteAsync();
+        await using (var db = fixture.BuildContext())
+        {
+            Assert.True(await db.SignUpOperations.AnyAsync(o => o.IdempotencyKey == completed.IdempotencyKey));
+        }
+
+        await BuildJob(deps, Now + SignUpOperation.Retention + TimeSpan.FromMinutes(1)).ExecuteAsync();
+
+        await using var after = fixture.BuildContext();
+        Assert.False(await after.SignUpOperations.AnyAsync(o => o.IdempotencyKey == completed.IdempotencyKey));
+    }
+
     private SignUpOperationReconciliationJob BuildJob(Dependencies deps, DateTime at)
     {
         var clock = new FakeClock(at);

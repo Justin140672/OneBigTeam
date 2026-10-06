@@ -19,7 +19,7 @@ internal sealed class SignUpOperationConfiguration : IEntityTypeConfiguration<Si
             .HasFilter("idempotency_key IS NOT NULL")
             .HasDatabaseName("ix_signup_operations_idempotency_key");
 
-        builder.Property(o => o.RequestFingerprint).HasColumnName("request_fingerprint").HasMaxLength(128).IsRequired();
+        builder.Property(o => o.RequestFingerprint).HasColumnName("request_fingerprint").HasMaxLength(128);
         builder.Property(o => o.AdminEmail).HasColumnName("admin_email").HasMaxLength(256).IsRequired();
         builder.Property(o => o.NormalizedEmail).HasColumnName("normalized_email").HasMaxLength(256).IsRequired();
         builder.HasIndex(o => o.NormalizedEmail)
