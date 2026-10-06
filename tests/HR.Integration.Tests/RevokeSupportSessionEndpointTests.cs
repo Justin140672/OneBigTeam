@@ -155,5 +155,83 @@ public class RevokeSupportSessionEndpointTests
         Assert.Equal("SupportSession", auditRecord!.EntityType);
     }
 
+    private static async Task<HttpResponseMessage> PostWithKeyAsync(HttpClient client, Guid sessionId, string key)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Post, Url(sessionId)) { Content = JsonContent.Create(new { }) };
+        request.Headers.Add("Idempotency-Key", key);
+        return await client.SendAsync(request);
+    }
+
+    private async Task<int> CountRevokedAuditEventsAsync(Guid sessionId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var auditDb = scope.ServiceProvider.GetRequiredService<AuditDbContext>();
+        return await auditDb.AuditEvents.CountAsync(e => e.EntityId == sessionId && e.EventType == "support.session-revoked");
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_With_Key_Replays_Original_Success_After_Response_Loss()
+    {
+        var sessionId = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+        var key = $"key-{Guid.NewGuid():N}";
+
+        var first = await PostWithKeyAsync(client, sessionId, key);
+        var retry = await PostWithKeyAsync(client, sessionId, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, retry.StatusCode);
+        Assert.Equal(
+            await first.Content.ReadFromJsonAsync<RevokeSupportSessionPayload>(),
+            await retry.Content.ReadFromJsonAsync<RevokeSupportSessionPayload>());
+        Assert.Equal(1, await CountRevokedAuditEventsAsync(sessionId));
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_Concurrent_Identical_Keys_All_Succeed_With_One_Audit_Event()
+    {
+        var sessionId = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+        var key = $"key-{Guid.NewGuid():N}";
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => PostWithKeyAsync(client, sessionId, key)));
+
+        Assert.All(responses, r => Assert.Equal(HttpStatusCode.OK, r.StatusCode));
+        var payloads = await Task.WhenAll(responses.Select(r => r.Content.ReadFromJsonAsync<RevokeSupportSessionPayload>()));
+        Assert.Single(payloads.Distinct());
+        Assert.Equal(1, await CountRevokedAuditEventsAsync(sessionId));
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_Concurrent_Different_Keys_Produce_One_Success_And_One_Audit_Event()
+    {
+        var sessionId = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 6).Select(i => PostWithKeyAsync(client, sessionId, $"key-{i}-{Guid.NewGuid():N}")));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+        Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.OK), r => Assert.True(r.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict));
+        Assert.Equal(1, await CountRevokedAuditEventsAsync(sessionId));
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_Key_Reused_For_Another_Session_Returns_Conflict_And_Leaves_It_Active()
+    {
+        var firstSession = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        var otherSession = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+        var key = $"key-{Guid.NewGuid():N}";
+
+        var first = await PostWithKeyAsync(client, firstSession, key);
+        var reused = await PostWithKeyAsync(client, otherSession, key);
+
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Conflict, reused.StatusCode);
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        Assert.Null((await db.SupportSessions.SingleAsync(s => s.Id == otherSession)).RevokedAt);
+    }
+
     private sealed record RevokeSupportSessionPayload(Guid SupportSessionId, DateTimeOffset RevokedAt);
 }

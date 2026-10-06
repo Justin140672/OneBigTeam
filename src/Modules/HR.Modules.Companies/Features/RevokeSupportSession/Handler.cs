@@ -1,4 +1,5 @@
 using HR.Infrastructure.Abstractions;
+using HR.Modules.Companies.Domain;
 using HR.Modules.Companies.Persistence;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
@@ -62,27 +63,57 @@ internal sealed class RevokeSupportSessionHandler(
         var revokeResult = supportSession.Revoke(now);
         if (revokeResult.IsFailure)
         {
+            if (request.IdempotencyKey is { } racedKey)
+            {
+                var winner = await dbContext.TryReplayAsync<IdempotencyRecord, RevokeSupportSessionResponse>(
+                    scope, racedKey, fingerprint!, cancellationToken);
+                if (winner?.Kind == IdempotencyOutcomeKind.Replayed)
+                {
+                    return Result.Success(winner.Response!);
+                }
+            }
+
             await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "already_revoked");
             return Result.Failure<RevokeSupportSessionResponse>(revokeResult.Error);
         }
 
-        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
-            supportSession, expectedVersion, "This support session was changed by another request. Reload and try again.", cancellationToken);
-        if (saveResult.IsFailure)
-        {
-            await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "concurrency_conflict");
-            return Result.Failure<RevokeSupportSessionResponse>(saveResult.Error);
-        }
-
         var response = new RevokeSupportSessionResponse(supportSession.Id, supportSession.RevokedAt!.Value);
+        const string concurrencyMessage = "This support session was changed by another request. Reload and try again.";
 
         if (request.IdempotencyKey is { } key)
         {
-            var outcome = await dbContext.SaveIdempotentAsync(
-                dbContext.IdempotencyRecords, scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
+            var outcome = await dbContext.SaveIdempotentWithConcurrencyAsync<IdempotencyRecord, SupportSession, RevokeSupportSessionResponse>(
+                dbContext.IdempotencyRecords, supportSession, expectedVersion, scope, key, fingerprint!,
+                StatusCodes.Status200OK, response, now, cancellationToken);
 
-            if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
-                return Result.Success(outcome.Response!);
+            switch (outcome.Kind)
+            {
+                case IdempotencyOutcomeKind.Replayed:
+                    return Result.Success(outcome.Response!);
+                case IdempotencyOutcomeKind.KeyReused:
+                    return Result.Failure<RevokeSupportSessionResponse>(
+                        Error.Conflict("This Idempotency-Key was already used for a different request."));
+                case IdempotencyOutcomeKind.ConcurrencyConflict:
+                    var winner = await dbContext.TryReplayAsync<IdempotencyRecord, RevokeSupportSessionResponse>(
+                        scope, key, fingerprint!, cancellationToken);
+                    if (winner?.Kind == IdempotencyOutcomeKind.Replayed)
+                    {
+                        return Result.Success(winner.Response!);
+                    }
+
+                    await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "concurrency_conflict");
+                    return Result.Failure<RevokeSupportSessionResponse>(Error.Concurrency(concurrencyMessage));
+            }
+        }
+        else
+        {
+            var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+                supportSession, expectedVersion, concurrencyMessage, cancellationToken);
+            if (saveResult.IsFailure)
+            {
+                await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "concurrency_conflict");
+                return Result.Failure<RevokeSupportSessionResponse>(saveResult.Error);
+            }
         }
 
         await auditEventPublisher.PublishAsync(
