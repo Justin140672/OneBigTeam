@@ -15,12 +15,18 @@ internal sealed class CompanyProvisioner(
     IConfiguration configuration) : ICompanyProvisioner
 {
     public async Task<Guid> ProvisionCompanyAsync(
-        string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken)
+        string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken, Guid? companyId = null)
     {
+        if (companyId is { } existingId
+            && await companiesDbContext.Companies.AnyAsync(c => c.Id == existingId, cancellationToken))
+        {
+            return existingId;
+        }
+
         var now = clock.UtcNowOffset();
         var trialLengthDays = await GetTrialLengthDaysAsync(now, cancellationToken);
 
-        var company = Company.Create(Guid.NewGuid(), companyName.Trim(), now);
+        var company = Company.Create(companyId ?? Guid.NewGuid(), companyName.Trim(), now);
         var settings = CompanySettings.CreateDefault(company.Id, now);
 
         var primaryDomain = WorkEmailAddressBuilder.ExtractDomain(admin.Email)

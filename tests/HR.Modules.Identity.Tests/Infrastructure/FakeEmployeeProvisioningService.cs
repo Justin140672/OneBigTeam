@@ -16,8 +16,15 @@ internal sealed class FakeEmployeeProvisioningService : IEmployeeProvisioningSer
 
     public List<(Guid CompanyId, Guid EmployeeId)> MarkedAsInitialCompanyAdmin { get; } = [];
 
+    public bool ShouldThrowOnMark { get; set; }
+
     public Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
     {
+        if (ShouldThrowOnMark)
+        {
+            throw new InvalidOperationException("Simulated mark-as-admin failure.");
+        }
+
         MarkedAsInitialCompanyAdmin.Add((companyId, employeeId));
         return Task.CompletedTask;
     }

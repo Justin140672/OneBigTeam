@@ -132,6 +132,12 @@ app.MapPost("/signup-submit", async (HttpRequest request, IHttpClientFactory htt
         // the visitor at login/password recovery instead of leaving them stuck retrying signup.
         if (signUpResponse.StatusCode == System.Net.HttpStatusCode.Conflict)
         {
+            var conflictProblem = await TryReadSignUpProblemAsync(signUpResponse);
+            if (conflictProblem?.Code == "concurrency")
+            {
+                return Results.Redirect(BuildRetryUrl("Your registration is already being processed. Please wait a moment and try again."));
+            }
+
             return Results.Redirect(BuildRetryUrl(
                 "You already have an account with this email address.",
                 existingEmail: true));

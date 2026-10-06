@@ -253,6 +253,47 @@ public class SignUpEndpointTests
         Assert.Equal(2, locations.Items.Count);
     }
 
+    [Fact]
+    public async Task Post_SignUp_With_Idempotency_Key_Replays_Original_Success_And_Provisions_Once()
+    {
+        using var client = _factory.CreateClient();
+        var email = $"ada-{Guid.NewGuid():N}@example.com";
+        var body = ValidSignUpRequest(email);
+        var key = $"key-{Guid.NewGuid():N}";
+
+        using var first = new HttpRequestMessage(HttpMethod.Post, "/api/signup") { Content = JsonContent.Create(body) };
+        first.Headers.Add("Idempotency-Key", key);
+        using var second = new HttpRequestMessage(HttpMethod.Post, "/api/signup") { Content = JsonContent.Create(body) };
+        second.Headers.Add("Idempotency-Key", key);
+
+        var firstResponse = await client.SendAsync(first);
+        var replayResponse = await client.SendAsync(second);
+
+        Assert.Equal(HttpStatusCode.OK, firstResponse.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, replayResponse.StatusCode);
+        var original = await firstResponse.Content.ReadFromJsonAsync<SignUpPayload>();
+        var replayed = await replayResponse.Content.ReadFromJsonAsync<SignUpPayload>();
+        Assert.Equal(original, replayed);
+        Assert.Single(_factory.SupabaseAuthGateway.CreatedUsers, u => u.Email == email);
+    }
+
+    [Fact]
+    public async Task Post_SignUp_Reusing_Idempotency_Key_For_A_Different_Payload_Returns_Conflict()
+    {
+        using var client = _factory.CreateClient();
+        var key = $"key-{Guid.NewGuid():N}";
+
+        using var first = new HttpRequestMessage(HttpMethod.Post, "/api/signup") { Content = JsonContent.Create(ValidSignUpRequest()) };
+        first.Headers.Add("Idempotency-Key", key);
+        using var second = new HttpRequestMessage(HttpMethod.Post, "/api/signup") { Content = JsonContent.Create(ValidSignUpRequest()) };
+        second.Headers.Add("Idempotency-Key", key);
+
+        (await client.SendAsync(first)).EnsureSuccessStatusCode();
+        var conflict = await client.SendAsync(second);
+
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+    }
+
     private sealed record LocationListPayload(IReadOnlyList<LocationListItem> Items);
 
     private sealed record LocationListItem(Guid Id, string Name, bool IsActive);

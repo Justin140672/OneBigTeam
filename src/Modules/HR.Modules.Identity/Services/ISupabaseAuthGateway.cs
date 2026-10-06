@@ -2,7 +2,11 @@ namespace HR.Modules.Identity.Services;
 
 internal interface ISupabaseAuthGateway
 {
-    Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken);
+    Task<Guid> CreateUserAsync(
+        string email, string password, string redirectTo, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null);
+
+    Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken);
 
     Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken);
 

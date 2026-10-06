@@ -23,32 +23,10 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         AdminEmail: $"ada-{Guid.NewGuid():N}@example.com",
         Password: "P@ssw0rd123");
 
-    private sealed record Dependencies(
-        FakeCompanyProvisioner Provisioner,
-        FakeCompanyDefaultDataSeeder DefaultDataSeeder,
-        FakeEmployeeProvisioningService EmployeeProvisioningService,
-        FakeSupabaseAuthGateway SupabaseAuthGateway,
-        FakeAuditEventPublisher AuditEventPublisher);
-
     private SignUpHandler BuildHandler(Dependencies dependencies) =>
-        new(
-            fixture.BuildContext(),
-            dependencies.Provisioner,
-            dependencies.DefaultDataSeeder,
-            dependencies.EmployeeProvisioningService,
-            dependencies.SupabaseAuthGateway,
-            dependencies.AuditEventPublisher,
-            TestAccountCreationEmailGuard.Create(dependencies.AuditEventPublisher, Clock),
-            EmptyConfiguration,
-            Clock,
-            NullLogger<SignUpHandler>.Instance);
+        SignUpHandlerFactory.Build(fixture.BuildContext(), dependencies, Clock);
 
-    private static Dependencies BuildDependencies() => new(
-        new FakeCompanyProvisioner(),
-        new FakeCompanyDefaultDataSeeder(),
-        new FakeEmployeeProvisioningService(),
-        new FakeSupabaseAuthGateway(),
-        new FakeAuditEventPublisher());
+    private static Dependencies BuildDependencies() => SignUpHandlerFactory.BuildDependencies();
 
     [Fact]
     public async Task HandleAsync_Returns_Success_And_Provisions_Company_On_Happy_Path()
@@ -209,87 +187,6 @@ public class SignUpHandlerTests(IdentityDatabaseFixture fixture)
         Assert.False(registrationEvent.Succeeded);
         Assert.Null(registrationEvent.AdminUserId);
         Assert.Equal(AuditActorType.Anonymous, ((IAuditEvent)registrationEvent).ActorType);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Deactivates_Company_And_Returns_Failure_When_DefaultDataSeeding_Fails()
-    {
-        var deps = BuildDependencies();
-        deps.DefaultDataSeeder.ShouldThrow = true;
-        var handler = BuildHandler(deps);
-        var request = ValidRequest();
-
-        var result = await handler.HandleAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal(1, deps.Provisioner.CallCount);
-        var deactivatedCompanyId = Assert.Single(deps.Provisioner.DeactivatedCompanyIds);
-        Assert.NotEqual(Guid.Empty, deactivatedCompanyId);
-
-        var auditEvent = Assert.Single(deps.AuditEventPublisher.PublishedEvents);
-        var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
-        Assert.False(registrationEvent.Succeeded);
-        Assert.Equal(deactivatedCompanyId, registrationEvent.CompanyId);
-        Assert.False(string.IsNullOrWhiteSpace(registrationEvent.FailureReason));
-        Assert.Null(registrationEvent.AdminUserId);
-
-        Assert.Empty(deps.SupabaseAuthGateway.CreatedUsers);
-        await using var db = fixture.BuildContext();
-        var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
-        Assert.False(profileExists);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Deactivates_Company_And_Returns_Failure_When_EmployeeProvisioning_Fails()
-    {
-        var deps = BuildDependencies();
-        deps.EmployeeProvisioningService.ShouldFail = true;
-        var handler = BuildHandler(deps);
-        var request = ValidRequest();
-
-        var result = await handler.HandleAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal(1, deps.Provisioner.CallCount);
-        Assert.Equal(1, deps.DefaultDataSeeder.CallCount);
-        var deactivatedCompanyId = Assert.Single(deps.Provisioner.DeactivatedCompanyIds);
-        Assert.NotEqual(Guid.Empty, deactivatedCompanyId);
-
-        var auditEvent = Assert.Single(deps.AuditEventPublisher.PublishedEvents);
-        var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
-        Assert.False(registrationEvent.Succeeded);
-
-        await using var db = fixture.BuildContext();
-        var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
-        Assert.False(profileExists);
-    }
-
-    [Fact]
-    public async Task HandleAsync_Deactivates_Company_And_Returns_Failure_When_SupabaseAuthGateway_Throws()
-    {
-        var deps = BuildDependencies();
-        deps.SupabaseAuthGateway.ShouldThrowOnCreate = true;
-        var handler = BuildHandler(deps);
-        var request = ValidRequest();
-
-        var result = await handler.HandleAsync(request, CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal(1, deps.Provisioner.CallCount);
-        Assert.Equal(1, deps.DefaultDataSeeder.CallCount);
-        Assert.Equal(1, deps.EmployeeProvisioningService.CallCount);
-        var deactivatedCompanyId = Assert.Single(deps.Provisioner.DeactivatedCompanyIds);
-        Assert.NotEqual(Guid.Empty, deactivatedCompanyId);
-
-        var auditEvent = Assert.Single(deps.AuditEventPublisher.PublishedEvents);
-        var registrationEvent = Assert.IsType<RegistrationCreatedAuditEvent>(auditEvent);
-        Assert.False(registrationEvent.Succeeded);
-        Assert.Equal(deactivatedCompanyId, registrationEvent.CompanyId);
-        Assert.Null(registrationEvent.AdminUserId);
-
-        await using var db = fixture.BuildContext();
-        var profileExists = await db.UserProfiles.AnyAsync(p => p.Email == request.AdminEmail);
-        Assert.False(profileExists);
     }
 
     // ── Ticket 9: work-email policy ─────────────────────────────────────────────

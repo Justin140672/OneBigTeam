@@ -30,8 +30,18 @@ internal sealed class FakeSupabaseAuthGateway(IHttpClientFactory httpClientFacto
 {
     private readonly SupabaseAuthGateway _real = new(httpClientFactory, options);
 
-    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken) =>
-        Task.FromResult(DeriveFakeUserId(email));
+    public Task<Guid> CreateUserAsync(
+        string email, string password, string redirectTo, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
+    {
+        if (metadata is { Count: > 0 })
+            Metadata[email.Trim().ToLowerInvariant()] = metadata;
+
+        return Task.FromResult(DeriveFakeUserId(email));
+    }
+
+    public Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
 
     public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken) =>
         Task.CompletedTask;

@@ -69,7 +69,9 @@ internal sealed class SupabaseAuthGateway(
         return "response body: (redacted)";
     }
 
-    public async Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
+    public async Task<Guid> CreateUserAsync(
+        string email, string password, string redirectTo, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         EnsureAccountEmailPermitted(email);
 
@@ -82,12 +84,9 @@ internal sealed class SupabaseAuthGateway(
         // endpoint as EnsureDevUserAsync below (with the real password baked in from the start and
         // email_confirm: false so the account still requires verification) avoids that entirely —
         // this is the one Admin API shape already proven to work end-to-end for password auth here.
-        var requestBody = new
-        {
-            email,
-            password,
-            email_confirm = false,
-        };
+        object requestBody = metadata is { Count: > 0 }
+            ? new { email, password, email_confirm = false, user_metadata = metadata }
+            : new { email, password, email_confirm = false };
 
         using var response = await http.PostAsJsonAsync("/auth/v1/admin/users", requestBody, JsonOptions, cancellationToken);
 
@@ -121,6 +120,20 @@ internal sealed class SupabaseAuthGateway(
         await ResendVerificationEmailAsync(email, redirectTo, cancellationToken);
 
         return userId;
+    }
+
+    public async Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        var http = CreateClient(options.Value.SecretKey);
+
+        using var response = await http.DeleteAsync($"/auth/v1/admin/users/{supabaseUserId}", cancellationToken);
+
+        if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException(
+                $"Supabase admin delete-user request failed with status {(int)response.StatusCode} ({response.StatusCode}). {Describe(body)}");
+        }
     }
 
     public async Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken)

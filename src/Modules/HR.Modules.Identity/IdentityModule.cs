@@ -59,7 +59,7 @@ public static class IdentityModule
         IConfiguration configuration)
     {
         services.AddDbContext<IdentityDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql =>
+            options.UseVersionedAggregates().UseNpgsql(connectionString, npgsql =>
                 npgsql.MigrationsHistoryTable("__ef_migrations_history", "identity")));
         services.AddHttpContextAccessor();
 
@@ -171,6 +171,8 @@ public static class IdentityModule
         services.AddScoped<EnableUserHandler>();
         services.AddScoped<IValidator<EnableUserRequest>, EnableUserValidator>();
         services.AddScoped<SignUpHandler>();
+        services.AddScoped<HR.Modules.Identity.Services.SignUpOperationCompensator>();
+        services.AddScoped<Jobs.SignUpOperationReconciliationJob>();
         services.AddScoped<IValidator<SignUpRequest>, SignUpValidator>();
         services.AddScoped<ResendVerificationHandler>();
         services.AddScoped<IValidator<ResendVerificationRequest>, ResendVerificationValidator>();
@@ -383,6 +385,10 @@ public static class IdentityModule
             "identity-invite-acceptance-reconciliation",
             job => job.ExecuteAsync(),
             "*/15 * * * *");
+        jobManager.AddOrUpdate<Jobs.SignUpOperationReconciliationJob>(
+            "identity-signup-operation-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/10 * * * *");
         return app;
     }
 

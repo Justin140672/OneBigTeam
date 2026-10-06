@@ -246,7 +246,12 @@ public sealed class SessionRevocationEnforcementTests : IAsyncLifetime
 
     private sealed class NoOpSupabaseAuthGateway : ISupabaseAuthGateway
     {
-        public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
+        public Task<Guid> CreateUserAsync(
+            string email, string password, string redirectTo, CancellationToken cancellationToken,
+            IReadOnlyDictionary<string, string>? metadata = null)
+            => throw new NotSupportedException();
+
+        public Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken)
             => throw new NotSupportedException();
 
         public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken)

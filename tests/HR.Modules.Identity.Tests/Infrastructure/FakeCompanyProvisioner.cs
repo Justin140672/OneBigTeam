@@ -11,14 +11,25 @@ internal sealed class FakeCompanyProvisioner : ICompanyProvisioner
 
     public int CallCount { get; private set; }
 
+    public List<Guid?> RequestedCompanyIds { get; } = [];
+
+    public Exception? ThrowOnProvision { get; set; }
+
     public List<CompanyProvisioningAdmin> ProvisionedAdmins { get; } = [];
 
-    public Task<Guid> ProvisionCompanyAsync(string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken)
+    public Task<Guid> ProvisionCompanyAsync(
+        string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken, Guid? companyId = null)
     {
         CallCount++;
         ProvisionedCompanyNames.Add(companyName);
         ProvisionedAdmins.Add(admin);
-        return Task.FromResult(CompanyIdToReturn ?? Guid.NewGuid());
+        RequestedCompanyIds.Add(companyId);
+        if (ThrowOnProvision is { } provisionFailure)
+        {
+            throw provisionFailure;
+        }
+
+        return Task.FromResult(CompanyIdToReturn ?? companyId ?? Guid.NewGuid());
     }
 
     public List<Guid> DeactivatedCompanyIds { get; } = [];

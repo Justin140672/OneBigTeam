@@ -31,7 +31,11 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public List<(string Email, string Password)> SignedInUsers { get; } = [];
     public List<(string Email, string Password)> ConfirmedUsersCreated { get; } = [];
 
-    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
+    public List<Guid> DeletedUserIds { get; } = [];
+
+    public Task<Guid> CreateUserAsync(
+        string email, string password, string redirectTo, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
         if (ShouldThrowOnCreate)
         {
@@ -39,7 +43,17 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         }
 
         CreatedUsers.Add((email, redirectTo));
-        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+        var userId = UserIdToReturn ?? Guid.NewGuid();
+        if (metadata is { Count: > 0 })
+            MetadataByEmail[email.Trim()] = metadata;
+
+        return Task.FromResult(userId);
+    }
+
+    public Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        DeletedUserIds.Add(supabaseUserId);
+        return Task.CompletedTask;
     }
 
     public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken)

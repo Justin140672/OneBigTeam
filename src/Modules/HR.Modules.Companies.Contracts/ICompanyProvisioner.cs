@@ -4,7 +4,8 @@ public sealed record CompanyProvisioningAdmin(string Email, string FirstName, st
 
 public interface ICompanyProvisioner
 {
-    Task<Guid> ProvisionCompanyAsync(string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken);
+    Task<Guid> ProvisionCompanyAsync(
+        string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken, Guid? companyId = null);
 
     Task DeactivateCompanyAsync(Guid companyId, CancellationToken cancellationToken);
 

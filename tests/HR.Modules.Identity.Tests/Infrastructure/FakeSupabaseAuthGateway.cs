@@ -22,9 +22,21 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
     public List<(string Email, string Password)> SignedInUsers { get; } = [];
     public List<(string Email, string Password)> ConfirmedUsersCreated { get; } = [];
 
-    public Task<Guid> CreateUserAsync(string email, string password, string redirectTo, CancellationToken cancellationToken)
+    public int CreateUserCallCount { get; private set; }
+
+    public List<Guid> DeletedUserIds { get; } = [];
+
+    public bool ShouldThrowOnDelete { get; set; }
+
+    public Func<string, Exception?>? FailAfterCreate { get; set; }
+
+    public Task<Guid> CreateUserAsync(
+        string email, string password, string redirectTo, CancellationToken cancellationToken,
+        IReadOnlyDictionary<string, string>? metadata = null)
     {
-        if (ShouldThrowEmailAlreadyRegistered)
+        CreateUserCallCount++;
+
+        if (ShouldThrowEmailAlreadyRegistered || UserIdsByEmail.ContainsKey(email.Trim()))
         {
             throw new EmailAlreadyRegisteredException(email);
         }
@@ -36,7 +48,31 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
         CreatedUsers.Add((email, redirectTo));
         CreatedUsersWithPassword.Add((email, password, redirectTo));
-        return Task.FromResult(UserIdToReturn ?? Guid.NewGuid());
+
+        var userId = UserIdToReturn ?? Guid.NewGuid();
+        UserIdsByEmail[email.Trim()] = userId;
+        if (metadata is { Count: > 0 })
+            MetadataByEmail[email.Trim()] = metadata;
+
+        if (FailAfterCreate?.Invoke(email) is { } failure)
+            throw failure;
+
+        return Task.FromResult(userId);
+    }
+
+    public Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken)
+    {
+        if (ShouldThrowOnDelete)
+            throw new InvalidOperationException("Simulated Supabase delete failure.");
+
+        DeletedUserIds.Add(supabaseUserId);
+        foreach (var email in UserIdsByEmail.Where(kv => kv.Value == supabaseUserId).Select(kv => kv.Key).ToList())
+        {
+            UserIdsByEmail.Remove(email);
+            MetadataByEmail.Remove(email);
+        }
+
+        return Task.CompletedTask;
     }
 
     public Task ResendVerificationEmailAsync(string email, string redirectTo, CancellationToken cancellationToken)

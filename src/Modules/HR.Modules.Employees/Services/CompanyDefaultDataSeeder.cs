@@ -21,21 +21,22 @@ internal sealed class CompanyDefaultDataSeeder(
     {
         var now = clock.UtcNowOffset();
 
-        var department = Department.Create(Guid.NewGuid(), companyId, "General", null, now);
-        dbContext.Departments.Add(department);
+        var department = await dbContext.Departments
+            .FirstOrDefaultAsync(d => d.CompanyId == companyId && d.Name == "General", cancellationToken);
+        if (department is null)
+        {
+            department = Department.Create(Guid.NewGuid(), companyId, "General", null, now);
+            dbContext.Departments.Add(department);
+        }
 
         var location = await EnsureLocationAsync(companyId, "Office", "Head Office", now, cancellationToken);
         await EnsureLocationAsync(companyId, HomeLocationTypeName, HomeLocationName, now, cancellationToken);
 
-        var employmentTypePermanent  = EmploymentType.Create(Guid.NewGuid(), companyId, "Permanent", null, now);
-        var employmentTypeFixedTerm  = EmploymentType.Create(Guid.NewGuid(), companyId, "Fixed Term", null, now);
-        var employmentTypeContractor = EmploymentType.Create(Guid.NewGuid(), companyId, "Contractor", null, now);
-        var employmentTypeCasual     = EmploymentType.Create(Guid.NewGuid(), companyId, "Casual", null, now);
-        var employmentTypeApprentice = EmploymentType.Create(Guid.NewGuid(), companyId, "Apprentice", null, now);
-        dbContext.EmploymentTypes.AddRange(
-            employmentTypePermanent, employmentTypeFixedTerm, employmentTypeContractor,
-            employmentTypeCasual, employmentTypeApprentice);
-        var employmentType = employmentTypePermanent;
+        var employmentType = await EnsureEmploymentTypeAsync(companyId, "Permanent", now, cancellationToken);
+        await EnsureEmploymentTypeAsync(companyId, "Fixed Term", now, cancellationToken);
+        await EnsureEmploymentTypeAsync(companyId, "Contractor", now, cancellationToken);
+        await EnsureEmploymentTypeAsync(companyId, "Casual", now, cancellationToken);
+        await EnsureEmploymentTypeAsync(companyId, "Apprentice", now, cancellationToken);
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
@@ -45,7 +46,11 @@ internal sealed class CompanyDefaultDataSeeder(
         await sicknessCategoryDefaultsProvisioner.EnsureDefaultSicknessCategoriesAsync(companyId, cancellationToken);
         await documentTypeDefaultsProvisioner.EnsureDefaultDocumentTypesAsync(companyId, cancellationToken);
 
-        var positionProfile = PositionProfile.Create(
+        var positionProfile = await dbContext.PositionProfiles
+            .FirstOrDefaultAsync(p => p.CompanyId == companyId && p.Title == "Administrator", cancellationToken);
+        if (positionProfile is null)
+        {
+            positionProfile = PositionProfile.Create(
             Guid.NewGuid(),
             companyId,
             department.Id,
@@ -59,11 +64,26 @@ internal sealed class CompanyDefaultDataSeeder(
             salaryType: null,
             defaultLeavePolicyId,
             now);
-
-        dbContext.PositionProfiles.Add(positionProfile);
+            dbContext.PositionProfiles.Add(positionProfile);
+        }
         await dbContext.SaveChangesAsync(cancellationToken);
 
         return new CompanyDefaultDataResult(department.Id, location.Id, positionProfile.Id, employmentType.Id);
+    }
+
+    private async Task<EmploymentType> EnsureEmploymentTypeAsync(
+        Guid companyId, string name, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var existing = await dbContext.EmploymentTypes
+            .FirstOrDefaultAsync(t => t.CompanyId == companyId && t.Name == name, cancellationToken);
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var created = EmploymentType.Create(Guid.NewGuid(), companyId, name, null, now);
+        dbContext.EmploymentTypes.Add(created);
+        return created;
     }
 
     private async Task<Location> EnsureLocationAsync(
