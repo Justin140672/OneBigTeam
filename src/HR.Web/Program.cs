@@ -586,6 +586,36 @@ app.MapPost("/support-session/end", async (
     return Results.Redirect("/login");
 }).AllowAnonymous();
 
+app.MapGet("/companies/{companyId:guid}/organisation-data-exports/{exportId:guid}/download", async (
+    Guid companyId,
+    Guid exportId,
+    HttpContext context,
+    HrApiHttpClientFactory httpClientFactory) =>
+{
+    var http = httpClientFactory.CreateClient();
+    HttpResponseMessage response;
+    try
+    {
+        response = await http.GetAsync(
+            $"api/companies/{companyId}/reporting/data-exports/{exportId}/download",
+            HttpCompletionOption.ResponseHeadersRead,
+            context.RequestAborted);
+    }
+    catch (HttpRequestException)
+    {
+        return Results.StatusCode(StatusCodes.Status502BadGateway);
+    }
+
+    if (!response.IsSuccessStatusCode)
+    {
+        var status = (int)response.StatusCode;
+        response.Dispose();
+        return Results.StatusCode(status);
+    }
+
+    return new StreamedApiDownloadResult(response);
+}).RequireAuthorization();
+
 app.MapGet("/companies/{companyId:guid}/data-import/employees/template/download", async (
     Guid companyId,
     HrApiHttpClientFactory httpClientFactory) =>

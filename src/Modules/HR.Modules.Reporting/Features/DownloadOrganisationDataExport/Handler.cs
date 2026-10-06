@@ -17,7 +17,6 @@ internal sealed class DownloadOrganisationDataExportHandler(
         Guid userId,
         CancellationToken cancellationToken)
     {
-
         var now = clock.UtcNowOffset();
 
         var export = await db.OrganisationDataExports
@@ -33,29 +32,37 @@ internal sealed class DownloadOrganisationDataExportHandler(
                 Error.NotFound("No downloadable organisation data export was found."));
         }
 
-        await using var stream = await storage.OpenAsync(export.StorageKey!, cancellationToken);
+        var stream = await storage.OpenAsync(export.StorageKey!, cancellationToken);
         if (stream is null)
         {
             return Result.Failure<DownloadOrganisationDataExportResult>(
                 Error.NotFound("No downloadable organisation data export was found."));
         }
 
-        using var memory = new MemoryStream();
-        await stream.CopyToAsync(memory, cancellationToken);
-        var bytes = memory.ToArray();
+        try
+        {
+            var downloadResult = export.RecordDownload(userId, now);
+            if (downloadResult.IsFailure)
+            {
+                await stream.DisposeAsync();
+                return Result.Failure<DownloadOrganisationDataExportResult>(downloadResult.Error);
+            }
 
-        var downloadResult = export.RecordDownload(userId, now);
-        if (downloadResult.IsFailure)
-            return Result.Failure<DownloadOrganisationDataExportResult>(downloadResult.Error);
+            await db.SaveChangesAsync(cancellationToken);
 
-        await db.SaveChangesAsync(cancellationToken);
-
-        await auditEventPublisher.PublishAsync(
-            new OrganisationDataExportDownloadedAuditEvent(
-                request.CompanyId, export.Id, userId, export.DownloadCount, now),
-            cancellationToken);
+            await auditEventPublisher.PublishAsync(
+                new OrganisationDataExportDownloadedAuditEvent(
+                    request.CompanyId, export.Id, userId, export.DownloadCount, now),
+                cancellationToken);
+        }
+        catch
+        {
+            await stream.DisposeAsync();
+            throw;
+        }
 
         var fileName = $"organisation-data-export-{now:yyyy-MM-dd}.zip";
-        return Result.Success(new DownloadOrganisationDataExportResult(bytes, fileName, "application/zip"));
+        long? length = stream.CanSeek ? stream.Length : null;
+        return Result.Success(new DownloadOrganisationDataExportResult(stream, length, fileName, "application/zip"));
     }
 }

@@ -60,29 +60,8 @@ public class OrganisationDataExportService(HrApiHttpClientFactory httpClientFact
         }
     }
 
-    public async Task<(byte[]? Bytes, string? ContentType, string? FileName, string? Error)> DownloadAsync(
-        Guid companyId, Guid exportId, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            var response = await Http.GetAsync($"{Base(companyId)}/{exportId}/download", cancellationToken);
-
-            if (!response.IsSuccessStatusCode)
-                return (null, null, null, "This export is no longer available for download.");
-
-            var bytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
-            var contentType = response.Content.Headers.ContentType?.MediaType ?? "application/zip";
-            var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
-                ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
-                ?? "organisation-data-export.zip";
-
-            return (bytes, contentType, fileName, null);
-        }
-        catch (HttpRequestException)
-        {
-            return (null, null, null, "This export is no longer available for download.");
-        }
-    }
+    public static string DownloadUrl(Guid companyId, Guid exportId) =>
+        $"/companies/{companyId}/organisation-data-exports/{exportId}/download";
 }
 
 public sealed record RequestOrganisationDataExportResult(Guid ExportId, string Status);

@@ -40,23 +40,34 @@ internal sealed class SupabaseOrganisationDataExportStorage : IOrganisationDataE
 
     public async Task<Stream?> OpenAsync(string storageKey, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
+        var request = new HttpRequestMessage(
             HttpMethod.Get,
             $"{_options.SupabaseUrl}/storage/v1/object/{_options.BucketName}/{storageKey}");
 
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
 
-        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        if (response.StatusCode == HttpStatusCode.NotFound)
-            return null;
+        HttpResponseMessage? response = null;
+        try
+        {
+            response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                response.Dispose();
+                request.Dispose();
+                return null;
+            }
 
-        response.EnsureSuccessStatusCode();
+            response.EnsureSuccessStatusCode();
 
-        var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var memory = new MemoryStream();
-        await stream.CopyToAsync(memory, cancellationToken);
-        memory.Position = 0;
-        return memory;
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return new ResponseOwningStream(stream, response, request);
+        }
+        catch
+        {
+            response?.Dispose();
+            request.Dispose();
+            throw;
+        }
     }
 
     public async Task DeleteAsync(string storageKey, CancellationToken cancellationToken)

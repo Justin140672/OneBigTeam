@@ -1,7 +1,7 @@
 @using HR.Web.Components.Controls
 @using HR.Web.Services
 @inject OrganisationDataExportService ExportService
-@inject IJSRuntime JS
+@inject NavigationManager Navigation
 
 @*
     Story 2: customer-facing organisation data export panel. Rendered inside the (already
@@ -78,7 +78,7 @@
                         </dd>
                         <dd class="col-12">
                             <SfButton IsPrimary="true" Disabled="@_busy"
-                                      OnClick="@(() => DownloadAsync(_latest!.ExportId!.Value))"
+                                      OnClick="@(() => Download(_latest!.ExportId!.Value))"
                                       aria-label="Download the completed organisation data export">
                                 Download export
                             </SfButton>
@@ -173,26 +173,11 @@
         _busy = false;
     }
 
-    private async Task DownloadAsync(Guid exportId)
+    private void Download(Guid exportId)
     {
-        _busy = true;
         _error = _info = null;
-
-        var (bytes, contentType, fileName, error) = await ExportService.DownloadAsync(CompanyId, exportId);
-        if (bytes is null)
-        {
-            _error = error ?? "This export is no longer available for download.";
-        }
-        else
-        {
-            await JS.InvokeVoidAsync("downloadFileFromBase64",
-                fileName ?? "organisation-data-export.zip",
-                contentType ?? "application/zip",
-                Convert.ToBase64String(bytes));
-            await ReloadAsync();
-        }
-
-        _busy = false;
+        Navigation.NavigateTo(OrganisationDataExportService.DownloadUrl(CompanyId, exportId), forceLoad: true);
+        _info = "Your download is starting. Use Refresh to update the download count.";
     }
 
     private static string StatusDisplay(string? status) => status switch

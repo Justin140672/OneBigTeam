@@ -1,6 +1,7 @@
 using FastEndpoints;
 using HR.SharedKernel;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Net.Http.Headers;
 
 namespace HR.Modules.Reporting.Features.DownloadOrganisationDataExport;
 
@@ -9,6 +10,8 @@ internal sealed class Endpoint(
     ICurrentUser currentUser)
     : Endpoint<DownloadOrganisationDataExportRequest>
 {
+    private const int CopyBufferSize = 81920;
+
     public override void Configure()
     {
         Get("/api/companies/{companyId:guid}/reporting/data-exports/{exportId:guid}/download");
@@ -38,6 +41,23 @@ internal sealed class Endpoint(
         }
 
         var file = result.Value!;
-        await Send.BytesAsync(file.Content, fileName: file.FileName, contentType: file.ContentType, cancellation: cancellationToken);
+        await using var content = file.Content;
+
+        var response = HttpContext.Response;
+        response.StatusCode = StatusCodes.Status200OK;
+        response.ContentType = file.ContentType;
+        response.ContentLength = file.ContentLength;
+        response.Headers[HeaderNames.ContentDisposition] =
+            new ContentDispositionHeaderValue("attachment") { FileName = file.FileName, FileNameStar = file.FileName }.ToString();
+        response.Headers[HeaderNames.CacheControl] = "private, no-store";
+
+        try
+        {
+            await response.StartAsync(cancellationToken);
+            await content.CopyToAsync(response.Body, CopyBufferSize, cancellationToken);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException)
+        {
+        }
     }
 }
