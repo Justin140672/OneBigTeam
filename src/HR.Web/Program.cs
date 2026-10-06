@@ -557,12 +557,30 @@ app.MapGet("/support-session/redeem", async (
 }).AllowAnonymous();
 
 // Ends the current support session (visible "End support session" action on SupportSessionBanner).
-// Clears both cookies set above and returns to the platform admin's own login page — this
-// deliberately does NOT call any revoke/refresh-token endpoint: the underlying SupportSession row
-// was already single-use-consumed at redemption time, so there is nothing further to invalidate
-// server-side; ending the session is purely "stop presenting this browser's support-scoped token".
-app.MapPost("/support-session/end", (HttpContext context, IHostEnvironment environment, CircuitSessionState sessionState) =>
+// Revokes the session server-side first (the redeemed bearer token stops working immediately), then
+// clears both cookies and returns to the platform admin's login page. Cookies are cleared even when
+// revocation fails; the API still fails closed on persisted state and the token expires on its own.
+app.MapPost("/support-session/end", async (
+    HttpContext context,
+    IHostEnvironment environment,
+    CircuitSessionState sessionState,
+    HrApiHttpClientFactory httpClientFactory,
+    ILogger<Program> logger) =>
 {
+    try
+    {
+        var http = httpClientFactory.CreateClient();
+        using var response = await http.PostAsync("api/companies/support-session/end", null, context.RequestAborted);
+        if (!response.IsSuccessStatusCode)
+        {
+            logger.LogWarning("Server-side support session revocation returned {StatusCode}.", (int)response.StatusCode);
+        }
+    }
+    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+    {
+        logger.LogWarning(ex, "Server-side support session revocation failed; clearing local cookies anyway.");
+    }
+
     SupabaseSessionAccessor.ClearSessionCookie(context, environment, sessionState);
     SupportSessionCookieAccessor.ClearCookie(context, environment);
     return Results.Redirect("/login");

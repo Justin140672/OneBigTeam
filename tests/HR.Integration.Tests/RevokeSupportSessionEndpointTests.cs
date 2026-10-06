@@ -35,16 +35,49 @@ public class RevokeSupportSessionEndpointTests
         return client;
     }
 
-    private async Task<Guid> SeedSupportSessionAsync(DateTimeOffset now, Guid? companyId = null)
+    private async Task<Guid> SeedSupportSessionAsync(DateTimeOffset now, Guid? companyId = null, bool redeem = false)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
 
         var session = SupportSession.Issue(
             companyId ?? Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", $"hash-{Guid.NewGuid():N}", now);
+        if (redeem)
+        {
+            session.Redeem(now);
+        }
+
         db.SupportSessions.Add(session);
         await db.SaveChangesAsync();
         return session.Id;
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_Revokes_Redeemed_Session()
+    {
+        var sessionId = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+
+        var response = await client.PostAsJsonAsync(Url(sessionId), new { });
+        response.EnsureSuccessStatusCode();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompaniesDbContext>();
+        var persisted = await db.SupportSessions.SingleAsync(s => s.Id == sessionId);
+        Assert.NotNull(persisted.RedeemedAt);
+        Assert.NotNull(persisted.RevokedAt);
+    }
+
+    [Fact]
+    public async Task Post_RevokeSupportSession_Repeated_Concurrent_Requests_Succeed_Exactly_Once()
+    {
+        var sessionId = await SeedSupportSessionAsync(DateTimeOffset.UtcNow, redeem: true);
+        using var client = ClientFor(Guid.NewGuid(), AllowListedEmail);
+
+        var responses = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => client.PostAsJsonAsync(Url(sessionId), new { })));
+
+        Assert.Equal(1, responses.Count(r => r.StatusCode == HttpStatusCode.OK));
+        Assert.All(responses.Where(r => r.StatusCode != HttpStatusCode.OK), r => Assert.True(r.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.Conflict));
     }
 
     private static string Url(Guid supportSessionId) => $"/api/companies/admin/support-sessions/{supportSessionId}/revoke";

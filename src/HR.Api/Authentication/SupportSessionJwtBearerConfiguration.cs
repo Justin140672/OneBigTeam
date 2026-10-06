@@ -4,6 +4,8 @@ using HR.Infrastructure.Abstractions;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 
 namespace HR.Api.Authentication;
@@ -37,6 +39,49 @@ public static class SupportSessionJwtBearerConfiguration
             ValidAlgorithms = [SecurityAlgorithms.HmacSha256],
             IssuerSigningKey = key,
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = ValidatePersistedStateAsync,
+        };
+    }
+
+
+    public static async Task ValidatePersistedStateAsync(TokenValidatedContext context)
+    {
+        try
+        {
+            var principal = context.Principal;
+            var validator = context.HttpContext.RequestServices.GetRequiredService<ISupportSessionStateValidator>();
+            var logger = context.HttpContext.RequestServices.GetRequiredService<ILoggerFactory>()
+                .CreateLogger("HR.Api.Authentication.SupportSession");
+
+            if (principal is null
+                || !Guid.TryParse(principal.FindFirst("support_session_id")?.Value, out var supportSessionId)
+                || !Guid.TryParse(principal.FindFirst("company_id")?.Value, out var companyId)
+                || !Guid.TryParse(principal.FindFirst("sub")?.Value, out var adminUserId))
+            {
+                context.Fail("Support session token is missing required claims.");
+                return;
+            }
+
+            var active = await validator.IsActiveAsync(
+                supportSessionId,
+                companyId,
+                adminUserId,
+                principal.FindFirst("email")?.Value,
+                context.HttpContext.RequestAborted);
+
+            if (!active)
+            {
+                logger.LogWarning("Rejected support session token for session {SupportSessionId}: persisted state is not active.", supportSessionId);
+                context.Fail("Support session is not active.");
+            }
+        }
+        catch (Exception)
+        {
+            context.Fail("Support session state could not be verified.");
+        }
     }
 
     public static bool LooksLikeSupportSessionToken(string? bearerToken)

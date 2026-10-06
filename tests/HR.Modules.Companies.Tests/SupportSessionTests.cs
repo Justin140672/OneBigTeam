@@ -107,15 +107,29 @@ public class SupportSessionTests
     }
 
     [Fact]
-    public void Revoke_Fails_When_Already_Redeemed()
+    public void Revoke_Succeeds_When_Already_Redeemed()
     {
         var session = SupportSession.Issue(Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", "hash", Now);
         session.Redeem(Now.AddMinutes(1));
 
         var result = session.Revoke(Now.AddMinutes(2));
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(Now.AddMinutes(2), session.RevokedAt);
+        Assert.False(session.GrantsAccess(Now.AddMinutes(3)));
+    }
+
+    [Fact]
+    public void GrantsAccess_Requires_Redeemed_Unrevoked_Unexpired()
+    {
+        var session = SupportSession.Issue(Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", "hash", Now);
+
+        Assert.False(session.GrantsAccess(Now.AddMinutes(1)));
+
+        session.Redeem(Now.AddMinutes(1));
+
+        Assert.True(session.GrantsAccess(Now.AddMinutes(2)));
+        Assert.False(session.GrantsAccess(Now.AddMinutes(20)));
     }
 
     [Fact]

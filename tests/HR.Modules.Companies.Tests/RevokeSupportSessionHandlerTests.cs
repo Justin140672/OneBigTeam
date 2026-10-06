@@ -33,7 +33,7 @@ public class RevokeSupportSessionHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("unauthorized", result.Error.Code);
-        Assert.Empty(publisher.Published);
+        Assert.Equal("unauthorized", Assert.IsType<SupportSessionRevocationRejectedAuditEvent>(Assert.Single(publisher.Published)).Outcome);
     }
 
     [Fact]
@@ -54,11 +54,11 @@ public class RevokeSupportSessionHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("not_found", result.Error.Code);
-        Assert.Empty(publisher.Published);
+        Assert.Equal("not_found", Assert.IsType<SupportSessionRevocationRejectedAuditEvent>(Assert.Single(publisher.Published)).Outcome);
     }
 
     [Fact]
-    public async Task HandleAsync_Returns_Validation_Failure_When_Already_Redeemed()
+    public async Task HandleAsync_Revokes_Redeemed_Session_And_Publishes_Audit_Event()
     {
         await using var context = BuildContext();
         var session = SupportSession.Issue(Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", "hash", Now);
@@ -77,9 +77,11 @@ public class RevokeSupportSessionHandlerTests
             new RevokeSupportSessionRequest(session.Id),
             CancellationToken.None);
 
-        Assert.True(result.IsFailure);
-        Assert.Equal("validation", result.Error.Code);
-        Assert.Empty(publisher.Published);
+        Assert.True(result.IsSuccess);
+        var persisted = await context.SupportSessions.SingleAsync(s => s.Id == session.Id);
+        Assert.NotNull(persisted.RevokedAt);
+        Assert.False(persisted.GrantsAccess(Now));
+        Assert.IsType<SupportSessionRevokedAuditEvent>(Assert.Single(publisher.Published));
     }
 
     [Fact]
@@ -115,6 +117,31 @@ public class RevokeSupportSessionHandlerTests
         Assert.Equal(companyId, auditEvent.CompanyId);
         Assert.Equal(session.Id, auditEvent.SupportSessionId);
         Assert.Equal(actorId, auditEvent.ActorUserId);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Second_Revoke_Fails_And_Audits_Rejected_Attempt()
+    {
+        await using var context = BuildContext();
+        var session = SupportSession.Issue(Guid.NewGuid(), Guid.NewGuid(), "admin@example.com", "reason", "hash", Now);
+        session.Redeem(Now.AddMinutes(1));
+        context.SupportSessions.Add(session);
+        await context.SaveChangesAsync();
+
+        var publisher = new CapturingAuditEventPublisher();
+        var handler = BuildHandler(
+            context,
+            new FakeCurrentUser(Guid.NewGuid(), email: "admin@example.com"),
+            BuildConfiguration("admin@example.com"),
+            publisher);
+
+        var first = await handler.HandleAsync(new RevokeSupportSessionRequest(session.Id), CancellationToken.None);
+        var second = await handler.HandleAsync(new RevokeSupportSessionRequest(session.Id), CancellationToken.None);
+
+        Assert.True(first.IsSuccess);
+        Assert.True(second.IsFailure);
+        Assert.Equal(2, publisher.Published.Count);
+        Assert.Equal("already_revoked", Assert.IsType<SupportSessionRevocationRejectedAuditEvent>(publisher.Published[1]).Outcome);
     }
 
     private static RevokeSupportSessionHandler BuildHandler(

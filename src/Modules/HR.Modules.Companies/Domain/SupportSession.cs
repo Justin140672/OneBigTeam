@@ -63,6 +63,8 @@ internal sealed class SupportSession : IVersionedAggregate
 
     public bool IsActive(DateTimeOffset now) => RedeemedAt is null && RevokedAt is null && now < ExpiresAt;
 
+    public bool GrantsAccess(DateTimeOffset now) => RedeemedAt is not null && RevokedAt is null && now < ExpiresAt;
+
     public Result Redeem(DateTimeOffset now)
     {
         if (RedeemedAt is not null)
@@ -80,9 +82,6 @@ internal sealed class SupportSession : IVersionedAggregate
 
     public Result Revoke(DateTimeOffset now)
     {
-        if (RedeemedAt is not null)
-            return Result.Failure(Error.Validation("This support session has already been redeemed."));
-
         if (RevokedAt is not null)
             return Result.Failure(Error.Validation("This support session has already been revoked."));
 

@@ -32,6 +32,7 @@ using HR.Modules.Companies.Features.GetFailedPayments;
 using HR.Modules.Companies.Features.GetHrSettings;
 using HR.Modules.Companies.Features.GetSubscriptionDetails;
 using HR.Modules.Companies.Features.GetSubscriptionStatus;
+using HR.Modules.Companies.Features.EndSupportSession;
 using HR.Modules.Companies.Features.GenerateSupportSession;
 using HR.Modules.Companies.Features.ListBackgroundJobs;
 using HR.Modules.Companies.Features.ListCustomers;
@@ -414,6 +415,9 @@ public static class CompaniesModule
         services.AddScoped<IValidator<GenerateSupportSessionRequest>, GenerateSupportSessionValidator>();
         services.AddScoped<RevokeSupportSessionHandler>();
         services.AddScoped<IValidator<RevokeSupportSessionRequest>, RevokeSupportSessionValidator>();
+        services.AddScoped<EndSupportSessionHandler>();
+        services.AddScoped<IValidator<EndSupportSessionRequest>, EndSupportSessionValidator>();
+        services.AddScoped<ISupportSessionStateValidator, SupportSessionStateValidator>();
         services.AddScoped<RedeemSupportSessionHandler>();
         services.AddScoped<IValidator<RedeemSupportSessionRequest>, RedeemSupportSessionValidator>();
 

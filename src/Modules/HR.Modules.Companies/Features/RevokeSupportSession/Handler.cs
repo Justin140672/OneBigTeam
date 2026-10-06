@@ -22,6 +22,7 @@ internal sealed class RevokeSupportSessionHandler(
     {
         if (!IsAllowListedPlatformAdmin())
         {
+            await PublishAttemptAsync(request.SupportSessionId, null, "unauthorized");
             return Result.Failure<RevokeSupportSessionResponse>(
                 Error.Unauthorized("This account is not authorised to manage customer support sessions."));
         }
@@ -51,15 +52,26 @@ internal sealed class RevokeSupportSessionHandler(
 
         if (supportSession is null)
         {
+            await PublishAttemptAsync(request.SupportSessionId, null, "not_found");
             return Result.Failure<RevokeSupportSessionResponse>(
                 Error.NotFound($"No support session was found with id '{request.SupportSessionId}'."));
         }
 
         var now = clock.UtcNowOffset();
+        var expectedVersion = supportSession.Version;
         var revokeResult = supportSession.Revoke(now);
         if (revokeResult.IsFailure)
         {
+            await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "already_revoked");
             return Result.Failure<RevokeSupportSessionResponse>(revokeResult.Error);
+        }
+
+        var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
+            supportSession, expectedVersion, "This support session was changed by another request. Reload and try again.", cancellationToken);
+        if (saveResult.IsFailure)
+        {
+            await PublishAttemptAsync(supportSession.Id, supportSession.CompanyId, "concurrency_conflict");
+            return Result.Failure<RevokeSupportSessionResponse>(saveResult.Error);
         }
 
         var response = new RevokeSupportSessionResponse(supportSession.Id, supportSession.RevokedAt!.Value);
@@ -72,10 +84,6 @@ internal sealed class RevokeSupportSessionHandler(
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
                 return Result.Success(outcome.Response!);
         }
-        else
-        {
-            await dbContext.SaveChangesAsync(cancellationToken);
-        }
 
         await auditEventPublisher.PublishAsync(
             new SupportSessionRevokedAuditEvent(
@@ -87,6 +95,16 @@ internal sealed class RevokeSupportSessionHandler(
 
         return Result.Success(response);
     }
+
+    private Task PublishAttemptAsync(Guid supportSessionId, Guid? companyId, string outcome) =>
+        auditEventPublisher.PublishAsync(
+            new SupportSessionRevocationRejectedAuditEvent(
+                companyId ?? Guid.Empty,
+                supportSessionId,
+                currentUser.UserId,
+                outcome,
+                clock.UtcNowOffset()),
+            CancellationToken.None);
 
     private bool IsAllowListedPlatformAdmin()
     {
