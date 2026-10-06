@@ -5,6 +5,7 @@
 @inject EmployeeService EmployeeService
 @inject VacancyService VacancyService
 @inject DepartmentService DepartmentService
+@inject CompensationService CompensationService
 @inject EmployeeDirectoryService EmployeeDirectoryService
 @inject AppSession Session
 
@@ -84,6 +85,11 @@
                         @if (_appointModel.ChangeCompensation)
                         {
                             <div class="col-md-4">
+                                <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
+                                                @bind-Value="_appointModel.Salary" Format="n2" Min="0"
+                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-salary" })" />
+                            </div>
+                            <div class="col-md-4">
                                 <label id="appoint-salary-type-label" for="appoint-salary-type" class="form-label">Salary Type <span class="text-danger">*</span></label>
                                 <SfDropDownList TValue="string" TItem="string" DataSource="@_appointSalaryTypeOptions"
                                                 @bind-Value="_appointModel.SalaryType"
@@ -91,11 +97,6 @@
                                 <div id="appoint-salary-type-error" role="alert">
                                     <ValidationMessage For="@(() => _appointModel.SalaryType)" />
                                 </div>
-                            </div>
-                            <div class="col-md-4">
-                                <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
-                                                @bind-Value="_appointModel.Salary" Format="n2" Min="0"
-                                                HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "appoint-salary" })" />
                             </div>
                             <div class="col-md-4">
                                 <HrTextField Label="Currency" Required="true" Id="appoint-currency"
@@ -260,7 +261,14 @@
 
         var vacancyTask = VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         var managerTask = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
-        await Task.WhenAll(vacancyTask, managerTask);
+        var compensationTask = employeeId is Guid currentEmployeeId
+            ? CompensationService.GetCurrentCompensationAsync(CompanyId, currentEmployeeId)
+            : Task.FromResult<CurrentCompensationModel?>(null);
+        await Task.WhenAll(vacancyTask, managerTask, compensationTask);
+
+        var currentCompensation = await compensationTask;
+        _appointModel.HoursPerWeek = currentCompensation?.HoursPerWeek;
+        _appointModel.Fte = currentCompensation?.FTE;
 
         var vacancy = await vacancyTask;
         _derivedPositionProfileName = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle ?? "(unknown)";

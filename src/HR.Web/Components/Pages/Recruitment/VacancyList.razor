@@ -120,6 +120,36 @@
         }
     }
 
+    protected override void ConfigureToolbar()
+    {
+        AddToolbarAction(
+            id:      "hr-publish",
+            text:    "Publish",
+            icon:    "fa-solid fa-bullhorn",
+            onClick: PublishAsync,
+            tooltip: "Publish selected vacancy");
+    }
+
+    private async Task PublishAsync(VacancyListItemModel item)
+    {
+        ClearActionError();
+
+        if (item.Status is not ("Draft" or "OnHold"))
+        {
+            SetActionError("Only draft or on-hold vacancies can be published.");
+            return;
+        }
+
+        var (result, error) = await VacancyService.PublishVacancyAsync(CompanyId, item.Id);
+        if (result is null)
+        {
+            SetActionError(error);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
     protected override async Task OnBeforeLoadAsync()
     {
         if (!Session.CanManageRecruitment)
