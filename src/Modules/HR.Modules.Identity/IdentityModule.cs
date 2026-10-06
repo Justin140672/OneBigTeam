@@ -173,6 +173,10 @@ public static class IdentityModule
         services.AddScoped<SignUpHandler>();
         services.AddScoped<HR.Modules.Identity.Services.SignUpOperationCompensator>();
         services.AddScoped<Jobs.SignUpOperationReconciliationJob>();
+        services.AddHealthChecks().AddCheck<SignUpCleanupBacklogHealthCheck>(
+            "signup-cleanup-backlog",
+            failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded,
+            tags: ["degraded"]);
         services.AddScoped<IValidator<SignUpRequest>, SignUpValidator>();
         services.AddScoped<ResendVerificationHandler>();
         services.AddScoped<IValidator<ResendVerificationRequest>, ResendVerificationValidator>();

@@ -12,7 +12,9 @@ namespace HR.Modules.Identity.Jobs;
 /// Reconciles signup operations: compensates operations abandoned partway through provisioning (or
 /// partway through compensation) once their lease plus the takeover safety interval has passed, sweeps
 /// compensated operations for resources a stale worker created late (company, owned Supabase account),
-/// and purges terminal operations after their retention window. Bounded batches; every operation is
+/// and purges terminal operations after their retention window. A failed operation is never purged
+/// until a sweep has succeeded; past retention an unswept failure keeps only its cleanup correlation
+/// data (company id, email, operation id) and has everything else redacted. Bounded batches; every operation is
 /// fenced with a versioned, token-guarded lease before any external side effect.
 /// </summary>
 internal sealed class SignUpOperationReconciliationJob(
@@ -127,11 +129,21 @@ internal sealed class SignUpOperationReconciliationJob(
         var retentionCutoff = now - SignUpOperation.Retention;
         db.ChangeTracker.Clear();
 
+        await db.SignUpOperations
+            .Where(o => o.Status == SignUpOperation.StatusFailed && o.SweptAt == null
+                && (o.CompletedAt ?? o.UpdatedAt) < retentionCutoff)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.RequestFingerprint, (string?)null)
+                .SetProperty(o => o.ResponseJson, (string?)null)
+                .SetProperty(o => o.FailureMessage, (string?)null)
+                .SetProperty(o => o.LastError, (string?)null));
+
         int purged;
         do
         {
             var expiredIds = await db.SignUpOperations
                 .Where(o => o.Status != SignUpOperation.StatusInProgress
+                    && (o.Status != SignUpOperation.StatusFailed || o.SweptAt != null)
                     && (o.CompletedAt ?? o.UpdatedAt) < retentionCutoff)
                 .OrderBy(o => o.UpdatedAt)
                 .Take(PurgeBatchSize)

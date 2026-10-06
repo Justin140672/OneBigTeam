@@ -22,12 +22,12 @@ namespace HR.Modules.Identity.Migrations
                 oldMaxLength: 128);
 
             // Existing fingerprints are unkeyed SHA-256 hashes over the full request including the
-            // password, so none may survive. Terminal rows that can no longer be replayed (released
-            // key, or past the 7 day retention window) are purged; surviving rows keep only a
+            // password, so none may survive. Completed rows that can no longer be replayed (released
+            // key, or past the 7 day retention window) are purged; failed rows are kept until a late-resource sweep has run; surviving rows keep only a
             // non-secret marker that the handler accepts when the email still matches.
             migrationBuilder.Sql(@"
                 DELETE FROM identity.signup_operations
-                WHERE status <> 'in_progress'
+                WHERE status = 'completed'
                   AND (idempotency_key IS NULL
                        OR COALESCE(completed_at, updated_at) < now() - interval '7 days');
 
