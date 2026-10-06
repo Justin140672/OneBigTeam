@@ -22,7 +22,8 @@ namespace HR.Modules.Recruitment.Features.MoveApplicationStage;
 internal sealed class MoveApplicationStageHandler(
     RecruitmentDbContext db,
     IClock clock,
-    RecruitmentStageChangeRecorder recorder)
+    RecruitmentStageChangeRecorder recorder,
+    InternalOfferTaskEffectsService? internalOfferEffects = null)
 {
     public async Task<Result<MoveApplicationStageResponse>> HandleAsync(
         MoveApplicationStageRequest request,
@@ -172,6 +173,9 @@ internal sealed class MoveApplicationStageHandler(
         }
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
+
+        if (internalOfferEffects is not null)
+            await internalOfferEffects.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
 
         return Result.Success(response);
     }

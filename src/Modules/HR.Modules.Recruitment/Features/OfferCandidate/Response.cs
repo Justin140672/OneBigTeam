@@ -32,4 +32,5 @@ internal sealed record OfferCandidateResponse(
     string? OfferNotes,
     string? OfferResponseStatus,
     DateTimeOffset? OfferMadeAt,
-    DateTimeOffset? OfferRespondedAt);
+    DateTimeOffset? OfferRespondedAt,
+    HR.Modules.Recruitment.Services.OfferTermsView? OfferTerms = null);

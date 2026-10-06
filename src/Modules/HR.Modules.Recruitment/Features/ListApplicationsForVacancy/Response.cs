@@ -32,4 +32,5 @@ internal sealed record ApplicationListItem(
     bool HasNextInterviewStage = false,
     Guid? NextInterviewStageId = null,
     string? NextInterviewStageName = null,
-    bool AllRequiredInterviewStagesPassed = true);
+    bool AllRequiredInterviewStagesPassed = true,
+    HR.Modules.Recruitment.Services.OfferTermsView? OfferTerms = null);

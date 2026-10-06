@@ -51,4 +51,6 @@ public enum NotificationType
     OrganisationDataExportReady                    = 45,
 
     ProductUpdate                                  = 46,
+
+    InternalOfferResponded                         = 47,
 }

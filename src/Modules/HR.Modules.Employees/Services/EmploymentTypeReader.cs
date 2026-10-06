@@ -12,4 +12,11 @@ internal sealed class EmploymentTypeReader(EmployeesDbContext dbContext) : IEmpl
             .AnyAsync(
                 t => t.Id == employmentTypeId && t.CompanyId == companyId && t.IsActive,
                 cancellationToken);
+
+    public Task<string?> GetNameAsync(Guid companyId, Guid employmentTypeId, CancellationToken cancellationToken) =>
+        dbContext.EmploymentTypes
+            .AsNoTracking()
+            .Where(t => t.Id == employmentTypeId && t.CompanyId == companyId)
+            .Select(t => (string?)t.Name)
+            .SingleOrDefaultAsync(cancellationToken);
 }

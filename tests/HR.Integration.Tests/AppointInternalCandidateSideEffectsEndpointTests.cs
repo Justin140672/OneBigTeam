@@ -113,7 +113,7 @@ public class AppointInternalCandidateSideEffectsEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await RecruiterHrClientAsync(_factory, companyId);
-        var s = await SeedAsync(_factory, companyId);
+        var s = await SeedAsync(_factory, companyId, offeredStartDate: Today.AddDays(10));
         var employeesBefore = await CountEmployeesAsync(_factory, companyId);
 
         var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s, effectiveDate: Today.AddDays(10)));

@@ -17,8 +17,8 @@ namespace HR.Modules.Recruitment.Features.AppointInternalCandidate;
 /// Eligibility (mirrors HireCandidate wherever the two overlap):
 ///  - the application is Internal, belongs to this vacancy and company, and is not already appointed;
 ///  - it is not withdrawn and is not on a terminal stage (so not rejected or already hired);
-///  - an offer that was declined or withdrawn blocks it; an accepted offer is NOT required, exactly as
-///    for an external hire (an offer awaiting a response, or none recorded, may still proceed);
+///  - the offer must have been explicitly accepted by the employee (declined, withdrawn, awaiting-response or
+///    missing offers block it); the appointment defaults to the accepted terms and a differing material term needs a revised offer;
 ///  - the candidate is linked to an employee of the same company whose employment is Active;
 ///  - the company has an active Hired terminal stage;
 ///  - the vacancy's position profile resolves with a department and a location.
@@ -97,6 +97,14 @@ internal sealed class AppointInternalCandidateHandler(
             return Fail(Error.Validation(
                 $"Cannot appoint this candidate — the offer was {application.OfferResponseStatus.Value.ToString().ToLowerInvariant()}."));
 
+        if (application.OfferResponseStatus is null)
+            return Fail(Error.Validation(
+                "Cannot appoint this candidate — no internal offer has been made. Make an offer and wait for the employee to accept it."));
+
+        if (application.OfferResponseStatus != OfferResponseStatus.Accepted)
+            return Fail(Error.Validation(
+                "Cannot appoint this candidate — the offer is still awaiting the employee's response."));
+
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
             .SingleOrDefaultAsync(s => s.Id == application.CurrentStageId && s.CompanyId == request.CompanyId, cancellationToken);
@@ -129,14 +137,17 @@ internal sealed class AppointInternalCandidateHandler(
         if (employee.EmploymentState != EmployeeApplicantEmploymentState.Active)
             return Fail(Error.Validation("Only an active employee can be appointed to a new role."));
 
-        if (!request.NoManager && request.ManagerId == employeeId)
-            return Fail(Error.Validation("An employee cannot be their own manager."));
+        var terms = ResolveAcceptedTerms(application, request, employeeId);
+        if (terms.Error is not null)
+            return Fail(terms.Error);
+
+        var positionProfileId = application.OfferPositionProfileId ?? vacancy.PositionProfileId;
 
         var positionProfile = await positionProfileReader.GetSummaryAsync(
-            request.CompanyId, vacancy.PositionProfileId, cancellationToken);
+            request.CompanyId, positionProfileId, cancellationToken);
 
         if (positionProfile is null)
-            return Fail(Error.NotFound($"Position profile '{vacancy.PositionProfileId}' was not found."));
+            return Fail(Error.NotFound($"Position profile '{positionProfileId}' was not found."));
 
         if (positionProfile.DepartmentId is null)
             return Fail(Error.Validation("The vacancy's position profile has no department set; cannot appoint without a department."));
@@ -144,7 +155,7 @@ internal sealed class AppointInternalCandidateHandler(
         if (positionProfile.LocationId is null)
             return Fail(Error.Validation("The vacancy's position profile has no location set; cannot appoint without a location."));
 
-        var effectiveDate = request.EffectiveDate ?? application.OfferedStartDate;
+        var effectiveDate = terms.EffectiveDate;
         if (effectiveDate is null)
             return Fail(Error.Validation(
                 "An effective date is required — none was supplied and no proposed start date was recorded on the offer."));
@@ -162,22 +173,14 @@ internal sealed class AppointInternalCandidateHandler(
             new InternalAppointmentRequest(
                 request.CompanyId,
                 employeeId,
-                vacancy.PositionProfileId,
+                positionProfileId,
                 effectiveDate.Value,
-                request.NoManager ? null : request.ManagerId,
+                terms.NoManager ? null : terms.ManagerId,
                 application.InternalAppointmentSourceReference,
-                BuildReason(vacancy.AdvertTitle ?? positionProfile.Title),
+                BuildReason(application.OfferJobTitle ?? vacancy.AdvertTitle ?? positionProfile.Title),
                 performedBy,
                 request.ConfirmBackdatedEffectiveDate,
-                request.CreateCompensationChange
-                    ? new InternalAppointmentCompensation(
-                        request.CompensationSalaryType!,
-                        request.CompensationSalary!.Value,
-                        request.CompensationCurrency!,
-                        request.CompensationHoursPerWeek,
-                        request.CompensationFte,
-                        request.CompensationNotes)
-                    : null),
+                terms.Compensation),
             cancellationToken);
 
         if (appointmentResult.IsFailure)
@@ -235,6 +238,102 @@ internal sealed class AppointInternalCandidateHandler(
             appointment.IsApplied,
             appointment.CompensationId,
             InternalAppointmentStatus.Completed.ToString()));
+    }
+
+    internal const string RevisedOfferRequiredMessage =
+        "This differs from the terms the employee accepted. Make a revised offer and obtain a fresh acceptance before appointing.";
+
+    private sealed record ResolvedTerms(
+        Guid? ManagerId,
+        bool NoManager,
+        DateOnly? EffectiveDate,
+        InternalAppointmentCompensation? Compensation,
+        Error? Error);
+
+    private static ResolvedTerms ResolveAcceptedTerms(
+        Application application,
+        AppointInternalCandidateRequest request,
+        Guid employeeId)
+    {
+        static ResolvedTerms Invalid(string message) => new(null, false, null, null, Error.Validation(message));
+
+        var effectiveDate = request.EffectiveDate ?? application.OfferedStartDate;
+        if (request.EffectiveDate is { } requestedDate
+            && application.OfferedStartDate is { } acceptedDate
+            && requestedDate != acceptedDate)
+            return Invalid($"The effective date {RevisedOfferRequiredMessage}");
+
+        Guid? managerId;
+        bool noManager;
+
+        if (application.HasManagerDecision)
+        {
+            var requestedManager = request.NoManager || request.ManagerId is not null;
+            if (requestedManager
+                && (request.NoManager != application.OfferNoManager
+                    || (!request.NoManager && request.ManagerId != application.OfferProposedManagerId)))
+                return Invalid($"The manager {RevisedOfferRequiredMessage}");
+
+            noManager = application.OfferNoManager;
+            managerId = application.OfferNoManager ? null : application.OfferProposedManagerId;
+        }
+        else
+        {
+            if (!request.NoManager && request.ManagerId is null)
+                return Invalid("Select a manager, or choose 'No manager'.");
+
+            noManager = request.NoManager;
+            managerId = request.ManagerId;
+        }
+
+        if (!noManager && managerId == employeeId)
+            return Invalid("An employee cannot be their own manager.");
+
+        InternalAppointmentCompensation? compensation = null;
+
+        var offerHasCompensation = application.OfferedSalary is not null
+            && application.OfferedSalaryFrequency is not null
+            && !string.IsNullOrWhiteSpace(application.OfferCurrency);
+
+        if (offerHasCompensation)
+        {
+            var frequency = application.OfferedSalaryFrequency!.Value.ToString();
+
+            if (request.CreateCompensationChange)
+            {
+                var differs =
+                    !string.Equals(request.CompensationSalaryType, frequency, StringComparison.OrdinalIgnoreCase)
+                    || request.CompensationSalary != application.OfferedSalary
+                    || !string.Equals(request.CompensationCurrency, application.OfferCurrency, StringComparison.OrdinalIgnoreCase)
+                    || (request.CompensationHoursPerWeek is not null && application.OfferHoursPerWeek is not null
+                        && request.CompensationHoursPerWeek != application.OfferHoursPerWeek)
+                    || (request.CompensationFte is not null && application.OfferFte is not null
+                        && request.CompensationFte != application.OfferFte);
+
+                if (differs)
+                    return Invalid($"The compensation {RevisedOfferRequiredMessage}");
+            }
+
+            compensation = new InternalAppointmentCompensation(
+                frequency,
+                application.OfferedSalary!.Value,
+                application.OfferCurrency!,
+                request.CompensationHoursPerWeek ?? application.OfferHoursPerWeek,
+                request.CompensationFte ?? application.OfferFte,
+                request.CompensationNotes);
+        }
+        else if (request.CreateCompensationChange)
+        {
+            compensation = new InternalAppointmentCompensation(
+                request.CompensationSalaryType!,
+                request.CompensationSalary!.Value,
+                request.CompensationCurrency!,
+                request.CompensationHoursPerWeek,
+                request.CompensationFte,
+                request.CompensationNotes);
+        }
+
+        return new ResolvedTerms(managerId, noManager, effectiveDate, compensation, null);
     }
 
     private static string BuildReason(string roleTitle)

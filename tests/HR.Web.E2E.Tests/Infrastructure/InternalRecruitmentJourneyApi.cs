@@ -172,21 +172,17 @@ internal static class InternalRecruitmentJourneyApi
     }
 
     public static Task<HttpResponseMessage> PostAppointAsync(
-        HttpClient appointerApi, Guid companyId, Guid vacancyId, Guid applicationId, Guid? managerId)
-    {
-        var today = DateOnly.FromDateTime(DateTime.Today).ToString("yyyy-MM-dd");
-        return appointerApi.PostAsJsonAsync(
+        HttpClient appointerApi, Guid companyId, Guid vacancyId, Guid applicationId, Guid? managerId = null) =>
+        appointerApi.PostAsJsonAsync(
             $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/appoint",
             new
             {
                 companyId,
                 vacancyId,
                 applicationId,
-                effectiveDate = today,
                 managerId,
-                noManager = managerId is null,
+                noManager = false,
             });
-    }
 
     public static async Task<HttpResponseMessage> PostNewCandidateApplicationAsync(
         HttpClient recruiterApi, Guid companyId, Guid vacancyId, string lastName)

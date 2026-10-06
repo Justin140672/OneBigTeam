@@ -1,4 +1,5 @@
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
@@ -6,7 +7,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace HR.Modules.Recruitment.Features.WithdrawApplication;
 
-internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock clock, IAuditEventPublisher auditPublisher)
+internal sealed class WithdrawApplicationHandler(
+    RecruitmentDbContext db,
+    IClock clock,
+    IAuditEventPublisher auditPublisher,
+    InternalOfferTaskEffectsService? internalOfferEffects = null)
 {
     public async Task<Result<WithdrawApplicationResponse>> HandleAsync(
         WithdrawApplicationRequest request,
@@ -121,6 +126,9 @@ internal sealed class WithdrawApplicationHandler(RecruitmentDbContext db, IClock
                 performedBy,
                 now),
             cancellationToken);
+
+        if (internalOfferEffects is not null)
+            await internalOfferEffects.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
 
         return Result.Success(response);
     }

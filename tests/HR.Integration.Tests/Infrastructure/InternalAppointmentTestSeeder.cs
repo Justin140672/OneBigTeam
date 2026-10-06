@@ -151,9 +151,10 @@ internal static class InternalAppointmentTestSeeder
         ApiWebApplicationFactory factory,
         Guid companyId,
         ApplicationSource source = ApplicationSource.Internal,
-        DateOnly? offeredStartDate = null)
+        DateOnly? offeredStartDate = null,
+        Guid? employeeId = null)
     {
-        var world = await SeedEmployeesAsync(factory, companyId);
+        var world = await SeedEmployeesAsync(factory, companyId, employeeId);
         var (vacancyId, stages) = await SeedVacancyAsync(factory, world);
 
         using var scope = factory.Services.CreateScope();
@@ -184,6 +185,43 @@ internal static class InternalAppointmentTestSeeder
         await db.SaveChangesAsync();
 
         return new Scenario(world, vacancyId, candidate.Id, application.Id, interview.Id, cvReview.Id, offer.Id, hired.Id);
+    }
+
+    public static async Task<Scenario> SeedUnofferedAsync(ApiWebApplicationFactory factory, Guid companyId)
+    {
+        var employeeUserId = Guid.NewGuid();
+        await TestRoleSeeder.AssignRoleAsync(factory, employeeUserId, SystemRoles.Employee, companyId);
+
+        var world = await SeedEmployeesAsync(factory, companyId, employeeUserId);
+        var (vacancyId, stages) = await SeedVacancyAsync(factory, world);
+
+        var cvReview = stages.Single(s => s.Name == "CV Review");
+        var offer = stages.Single(s => s.Name == "Offer");
+        var hired = stages.Single(s => s.TerminalOutcome == RecruitmentStageTerminalOutcome.Hired);
+        var now = DateTimeOffset.UtcNow;
+
+        Guid candidateId;
+        Guid applicationId;
+        using (var scope = factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<RecruitmentDbContext>();
+
+            var candidate = Candidate.CreateForEmployee(
+                Guid.NewGuid(), companyId, world.EmployeeId, "Priya", "Shah", world.WorkEmail, null, now.AddDays(-14));
+            var application = Application.Create(
+                Guid.NewGuid(), companyId, vacancyId, candidate.Id, cvReview.Id, null, now.AddDays(-14), ApplicationSource.Internal);
+
+            db.Candidates.Add(candidate);
+            db.Applications.Add(application);
+            await db.SaveChangesAsync();
+
+            candidateId = candidate.Id;
+            applicationId = application.Id;
+        }
+
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(factory, companyId, applicationId);
+
+        return new Scenario(world, vacancyId, candidateId, applicationId, Guid.Empty, cvReview.Id, offer.Id, hired.Id);
     }
 
     public static async Task<int> CountEmployeesAsync(ApiWebApplicationFactory factory, Guid companyId)

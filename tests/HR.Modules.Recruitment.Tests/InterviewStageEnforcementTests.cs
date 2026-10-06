@@ -390,7 +390,7 @@ public class InterviewStageEnforcementTests
             new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()));
 
     private static OfferCandidateHandler OfferHandler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader(),
+        OfferHandlerFactory.Create(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader(),
             new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()),
             new FakeCompanyRecruitmentSettingsReader(), new FakeAuditPublisher());
 

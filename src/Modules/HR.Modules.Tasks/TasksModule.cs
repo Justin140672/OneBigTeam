@@ -80,6 +80,7 @@ public static class TasksModule
         services.AddScoped<ITaskCompletionAction, AssetTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, AssetReturnTaskCompletionAction>();
         services.AddScoped<ITaskCompletionAction, InterviewFeedbackTaskCompletionAction>();
+        services.AddScoped<ITaskCompletionAction, InternalOfferTaskCompletionAction>();
         services.AddScoped<IIntegrationEventHandler<LeaveRequestedIntegrationEvent>, LeaveRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, SicknessEvidenceRequestedHandler>();
         services.AddScoped<IIntegrationEventHandler<SicknessEvidenceRequestedIntegrationEvent>, NotifyHrOfFitNoteThresholdHandler>();

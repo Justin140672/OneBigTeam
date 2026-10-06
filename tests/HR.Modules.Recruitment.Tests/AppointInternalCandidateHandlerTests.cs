@@ -70,7 +70,8 @@ public class AppointInternalCandidateHandlerTests
         EmployeeApplicantEmploymentState employmentState = EmployeeApplicantEmploymentState.Active,
         bool linkCandidateToEmployee = true,
         ApplicationSource? source = ApplicationSource.Internal,
-        string? advertTitle = "Engineering Manager")
+        string? advertTitle = "Engineering Manager",
+        bool acceptedOffer = true)
     {
         var db = BuildContext();
         var companyId = Guid.NewGuid();
@@ -89,6 +90,12 @@ public class AppointInternalCandidateHandlerTests
         var application = Application.Create(
             Guid.NewGuid(), companyId, vacancy.Id, candidate.Id,
             (stage ?? (s => s.Offer))(stages).Id, null, Now.AddDays(-20), source);
+        if (acceptedOffer)
+        {
+            application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, null, new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
+            application.RespondToOffer(OfferResponseStatus.Accepted, Now.AddDays(-2));
+        }
+
         db.Candidates.Add(candidate);
         db.Applications.Add(application);
 
@@ -350,7 +357,10 @@ public class AppointInternalCandidateHandlerTests
     {
         var offeredStart = new DateOnly(2026, 11, 2);
         var h = await SeedAsync(configure: (a, _) =>
-            a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, offeredStart, new DateOnly(2026, 9, 20), null, Now.AddDays(-6)));
+        {
+            a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, offeredStart, new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
+            a.RespondToOffer(OfferResponseStatus.Accepted, Now.AddDays(-2));
+        });
 
         var result = await h.Handler().HandleAsync(
             h.Request() with { EffectiveDate = null }, Guid.NewGuid(), CancellationToken.None);
@@ -361,15 +371,18 @@ public class AppointInternalCandidateHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Prefers_Supplied_Effective_Date_Over_Offered_Start_Date()
+    public async Task HandleAsync_Requires_Revised_Offer_When_Supplied_Effective_Date_Differs_From_Accepted_Date()
     {
         var h = await SeedAsync(configure: (a, _) =>
-            a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 11, 2), new DateOnly(2026, 9, 20), null, Now.AddDays(-6)));
+        {
+            a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, new DateOnly(2026, 11, 2), new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
+            a.RespondToOffer(OfferResponseStatus.Accepted, Now.AddDays(-2));
+        });
 
         var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);
 
-        Assert.True(result.IsSuccess);
-        Assert.Equal(EffectiveDate, Assert.Single(h.Service.AppointRequests).EffectiveDate);
+        await AssertRefusedUntouchedAsync(h, result, "validation");
+        Assert.Contains("revised offer", result.Error.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -488,16 +501,13 @@ public class AppointInternalCandidateHandlerTests
         await AssertRefusedUntouchedAsync(h, result, "validation");
     }
 
-    [Theory]
-    [InlineData("Accepted")]
-    [InlineData("AwaitingResponse")]
-    public async Task HandleAsync_Succeeds_When_Offer_Accepted_Or_Awaiting_Response(string response)
+    [Fact]
+    public async Task HandleAsync_Succeeds_When_Offer_Accepted()
     {
         var h = await SeedAsync(configure: (a, _) =>
         {
             a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, EffectiveDate, new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
-            if (response != "AwaitingResponse")
-                a.RespondToOffer(Enum.Parse<OfferResponseStatus>(response), Now.AddDays(-2));
+            a.RespondToOffer(OfferResponseStatus.Accepted, Now.AddDays(-2));
         });
 
         var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);
@@ -506,7 +516,29 @@ public class AppointInternalCandidateHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_Succeeds_When_No_Offer_Recorded_From_A_Non_Offer_Stage()
+    public async Task HandleAsync_Returns_Validation_When_Offer_Awaiting_Response()
+    {
+        var h = await SeedAsync(configure: (a, _) =>
+            a.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, EffectiveDate, new DateOnly(2026, 9, 20), null, Now.AddDays(-6)));
+
+        var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);
+
+        await AssertRefusedUntouchedAsync(h, result, "validation");
+        Assert.Contains("awaiting", result.Error.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Returns_Validation_When_No_Offer_Recorded()
+    {
+        var h = await SeedAsync(acceptedOffer: false);
+
+        var result = await h.Handler().HandleAsync(h.Request(), Guid.NewGuid(), CancellationToken.None);
+
+        await AssertRefusedUntouchedAsync(h, result, "validation");
+    }
+
+    [Fact]
+    public async Task HandleAsync_Succeeds_From_A_Non_Offer_Stage_When_Offer_Accepted()
     {
         var h = await SeedAsync(stage: s => s.Interview);
 

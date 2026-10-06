@@ -13,7 +13,8 @@ internal sealed class RejectCandidateHandler(
     RecruitmentDbContext db,
     IClock clock,
     RecruitmentStageChangeRecorder recorder,
-    InterviewTaskCleanupService cleanupService)
+    InterviewTaskCleanupService cleanupService,
+    InternalOfferTaskEffectsService? internalOfferEffects = null)
 {
     public async Task<Result<RejectCandidateResponse>> HandleAsync(
         RejectCandidateRequest request,
@@ -154,6 +155,9 @@ internal sealed class RejectCandidateHandler(
             await cleanupService.RunAsync(cleanup, cancellationToken);
 
         await recorder.PublishStageChangedEventsAsync(application, previousStageId, performedBy, now, cancellationToken);
+
+        if (internalOfferEffects is not null)
+            await internalOfferEffects.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
 
         return Result.Success(response);
     }

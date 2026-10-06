@@ -29,7 +29,8 @@ public record ApplicationListItemModel(
     bool HasNextInterviewStage = false,
     Guid? NextInterviewStageId = null,
     string? NextInterviewStageName = null,
-    bool AllRequiredInterviewStagesPassed = true) : IKanbanActionSource;
+    bool AllRequiredInterviewStagesPassed = true,
+    ApplicationOfferTermsModel? OfferTerms = null) : IKanbanActionSource;
 
 
 public record GetApplicationResponse(
@@ -88,7 +89,8 @@ public record GetApplicationResponse(
     bool HasNextInterviewStage = false,
     Guid? NextInterviewStageId = null,
     string? NextInterviewStageName = null,
-    bool AllRequiredInterviewStagesPassed = true) : IKanbanActionSource;
+    bool AllRequiredInterviewStagesPassed = true,
+    ApplicationOfferTermsModel? OfferTerms = null) : IKanbanActionSource;
 
 // ── INTERNAL RECRUITMENT TICKET 1: SUBMITTED CV ──────────────────────────────
 
@@ -243,7 +245,13 @@ public record OfferCandidateRequest(
     string? OfferedSalaryFrequency = null,
     DateOnly? ProposedStartDate = null,
     DateOnly? OfferDate = null,
-    string? OfferNotes = null);
+    string? OfferNotes = null,
+    Guid? ProposedManagerId = null,
+    bool NoManager = false,
+    string? Currency = null,
+    decimal? HoursPerWeek = null,
+    decimal? Fte = null,
+    DateOnly? ResponseDeadline = null);
 
 public record OfferCandidateResponse(
     Guid Id,
@@ -423,3 +431,56 @@ public static class ApplicationTypeFilterExtensions
         _ => null,
     };
 }
+
+// Mirrors HR.Modules.Recruitment.Services.OfferTermsView: the snapshot of the terms presented in an offer.
+public record ApplicationOfferTermsModel(
+    int OfferVersion,
+    string? OfferResponseStatus,
+    Guid? PositionProfileId,
+    string? JobTitle,
+    Guid? DepartmentId,
+    string? DepartmentName,
+    Guid? LocationId,
+    string? LocationName,
+    Guid? EmploymentTypeId,
+    string? EmploymentTypeName,
+    Guid? ProposedManagerId,
+    string? ProposedManagerName,
+    bool NoManager,
+    decimal? Salary,
+    string? SalaryFrequency,
+    string? Currency,
+    DateOnly? ProposedStartDate,
+    string[] WorkingDays,
+    decimal? HoursPerDay,
+    decimal? HoursPerWeek,
+    decimal? Fte,
+    int? ProbationMonths,
+    DateOnly? OfferDate,
+    DateOnly? ResponseDeadline,
+    string? OfferNotes,
+    DateTimeOffset? OfferMadeAt,
+    DateTimeOffset? OfferRespondedAt,
+    Guid? RespondedByUserId,
+    string? ResponseChannel,
+    string? ResponseReason,
+    bool IsSnapshotComplete);
+
+public record InternalOfferDetailsModel(
+    Guid ApplicationId,
+    Guid VacancyId,
+    bool IsOfferRecipient,
+    bool CanRespond,
+    string? CannotRespondReason,
+    ApplicationOfferTermsModel Terms,
+    IReadOnlyList<string> InternalAppointmentNotices);
+
+public record RespondToInternalOfferRequest(string Decision, int OfferVersion, string? Reason);
+
+public record RespondToInternalOfferResult(
+    Guid ApplicationId,
+    Guid VacancyId,
+    int OfferVersion,
+    string OfferResponseStatus,
+    DateTimeOffset? OfferRespondedAt,
+    bool WasAlreadyRecorded);

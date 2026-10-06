@@ -1,0 +1,255 @@
+@page "/companies/{CompanyId:guid}/internal-offers/{ApplicationId:guid}"
+@rendermode InteractiveServer
+@using System.Globalization
+@inject AppSession Session
+@inject NavigationManager Navigation
+@inject ApplicationService ApplicationService
+
+<PageTitle>Internal job offer</PageTitle>
+
+<div class="container py-4" data-testid="internal-offer-review">
+    <BackButton />
+    <h1 class="mb-1">Internal job offer</h1>
+
+    @if (_loading)
+    {
+        <HrLoadingIndicator Label="Loading your offer…" />
+    }
+    else if (_offer is null)
+    {
+        <div class="alert alert-warning mt-3" role="alert" data-testid="internal-offer-unavailable">
+            This offer could not be found. It may have been withdrawn or you may not have access to it.
+        </div>
+    }
+    else
+    {
+        var terms = _offer.Terms;
+
+        <p class="text-muted mb-3" data-testid="internal-offer-status">
+            Version @terms.OfferVersion &middot; Status: <strong>@StatusLabel(terms.OfferResponseStatus)</strong>
+        </p>
+
+        <div class="alert alert-info" data-testid="internal-offer-notices">
+            <ul class="mb-0">
+                @foreach (var notice in _offer.InternalAppointmentNotices)
+                {
+                    <li>@notice</li>
+                }
+            </ul>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-medium">Offered role</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Job title</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-job-title">@Show(terms.JobTitle)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Department</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-department">@Show(terms.DepartmentName)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Location</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-location">@Show(terms.LocationName)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Employment type</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-employment-type">@Show(terms.EmploymentTypeName)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Proposed manager</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-manager">@ManagerText(terms)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Effective date</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-effective-date">@ShowDate(terms.ProposedStartDate)</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-medium">Pay and working pattern</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Salary</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-salary">@SalaryText(terms)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Working days</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-working-days">@(terms.WorkingDays.Length == 0 ? "Not specified" : string.Join(", ", terms.WorkingDays))</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Hours per day</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-hours-per-day">@ShowNumber(terms.HoursPerDay)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Hours per week</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-hours-per-week">@ShowNumber(terms.HoursPerWeek)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">FTE</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-fte">@ShowNumber(terms.Fte)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Probation period</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-probation">@(terms.ProbationMonths is { } months ? $"{months} month(s)" : "Not applicable")</dd>
+                </dl>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-medium">Offer details</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted fw-normal">Offer date</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-offer-date">@ShowDate(terms.OfferDate)</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Respond by</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-response-deadline">@(terms.ResponseDeadline is null ? "No deadline" : ShowDate(terms.ResponseDeadline))</dd>
+
+                    <dt class="col-sm-4 text-muted fw-normal">Notes</dt>
+                    <dd class="col-sm-8" data-testid="offer-terms-notes">@Show(terms.OfferNotes)</dd>
+
+                    @if (terms.OfferRespondedAt is { } respondedAt)
+                    {
+                        <dt class="col-sm-4 text-muted fw-normal">Responded</dt>
+                        <dd class="col-sm-8" data-testid="offer-terms-responded-at">@respondedAt.ToLocalTime().ToString("d MMM yyyy HH:mm", CultureInfo.CurrentCulture)</dd>
+                    }
+                </dl>
+            </div>
+        </div>
+
+        @if (_message is not null)
+        {
+            <div class="alert alert-success" role="status" data-testid="internal-offer-message">@_message</div>
+        }
+
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert" data-testid="internal-offer-error">@_error</div>
+        }
+
+        @if (_offer.CanRespond)
+        {
+            @if (!_declining)
+            {
+                <div class="d-flex gap-2" data-testid="internal-offer-actions">
+                    <SfButton IsPrimary="true" Disabled="@(_submitting || Session.IsReadOnly)" OnClick="AcceptAsync" data-testid="internal-offer-accept">
+                        @if (_submitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Accept offer
+                    </SfButton>
+                    <SfButton Disabled="@(_submitting || Session.IsReadOnly)" OnClick="() => _declining = true" data-testid="internal-offer-decline">Decline offer</SfButton>
+                </div>
+            }
+            else
+            {
+                <div class="card" data-testid="internal-offer-decline-panel">
+                    <div class="card-body">
+                        <HrTextField Label="Reason for declining (optional)" Id="internal-offer-decline-reason"
+                                     @bind-Value="_declineReason" Multiline="true" Rows="3"
+                                     HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "internal-offer-decline-reason", ["maxlength"] = "1000" })" />
+                        <div class="d-flex gap-2 mt-3">
+                            <SfButton Disabled="@(_submitting || Session.IsReadOnly)" OnClick="DeclineAsync" data-testid="internal-offer-decline-confirm">
+                                @if (_submitting)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                                }
+                                Confirm decline
+                            </SfButton>
+                            <SfButton Disabled="_submitting" OnClick="() => _declining = false" data-testid="internal-offer-decline-cancel">Cancel</SfButton>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+        else if (_offer.IsOfferRecipient && _offer.CannotRespondReason is not null)
+        {
+            <div class="alert alert-secondary" data-testid="internal-offer-cannot-respond">@_offer.CannotRespondReason</div>
+        }
+    }
+</div>
+
+@code {
+    [Parameter] public Guid CompanyId { get; set; }
+    [Parameter] public Guid ApplicationId { get; set; }
+
+    private bool _loading = true;
+    private bool _submitting;
+    private bool _declining;
+    private string? _declineReason;
+    private string? _error;
+    private string? _message;
+    private InternalOfferDetailsModel? _offer;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await Session.InitialiseAsync();
+
+        if (Session.CompanyId != CompanyId)
+        {
+            Navigation.NavigateTo("/", replace: true);
+            return;
+        }
+
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _offer = await ApplicationService.GetInternalOfferAsync(CompanyId, ApplicationId);
+        _loading = false;
+    }
+
+    private Task AcceptAsync() => RespondAsync("Accept", null, "You have accepted this offer. The recruitment team has been notified.");
+
+    private Task DeclineAsync() => RespondAsync("Decline", string.IsNullOrWhiteSpace(_declineReason) ? null : _declineReason.Trim(), "You have declined this offer. The recruitment team has been notified.");
+
+    private async Task RespondAsync(string decision, string? reason, string successMessage)
+    {
+        if (_submitting || _offer is null)
+            return;
+
+        _submitting = true;
+        _error = null;
+        _message = null;
+
+        try
+        {
+            var (result, error) = await ApplicationService.RespondToInternalOfferAsync(
+                CompanyId, ApplicationId, new RespondToInternalOfferRequest(decision, _offer.Terms.OfferVersion, reason));
+
+            if (result is null)
+            {
+                _error = error;
+                await LoadAsync();
+                return;
+            }
+
+            _declining = false;
+            _message = successMessage;
+            await LoadAsync();
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    private static string StatusLabel(string? status) => status switch
+    {
+        "AwaitingResponse" => "Awaiting your response",
+        "Accepted" => "Accepted",
+        "Declined" => "Declined",
+        "Withdrawn" => "Withdrawn",
+        _ => status ?? "-",
+    };
+
+    private static string Show(string? value) => string.IsNullOrWhiteSpace(value) ? "Not specified" : value;
+
+    private static string ShowDate(DateOnly? value) => value?.ToString("d MMM yyyy", CultureInfo.CurrentCulture) ?? "Not specified";
+
+    private static string ShowNumber(decimal? value) => value is null ? "Not specified" : value.Value.ToString("0.##", CultureInfo.CurrentCulture);
+
+    private static string ManagerText(ApplicationOfferTermsModel terms) =>
+        terms.NoManager ? "No manager" : string.IsNullOrWhiteSpace(terms.ProposedManagerName) ? "Not specified" : terms.ProposedManagerName;
+
+    private static string SalaryText(ApplicationOfferTermsModel terms) =>
+        terms.Salary is null
+            ? "Not specified"
+            : $"{terms.Currency} {terms.Salary.Value.ToString("N2", CultureInfo.CurrentCulture)} ({(terms.SalaryFrequency ?? "").ToLowerInvariant()})";
+}

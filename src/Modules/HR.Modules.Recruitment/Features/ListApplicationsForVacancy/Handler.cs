@@ -48,6 +48,7 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 InternalEmployeeId = x.a.Source == Domain.ApplicationSource.Internal ? x.c.EmployeeId : null,
                 x.a.AppointmentStatus,
                 x.a.AppointmentEffectiveDate,
+                Offer = x.a,
             })
             .ToListAsync(cancellationToken);
 
@@ -78,7 +79,8 @@ internal sealed class ListApplicationsForVacancyHandler(RecruitmentDbContext db)
                 states.GetValueOrDefault(r.Id)?.HasNextInterviewStage ?? false,
                 states.GetValueOrDefault(r.Id)?.NextInterviewStageId,
                 states.GetValueOrDefault(r.Id)?.NextInterviewStageName,
-                states.GetValueOrDefault(r.Id)?.AllRequiredInterviewStagesPassed ?? true))
+                states.GetValueOrDefault(r.Id)?.AllRequiredInterviewStagesPassed ?? true,
+                r.IsInternal && r.OfferResponseStatus is not null ? OfferTermsView.From(r.Offer) : null))
             .ToList();
 
         return Result.Success(new ListApplicationsForVacancyResponse(items));

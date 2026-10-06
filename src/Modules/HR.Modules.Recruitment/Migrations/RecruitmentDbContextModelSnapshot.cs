@@ -113,27 +113,138 @@ namespace HR.Modules.Recruitment.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("offer_approved_by_user_id");
 
+                    b.Property<string>("OfferCurrency")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("offer_currency");
+
                     b.Property<DateOnly?>("OfferDate")
                         .HasColumnType("date")
                         .HasColumnName("offer_date");
 
+                    b.Property<Guid?>("OfferDepartmentId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_department_id");
+
+                    b.Property<string>("OfferDepartmentName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("offer_department_name");
+
+                    b.Property<Guid?>("OfferEmploymentTypeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_employment_type_id");
+
+                    b.Property<string>("OfferEmploymentTypeName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("offer_employment_type_name");
+
+                    b.Property<decimal?>("OfferFte")
+                        .HasPrecision(4, 3)
+                        .HasColumnType("numeric(4,3)")
+                        .HasColumnName("offer_fte");
+
+                    b.Property<decimal?>("OfferHoursPerDay")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("offer_hours_per_day");
+
+                    b.Property<decimal?>("OfferHoursPerWeek")
+                        .HasPrecision(5, 2)
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("offer_hours_per_week");
+
+                    b.Property<string>("OfferJobTitle")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("offer_job_title");
+
+                    b.Property<Guid?>("OfferLocationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_location_id");
+
+                    b.Property<string>("OfferLocationName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("offer_location_name");
+
                     b.Property<DateTimeOffset?>("OfferMadeAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("offer_made_at");
+
+                    b.Property<Guid?>("OfferMadeByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_made_by_user_id");
+
+                    b.Property<bool>("OfferNoManager")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("offer_no_manager");
 
                     b.Property<string>("OfferNotes")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("offer_notes");
 
+                    b.Property<Guid?>("OfferPositionProfileId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_position_profile_id");
+
+                    b.Property<int?>("OfferProbationMonths")
+                        .HasColumnType("integer")
+                        .HasColumnName("offer_probation_months");
+
+                    b.Property<Guid?>("OfferProposedManagerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_proposed_manager_id");
+
+                    b.Property<string>("OfferProposedManagerName")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("offer_proposed_manager_name");
+
                     b.Property<DateTimeOffset?>("OfferRespondedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("offer_responded_at");
+
+                    b.Property<Guid?>("OfferRespondedByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("offer_responded_by_user_id");
+
+                    b.Property<string>("OfferResponseChannel")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("offer_response_channel");
+
+                    b.Property<DateOnly?>("OfferResponseDeadline")
+                        .HasColumnType("date")
+                        .HasColumnName("offer_response_deadline");
+
+                    b.Property<string>("OfferResponseReason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("offer_response_reason");
 
                     b.Property<string>("OfferResponseStatus")
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)")
                         .HasColumnName("offer_response_status");
+
+                    b.Property<DateTimeOffset?>("OfferTermsSnapshotAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("offer_terms_snapshot_at");
+
+                    b.Property<int>("OfferVersion")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("offer_version");
+
+                    b.Property<int?>("OfferWorkingDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("offer_working_days");
 
                     b.Property<decimal?>("OfferedSalary")
                         .HasPrecision(18, 2)
@@ -688,6 +799,85 @@ namespace HR.Modules.Recruitment.Migrations
                     b.HasIndex("CompanyId");
 
                     b.ToTable("external_recruiters", "recruitment");
+                });
+
+            modelBuilder.Entity("HR.Modules.Recruitment.Domain.InternalOfferTaskEffect", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("AttemptCount")
+                        .HasColumnType("integer")
+                        .HasColumnName("attempt_count");
+
+                    b.Property<DateTimeOffset?>("ClosedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("closed_at");
+
+                    b.Property<Guid>("CompanyId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("company_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EmployeeId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("employee_id");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<string>("JobTitle")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("job_title");
+
+                    b.Property<DateTimeOffset?>("LastAttemptAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_attempt_at");
+
+                    b.Property<Guid>("MadeByUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("made_by_user_id");
+
+                    b.Property<int>("OfferVersion")
+                        .HasColumnType("integer")
+                        .HasColumnName("offer_version");
+
+                    b.Property<DateOnly?>("ResponseDeadline")
+                        .HasColumnType("date")
+                        .HasColumnName("response_deadline");
+
+                    b.Property<DateTimeOffset?>("ResponseNotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("response_notified_at");
+
+                    b.Property<DateTimeOffset?>("TaskCreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("task_created_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("ix_internal_offer_task_effects_open")
+                        .HasFilter("closed_at IS NULL");
+
+                    b.HasIndex("ApplicationId", "OfferVersion")
+                        .IsUnique();
+
+                    b.HasIndex("CompanyId", "ApplicationId");
+
+                    b.ToTable("internal_offer_task_effects", "recruitment");
                 });
 
             modelBuilder.Entity("HR.Modules.Recruitment.Domain.Interview", b =>

@@ -135,10 +135,10 @@ public class AppointInternalCandidateEndpointTests
         var employeesBefore = await CountEmployeesAsync(_factory, companyId);
 
         Guid applicationId;
-        using (var employeeClient = _factory.CreateClient())
+        using var employeeClient = _factory.CreateClient();
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeUserId.ToString());
+        employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
         {
-            employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.UserHeader, employeeUserId.ToString());
-            employeeClient.DefaultRequestHeaders.Add(TestAuthHandler.TenantHeader, companyId.ToString());
             using var form = new MultipartFormDataContent();
             var bytes = new byte[2048];
             bytes[0] = 0x25; bytes[1] = 0x50; bytes[2] = 0x44; bytes[3] = 0x46;
@@ -152,7 +152,26 @@ public class AppointInternalCandidateEndpointTests
             applicationId = (await apply.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("applicationId").GetGuid();
         }
 
+        await PassedInterviewSeed.AddForAllInterviewStagesAsync(_factory, companyId, applicationId);
+
         using var client = await RecruiterHrClientAsync(_factory, companyId);
+        var offer = await client.PostAsJsonAsync(
+            $"/api/companies/{companyId}/vacancies/{vacancyId}/applications/{applicationId}/offer",
+            new
+            {
+                proposedStartDate = Today.ToString("yyyy-MM-dd"),
+                offeredSalary = 70000m,
+                offeredSalaryFrequency = "Annual",
+                currency = "GBP",
+                proposedManagerId = world.NewManagerId,
+            });
+        Assert.Equal(HttpStatusCode.OK, offer.StatusCode);
+
+        var accept = await employeeClient.PostAsJsonAsync(
+            $"/api/companies/{companyId}/internal-offers/{applicationId}/response",
+            new { decision = "Accept", offerVersion = 1 });
+        Assert.Equal(HttpStatusCode.OK, accept.StatusCode);
+
         var response = await client.PostAsJsonAsync(
             AppointUrl(companyId, vacancyId, applicationId),
             new { effectiveDate = Today.ToString("yyyy-MM-dd"), managerId = world.NewManagerId, noManager = false });
@@ -242,8 +261,8 @@ public class AppointInternalCandidateEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await RecruiterHrClientAsync(_factory, companyId);
-        var s = await SeedAsync(_factory, companyId);
         var effective = Today.AddDays(30);
+        var s = await SeedAsync(_factory, companyId, offeredStartDate: effective);
 
         var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s, effectiveDate: effective));
 
@@ -273,7 +292,7 @@ public class AppointInternalCandidateEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await RecruiterHrClientAsync(_factory, companyId);
-        var s = await SeedAsync(_factory, companyId);
+        var s = await SeedAsync(_factory, companyId, offeredStartDate: Today.AddDays(-7));
 
         var response = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s, effectiveDate: Today.AddDays(-7)));
 
@@ -346,7 +365,7 @@ public class AppointInternalCandidateEndpointTests
     {
         var companyId = Guid.NewGuid();
         using var client = await RecruiterHrClientAsync(_factory, companyId);
-        var s = await SeedAsync(_factory, companyId);
+        var s = await SeedAsync(_factory, companyId, offeredStartDate: Today.AddDays(14));
         var appoint = await client.PostAsJsonAsync(AppointUrl(s), AppointBody(s, effectiveDate: Today.AddDays(14)));
         Assert.Equal(HttpStatusCode.OK, appoint.StatusCode);
 
@@ -545,7 +564,6 @@ public class AppointInternalCandidateEndpointTests
 
     public static TheoryData<string> InvalidBodies => new()
     {
-        """{ "effectiveDate": "2026-10-01", "noManager": false }""",
         """{ "effectiveDate": "2026-10-01", "managerId": "3f2b8c1e-9d4a-4c55-8e1f-0a6b7c8d9e10", "noManager": true }""",
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true }""",
         """{ "effectiveDate": "2026-10-01", "noManager": true, "createCompensationChange": true, "compensationSalaryType": "Weekly", "compensationSalary": 50000, "compensationCurrency": "GBP" }""",
@@ -569,6 +587,24 @@ public class AppointInternalCandidateEndpointTests
         await AssertUntouchedAsync(s);
     }
 
+
+    [Fact]
+    public async Task Post_Appoint_Returns_BadRequest_For_Legacy_Offer_When_Neither_Manager_Nor_NoManager_Is_Supplied()
+    {
+        var companyId = Guid.NewGuid();
+        using var client = await RecruiterHrClientAsync(_factory, companyId);
+        var s = await SeedAsync(_factory, companyId);
+
+        var response = await client.PostAsJsonAsync(AppointUrl(s), new
+        {
+            effectiveDate = Today.ToString("yyyy-MM-dd"),
+            noManager = false,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("validation", (await response.Content.ReadFromJsonAsync<ProblemPayload>())!.Code);
+        await AssertUntouchedAsync(s);
+    }
 
     private async Task AssertUntouchedAsync(Scenario s)
     {

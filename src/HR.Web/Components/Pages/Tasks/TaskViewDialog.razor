@@ -103,6 +103,10 @@
                                                                         Task="_task"
                                                                         OnCompleted="OnActionCompletedAsync" />
                     }
+                    else if (_task.ActionType == "Approve" && _task.Source == "Recruitment")
+                    {
+                        <InternalOfferTaskPanel CompanyId="CompanyId" Task="_task" OnCompleted="OnActionCompletedAsync" />
+                    }
                     else if (_task.ActionType == "Return" && _task.Source == "Asset")
                     {
                         <AssetReturnTaskPanel CompanyId="CompanyId"

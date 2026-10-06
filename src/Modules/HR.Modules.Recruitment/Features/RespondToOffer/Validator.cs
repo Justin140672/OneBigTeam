@@ -18,6 +18,8 @@ internal sealed class RespondToOfferValidator : AbstractValidator<RespondToOffer
         RuleFor(r => r.VacancyId).NotEmpty();
         RuleFor(r => r.ApplicationId).NotEmpty();
 
+        RuleFor(r => r.Reason).MaximumLength(1000);
+
         RuleFor(r => r.Status)
             .NotEmpty()
             .Must(s => Enum.TryParse<OfferResponseStatus>(s, ignoreCase: true, out var parsed)

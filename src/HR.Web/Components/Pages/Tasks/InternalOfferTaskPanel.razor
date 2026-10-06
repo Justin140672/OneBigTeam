@@ -1,0 +1,24 @@
+@using HR.Web.Models
+@inject NavigationManager Navigation
+
+<div class="card" data-testid="internal-offer-task-panel">
+    <div class="card-header fw-medium">Internal job offer</div>
+    <div class="card-body">
+        <p class="mb-3">Review the full terms of your offer, then accept or decline it. This task closes when you respond.</p>
+        <SfButton IsPrimary="true" OnClick="OpenOffer" Disabled="@(Task.SourceEntityId is null)" data-testid="internal-offer-review-btn">
+            <i class="fa-solid fa-file-signature me-1"></i>Review offer
+        </SfButton>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public Guid CompanyId { get; set; }
+    [Parameter, EditorRequired] public TaskDetailModel Task { get; set; } = null!;
+    [Parameter] public EventCallback OnCompleted { get; set; }
+
+    private void OpenOffer()
+    {
+        if (Task.SourceEntityId is { } applicationId)
+            Navigation.NavigateTo($"/companies/{CompanyId}/internal-offers/{applicationId}");
+    }
+}

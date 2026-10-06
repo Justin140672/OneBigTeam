@@ -19,8 +19,8 @@ internal sealed class AppointInternalCandidateValidator : AbstractValidator<Appo
 
         RuleFor(r => r.ManagerId)
             .Must(id => id is { } managerId && managerId != Guid.Empty)
-            .When(r => !r.NoManager)
-            .WithMessage("Select a manager, or choose 'No manager'.");
+            .When(r => !r.NoManager && r.ManagerId.HasValue)
+            .WithMessage("Manager is invalid.");
 
         RuleFor(r => r.ManagerId)
             .Null()

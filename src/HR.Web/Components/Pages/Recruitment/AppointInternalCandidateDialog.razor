@@ -21,6 +21,19 @@
                     <div class="alert alert-info py-2" data-testid="appoint-existing-employee-notice">
                         @_appointCandidateName is an existing employee. Their existing employee record will be updated — no new employee will be created. Employee number, start date, continuous service and system access stay the same.
                     </div>
+                    @if (_accepted is not null)
+                    {
+                        <div class="alert alert-light border py-2" data-testid="appoint-accepted-terms">
+                            <div class="fw-semibold">Terms accepted by the employee (offer version @_accepted.OfferVersion)</div>
+                            <div data-testid="appoint-accepted-effective-date">Effective date: @(_accepted.ProposedStartDate?.ToString("d MMM yyyy") ?? "Not specified")</div>
+                            <div data-testid="appoint-accepted-manager">Manager: @(_accepted.NoManager ? "No manager" : _accepted.ProposedManagerName ?? "Not specified")</div>
+                            @if (_hasAcceptedCompensation)
+                            {
+                                <div data-testid="appoint-accepted-salary">Salary: @_accepted.Currency @_accepted.Salary?.ToString("N2") (@(_accepted.SalaryFrequency?.ToLowerInvariant()))</div>
+                            }
+                            <div class="text-muted small">Changing a material term requires a revised offer and a fresh acceptance.</div>
+                        </div>
+                    }
                     @if (_appointPending)
                     {
                         <div class="alert alert-warning py-2" data-testid="appoint-pending-notice">
@@ -78,11 +91,14 @@
                                                  ValueExpression="@(() => _appointModel.ConfirmBackdated)" />
                             </div>
                         }
+                        @if (!_hasAcceptedCompensation)
+                        {
                         <div class="col-12" data-testid="appoint-change-compensation">
                             <HrCheckBoxField Label="Change compensation" Id="appoint-change-compensation-input"
                                              @bind-Checked="_appointModel.ChangeCompensation" />
                         </div>
-                        @if (_appointModel.ChangeCompensation)
+                        }
+                        @if (_appointModel.ChangeCompensation && !_hasAcceptedCompensation)
                         {
                             <div class="col-md-4">
                                 <HrNumericField TValue="decimal?" Label="Salary" Required="true" Id="appoint-salary"
@@ -160,6 +176,8 @@
     private SfDropDownList<Guid?, ManagerOption> _appointManagerDropdown = default!;
     private List<ManagerOption> _appointManagerOptions = [];
     private Guid? _appointEmployeeId;
+    private ApplicationOfferTermsModel? _accepted;
+    private bool _hasAcceptedCompensation;
     private static readonly string[] _appointSalaryTypeOptions = ["Annual", "Hourly", "Daily"];
 
     private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
@@ -234,8 +252,10 @@
 
     public async Task OpenAsync(
         Guid applicationId, string candidateName, Guid? employeeId, string? appointmentStatus,
-        DateOnly? offeredStartDate, decimal? offeredSalary)
+        DateOnly? offeredStartDate, decimal? offeredSalary, ApplicationOfferTermsModel? acceptedTerms = null)
     {
+        _accepted = acceptedTerms is { IsSnapshotComplete: true } ? acceptedTerms : null;
+        _hasAcceptedCompensation = _accepted is { Salary: not null, Currency: not null };
         _error = null;
         _appointing = false;
         _applicationId = applicationId;
@@ -283,7 +303,22 @@
         _appointManagerOptions = BuildAppointManagerOptions((await managerTask)?.Items);
 
         _appointModel.ManagerId = NoManagerOption.Id;
-        if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
+        if (_accepted is not null)
+        {
+            _appointModel.EffectiveDate = _accepted.ProposedStartDate ?? _appointModel.EffectiveDate;
+
+            if (_accepted.NoManager)
+            {
+                _appointModel.ManagerId = NoManagerOption.Id;
+            }
+            else if (_accepted.ProposedManagerId is Guid acceptedManagerId)
+            {
+                if (_appointManagerOptions.All(o => o.Id != acceptedManagerId))
+                    _appointManagerOptions.Insert(1, new ManagerOption(acceptedManagerId, _accepted.ProposedManagerName ?? "Proposed manager"));
+                _appointModel.ManagerId = acceptedManagerId;
+            }
+        }
+        else if (vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _appointEmployeeId)
         {
             if (_appointManagerOptions.Any(o => o.Id == vacancy.HiringManagerId))
             {

@@ -585,14 +585,27 @@ public class OfferCandidateHandlerTests
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, Guid.NewGuid(), "Senior Software Engineer", null, Guid.NewGuid(), Now);
         var stages = RecruitmentStageTestData.AddDefaultStages(db, companyId, Now);
         db.Vacancies.Add(vacancy);
-        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, Guid.NewGuid(), Now);
+        var employeeId = Guid.NewGuid();
+        var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Interview.Id, employeeId, Now);
         db.Interviews.Add(RecruitmentStageTestData.PassedInterview(companyId, application.Id, stages.Interview.Id, Now));
         await db.SaveChangesAsync();
 
-        var result = await handler(db).HandleAsync(
-            new OfferCandidateRequest { CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id, OfferedSalary = 55000m, OfferedSalaryFrequency = "Annual" },
-            Guid.NewGuid(),
-            CancellationToken.None);
+        var wiring = InternalOfferWiring.For(db, new FakeClock(FixedUtcNow));
+        wiring.Applicants.Set(FakeEmployeeApplicantReader.Profile(companyId, employeeId));
+
+        var result = await OfferHandlerFactory.Create(
+                db, new FakeClock(FixedUtcNow), new FakePositionProfileReader(),
+                new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()),
+                new FakeCompanyRecruitmentSettingsReader(), new FakeAuditPublisher(), wiring)
+            .HandleAsync(
+                new OfferCandidateRequest
+                {
+                    CompanyId = companyId, VacancyId = vacancy.Id, ApplicationId = application.Id,
+                    OfferedSalary = 55000m, OfferedSalaryFrequency = "Annual",
+                    ProposedStartDate = new DateOnly(2026, 11, 1), NoManager = true, Currency = "GBP",
+                },
+                Guid.NewGuid(),
+                CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(stages.Offer.Id, result.Value!.CurrentStageId);
@@ -609,7 +622,7 @@ public class OfferCandidateHandlerTests
         FakeIntegrationEventPublisher? eventPublisher = null,
         FakeAuditPublisher? auditPublisher = null,
         FakeCompanyRecruitmentSettingsReader? recruitmentSettingsReader = null) =>
-        new(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(), auditPublisher ?? new FakeAuditPublisher());
+        OfferHandlerFactory.Create(db, new FakeClock(FixedUtcNow), positionProfileReader ?? new FakePositionProfileReader(), new RecruitmentStageChangeRecorder(db, eventPublisher ?? new FakeIntegrationEventPublisher(), auditPublisher ?? new FakeAuditPublisher()), recruitmentSettingsReader ?? new FakeCompanyRecruitmentSettingsReader(), auditPublisher ?? new FakeAuditPublisher());
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

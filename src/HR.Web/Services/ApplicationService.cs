@@ -262,6 +262,31 @@ public sealed class ApplicationService(HrApiHttpClientFactory httpClientFactory)
         return (null, await ReadErrorAsync(response, "Failed to record the offer response."));
     }
 
+    public async Task<InternalOfferDetailsModel?> GetInternalOfferAsync(Guid companyId, Guid applicationId)
+    {
+        try
+        {
+            return await Http.GetFromJsonAsync<InternalOfferDetailsModel>(
+                $"api/companies/{companyId}/internal-offers/{applicationId}", HrApiJsonOptions.Default);
+        }
+        catch (HttpRequestException)
+        {
+            return null;
+        }
+    }
+
+    public async Task<(RespondToInternalOfferResult? Result, string? Error)> RespondToInternalOfferAsync(
+        Guid companyId, Guid applicationId, RespondToInternalOfferRequest request)
+    {
+        var response = await Http.PostAsJsonAsync(
+            $"api/companies/{companyId}/internal-offers/{applicationId}/response", request, HrApiJsonOptions.Default);
+
+        if (response.IsSuccessStatusCode)
+            return (await response.Content.ReadFromJsonAsync<RespondToInternalOfferResult>(HrApiJsonOptions.Default), null);
+
+        return (null, await ReadErrorAsync(response, "Failed to record your response."));
+    }
+
     public async Task<(RejectCandidateResponse? Result, string? Error)> RejectCandidateAsync(
         Guid companyId, Guid vacancyId, Guid applicationId, string? rejectionReason)
     {

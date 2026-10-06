@@ -120,7 +120,8 @@ internal sealed record OfferDetailsRecordedAuditEvent(
     DateOnly OfferDate,
     DateOnly? ProposedStartDate,
     Guid PerformedByUserId,
-    DateTimeOffset OccurredAt) : IAuditEvent
+    DateTimeOffset OccurredAt,
+    int OfferVersion = 0) : IAuditEvent
 {
     string IAuditEvent.EventType => "offer.details_recorded";
     string IAuditEvent.EntityType => "Application";
@@ -131,7 +132,7 @@ internal sealed record OfferDetailsRecordedAuditEvent(
     string? IAuditEvent.Summary => "Offer details recorded";
     object? IAuditEvent.Before => null;
     object? IAuditEvent.After => new { OfferDate, ProposedStartDate, ResponseStatus = "AwaitingResponse" };
-    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId, OfferVersion };
 }
 
 // Ticket 2: published when an offer's response is recorded (Accepted / Declined / Withdrawn).
@@ -143,7 +144,9 @@ internal sealed record OfferResponseRecordedAuditEvent(
     string PreviousStatus,
     string NewStatus,
     Guid PerformedByUserId,
-    DateTimeOffset OccurredAt) : IAuditEvent
+    DateTimeOffset OccurredAt,
+    int OfferVersion = 0,
+    string? Channel = null) : IAuditEvent
 {
     string IAuditEvent.EventType => "offer.response_recorded";
     string IAuditEvent.EntityType => "Application";
@@ -154,7 +157,7 @@ internal sealed record OfferResponseRecordedAuditEvent(
     string? IAuditEvent.Summary => $"Offer response recorded as '{NewStatus}'";
     object? IAuditEvent.Before => new { ResponseStatus = PreviousStatus };
     object? IAuditEvent.After => new { ResponseStatus = NewStatus };
-    object? IAuditEvent.Metadata => new { VacancyId, CandidateId };
+    object? IAuditEvent.Metadata => new { VacancyId, CandidateId, OfferVersion, Channel };
 }
 
 internal sealed record CandidatesPurgedAuditEvent(

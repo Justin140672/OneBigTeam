@@ -379,7 +379,7 @@ public class ApplicationConcurrencyHandlerTests
 
 
     private static OfferCandidateHandler OfferHandler(RecruitmentDbContext db, FakeAuditPublisher? audit = null) =>
-        new(
+        OfferHandlerFactory.Create(
             db,
             new FakeClock(FixedUtcNow),
             new FakePositionProfileReader(),

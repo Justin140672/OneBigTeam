@@ -67,7 +67,8 @@ internal sealed record GetApplicationResponse(
     // Internal recruitment Ticket 7: internal appointment progress ("Pending" / "Completed"; null when
     // none started) and, once completed, the effective date of the employee change.
     string? InternalAppointmentStatus = null,
-    DateOnly? InternalAppointmentEffectiveDate = null);
+    DateOnly? InternalAppointmentEffectiveDate = null,
+    HR.Modules.Recruitment.Services.OfferTermsView? OfferTerms = null);
 
 internal sealed record ApplicationStageHistoryItem(
     Guid Id,

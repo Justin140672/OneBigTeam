@@ -173,6 +173,29 @@ public sealed class InternalAppointmentDialog(IPage page)
     public Task ExpectCompensationFieldsHiddenAsync() =>
         Assertions.Expect(Field("Salary")).ToHaveCountAsync(0, new() { Timeout = 10_000 });
 
+    private ILocator AcceptedTerms => Content.Locator("[data-testid='appoint-accepted-terms']");
+
+    public async Task ExpectAcceptedTermsAsync(DateOnly effectiveDate, string managerText, string salaryText)
+    {
+        await Assertions.Expect(AcceptedTerms).ToBeVisibleAsync(new() { Timeout = 10_000 });
+        await Assertions.Expect(AcceptedTerms.Locator("[data-testid='appoint-accepted-effective-date']"))
+            .ToContainTextAsync(DisplayDatePattern(effectiveDate), new() { Timeout = 10_000 });
+        await Assertions.Expect(AcceptedTerms.Locator("[data-testid='appoint-accepted-manager']"))
+            .ToContainTextAsync(managerText, new() { Timeout = 10_000 });
+        await Assertions.Expect(AcceptedTerms.Locator("[data-testid='appoint-accepted-salary']"))
+            .ToContainTextAsync(salaryText, new() { Timeout = 10_000 });
+    }
+
+    public async Task ExpectAcceptedTermsWithoutCompensationChangeAsync()
+    {
+        await Assertions.Expect(AcceptedTerms).ToBeVisibleAsync(new() { Timeout = 10_000 });
+        await Assertions.Expect(ChangeCompensationWrapper).ToHaveCountAsync(0, new() { Timeout = 10_000 });
+        await ExpectCompensationFieldsHiddenAsync();
+    }
+
+    public static Regex DisplayDatePattern(DateOnly date) =>
+        new($"\\b{date.Day} [A-Za-z]{{3,4}}\\.? {date.Year}\\b");
+
     public Task SelectSalaryTypeAsync(string salaryType) =>
         DropDownSelector.SelectAsync(page, SalaryTypeField, salaryType);
 

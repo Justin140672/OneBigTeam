@@ -155,7 +155,7 @@ public class RespondToOfferHandlerTests
     }
 
     private static RespondToOfferHandler handler(RecruitmentDbContext db, FakeAuditPublisher? auditPublisher = null) =>
-        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher());
+        new(db, new FakeClock(FixedUtcNow), auditPublisher ?? new FakeAuditPublisher(), InternalOfferWiring.For(db, new FakeClock(FixedUtcNow)).Effects);
 
     private static RecruitmentDbContext BuildContext() =>
         new(new DbContextOptionsBuilder<RecruitmentDbContext>()

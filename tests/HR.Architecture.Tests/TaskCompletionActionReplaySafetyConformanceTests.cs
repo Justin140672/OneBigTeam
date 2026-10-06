@@ -36,6 +36,7 @@ public class TaskCompletionActionReplaySafetyConformanceTests
         "HR.Modules.Tasks.Features.CompleteTask.Actions.LeaveTaskCompletionAction",
         "HR.Modules.Tasks.Features.CompleteTask.Actions.AssetTaskCompletionAction",
         "HR.Modules.Tasks.Features.CompleteTask.Actions.InterviewFeedbackTaskCompletionAction",
+        "HR.Modules.Tasks.Features.CompleteTask.Actions.InternalOfferTaskCompletionAction",
         "HR.Modules.Tasks.Features.CompleteTask.Actions.AssetReturnTaskCompletionAction",
         "HR.Modules.Tasks.Features.CompleteTask.Actions.ProbationTaskCompletionAction",
         "HR.Modules.Onboarding.Features.CompleteOnboardingTaskFromTask.CompleteOnboardingTaskFromTaskAction",

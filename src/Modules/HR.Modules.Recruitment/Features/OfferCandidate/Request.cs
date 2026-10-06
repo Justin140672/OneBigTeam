@@ -18,6 +18,13 @@ internal sealed record OfferCandidateRequest
     public DateOnly? OfferDate { get; init; }
     public string? OfferNotes { get; init; }
 
+    public Guid? ProposedManagerId { get; init; }
+    public bool NoManager { get; init; }
+    public string? Currency { get; init; }
+    public decimal? HoursPerWeek { get; init; }
+    public decimal? Fte { get; init; }
+    public DateOnly? ResponseDeadline { get; init; }
+
     // Populated by the endpoint from the optional "Idempotency-Key" request header (ticket 3, P1
     // follow-up). Null when the caller didn't supply one, in which case no dedup is attempted.
     internal string? IdempotencyKey { get; init; }

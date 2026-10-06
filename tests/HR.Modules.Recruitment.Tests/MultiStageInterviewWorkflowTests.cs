@@ -370,7 +370,7 @@ public class MultiStageInterviewWorkflowTests
             new InterviewTaskEffectsService(db, new FakeTaskCreator(), new FakeTaskCanceller(), new FakeTaskCompleter(), new FakeClock(FixedUtcNow), Microsoft.Extensions.Logging.Abstractions.NullLogger<InterviewTaskEffectsService>.Instance));
 
     private static OfferCandidateHandler OfferHandler(RecruitmentDbContext db) =>
-        new(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader(),
+        OfferHandlerFactory.Create(db, new FakeClock(FixedUtcNow), new FakePositionProfileReader(),
             new RecruitmentStageChangeRecorder(db, new FakeIntegrationEventPublisher(), new FakeAuditPublisher()),
             new FakeCompanyRecruitmentSettingsReader(), new FakeAuditPublisher());
 

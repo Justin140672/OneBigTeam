@@ -3,6 +3,9 @@
 @inject ApplicationService ApplicationService
 @inject VacancyService VacancyService
 @inject PositionProfileService PositionProfileService
+@inject EmployeeService EmployeeService
+@inject EmployeeDirectoryService EmployeeDirectoryService
+@using Syncfusion.Blazor.Data
 
 <SfDialog Width="520px" IsModal="true" @bind-Visible="_visible" Header="Make an Offer" CssClass="offer-candidate-dialog">
     <DialogTemplates>
@@ -49,6 +52,51 @@
                                      @bind-Value="_model.OfferDate"
                                      HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-date" })" />
                     </div>
+                    @if (_isInternal)
+                    {
+                        <div class="col-md-6">
+                            <HrTextField Label="Currency" Required="true" Id="offer-currency"
+                                         @bind-Value="_model.Currency" Placeholder="e.g. GBP"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-currency" })" />
+                        </div>
+                        <div class="col-md-6">
+                            <HrDateField TValue="DateOnly?" Label="Respond By (optional)" Id="offer-response-deadline"
+                                         @bind-Value="_model.ResponseDeadline"
+                                         HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-response-deadline" })" />
+                        </div>
+                        <div class="col-12">
+                            <label id="offer-manager-label" for="offer-manager" class="form-label">Proposed Manager <span class="text-danger">*</span></label>
+                            <SfDropDownList @ref="_managerDropdown"
+                                            TValue="Guid?"
+                                            TItem="ManagerOption"
+                                            DataSource="@_managerOptions"
+                                            @bind-Value="_model.ManagerId"
+                                            Placeholder="Select a manager"
+                                            AllowFiltering="true"
+                                            HtmlAttributes="@ManagerAria()">
+                                <DropDownListFieldSettings Value="Id" Text="Name" />
+                                <DropDownListEvents TValue="Guid?" TItem="ManagerOption" Filtering="OnManagerFilteringAsync" />
+                            </SfDropDownList>
+                            <div id="offer-manager-error" role="alert">
+                                <ValidationMessage For="@(() => _model.ManagerId)" />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <HrNumericField TValue="decimal?" Label="Hours per Week" Id="offer-hours-per-week"
+                                            @bind-Value="_model.HoursPerWeek" Format="n2" Min="0"
+                                            HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-hours-per-week" })" />
+                        </div>
+                        <div class="col-md-6">
+                            <HrNumericField TValue="decimal?" Label="FTE" Id="offer-fte"
+                                            @bind-Value="_model.Fte" Format="n2" Min="0" Max="1" Step="0.1"
+                                            HtmlAttributes="@(new Dictionary<string, object> { ["data-testid"] = "offer-fte" })" />
+                        </div>
+                        <div class="col-12">
+                            <div class="alert alert-info py-2 mb-0" data-testid="offer-internal-notice">
+                                This is an internal appointment. No new employee record is created, the employee number, original start date, continuous-service date and system access are unchanged, and no new-starter onboarding is triggered. The employee is notified by a task and must accept before they can be appointed.
+                            </div>
+                        </div>
+                    }
                     <div class="col-12">
                         <HrTextField Label="Offer Notes" Id="offer-notes"
                                      @bind-Value="_model.OfferNotes" Multiline="true" Rows="3"
@@ -84,6 +132,14 @@
     private string? _salaryType;
     private readonly OfferFormModel _model = new();
     private EditContext _editContext = default!;
+    private bool _isInternal;
+    private Guid? _employeeId;
+    private SfDropDownList<Guid?, ManagerOption> _managerDropdown = default!;
+    private List<ManagerOption> _managerOptions = [];
+
+    private static readonly ManagerOption NoManagerOption = new(Guid.Empty, "No manager");
+
+    private sealed record ManagerOption(Guid Id, string Name);
 
     protected override void OnInitialized() => _editContext = new EditContext(_model);
 
@@ -96,9 +152,22 @@
         _model.ProposedStartDate = null;
         _model.OfferDate = DateOnly.FromDateTime(DateTime.Today);
         _model.OfferNotes = null;
+        _model.ManagerId = null;
+        _model.Currency = "GBP";
+        _model.HoursPerWeek = null;
+        _model.Fte = null;
+        _model.ResponseDeadline = null;
         _profileTitle = null;
         _salaryMin = _salaryMax = null;
         _salaryType = null;
+        _isInternal = false;
+        _employeeId = null;
+        _managerOptions = [];
+
+        var application = await ApplicationService.GetApplicationAsync(CompanyId, VacancyId, applicationId);
+        _isInternal = application?.IsInternal == true;
+        _employeeId = application?.EmployeeId;
+        _model.IsInternal = _isInternal;
 
         var vacancy = await VacancyService.GetVacancyAsync(CompanyId, VacancyId);
         _profileTitle = vacancy?.PositionProfileTitle ?? vacancy?.EffectiveTitle;
@@ -112,9 +181,72 @@
 
         _model.OfferedSalary = _salaryMin;
 
+        if (_isInternal)
+        {
+            var existing = application?.OfferTerms;
+            if (existing is not null)
+            {
+                _model.OfferedSalary = existing.Salary ?? _model.OfferedSalary;
+                _model.OfferedSalaryFrequency = existing.SalaryFrequency ?? _model.OfferedSalaryFrequency;
+                _model.ProposedStartDate = existing.ProposedStartDate;
+                _model.Currency = existing.Currency ?? _model.Currency;
+                _model.HoursPerWeek = existing.HoursPerWeek;
+                _model.Fte = existing.Fte;
+                _model.OfferNotes = existing.OfferNotes;
+            }
+
+            var managers = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
+            _managerOptions = BuildManagerOptions(managers?.Items);
+            _model.ManagerId = existing is { NoManager: true } ? NoManagerOption.Id
+                : existing?.ProposedManagerId ?? NoManagerOption.Id;
+
+            if (existing?.ProposedManagerId is Guid existingManagerId && _managerOptions.All(o => o.Id != existingManagerId))
+            {
+                var manager = await EmployeeDirectoryService.GetAsync(CompanyId, existingManagerId);
+                if (manager is not null)
+                    _managerOptions.Insert(1, new ManagerOption(manager.Id, manager.DisplayName));
+            }
+            else if (existing is null && vacancy is not null && vacancy.HiringManagerId != Guid.Empty && vacancy.HiringManagerId != _employeeId)
+            {
+                var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, vacancy.HiringManagerId);
+                if (hiringManager is not null)
+                {
+                    if (_managerOptions.All(o => o.Id != hiringManager.Id))
+                        _managerOptions.Insert(1, new ManagerOption(hiringManager.Id, hiringManager.DisplayName));
+                    _model.ManagerId = hiringManager.Id;
+                }
+            }
+        }
+
         _editContext = new EditContext(_model);
         _visible = true;
         StateHasChanged();
+    }
+
+    private List<ManagerOption> BuildManagerOptions(IEnumerable<EmployeeListItemModel>? employees) =>
+        (employees ?? [])
+            .Where(e => e.Status != "FormerEmployee")
+            .Where(e => e.Id != _employeeId)
+            .Select(e => new ManagerOption(e.Id, e.FullName))
+            .OrderBy(e => e.Name)
+            .Prepend(NoManagerOption)
+            .ToList();
+
+    private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)
+    {
+        args.PreventDefaultAction = true;
+        var result = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, search: args.Text, pageSize: 50);
+        _managerOptions = BuildManagerOptions(result?.Items);
+        await _managerDropdown.FilterAsync(_managerOptions, new Query());
+    }
+
+    private Dictionary<string, object> ManagerAria()
+    {
+        var attributes = FieldAria.Build(_editContext, _model, "offer-manager", nameof(OfferFormModel.ManagerId), true);
+        attributes["aria-label"] = "Proposed manager";
+        attributes["aria-labelledby"] = "offer-manager-label";
+        attributes["data-testid"] = "offer-manager";
+        return attributes;
     }
 
     private async Task ConfirmAsync()
@@ -123,10 +255,17 @@
             return;
 
         var freq = _model.OfferedSalaryFrequency;
+        var noManager = _isInternal && _model.ManagerId == NoManagerOption.Id;
         var request = new OfferCandidateRequest(
             CompanyId, VacancyId, _applicationId,
             _model.OfferedSalary, freq, _model.ProposedStartDate, _model.OfferDate,
-            FormText.Optional(_model.OfferNotes));
+            FormText.Optional(_model.OfferNotes),
+            ProposedManagerId: _isInternal && !noManager ? _model.ManagerId : null,
+            NoManager: noManager,
+            Currency: _isInternal ? _model.Currency?.Trim().ToUpperInvariant() : null,
+            HoursPerWeek: _isInternal ? _model.HoursPerWeek : null,
+            Fte: _isInternal ? _model.Fte : null,
+            ResponseDeadline: _isInternal ? _model.ResponseDeadline : null);
 
         var (result, error) = await ApplicationService.OfferCandidateAsync(CompanyId, VacancyId, _applicationId, request);
         if (result is null)
@@ -150,7 +289,7 @@
 
     private static string FormatMoney(decimal? value) => value is null ? "—" : value.Value.ToString("C0");
 
-    public sealed class OfferFormModel
+    public sealed class OfferFormModel : IValidatableObject
     {
         public decimal? OfferedSalary { get; set; }
         public string? OfferedSalaryFrequency { get; set; } = "Annual";
@@ -158,5 +297,36 @@
         public DateOnly? OfferDate { get; set; }
         [MaxLength(2000, ErrorMessage = "Offer notes cannot exceed 2000 characters.")]
         public string? OfferNotes { get; set; }
+
+        public bool IsInternal { get; set; }
+        public Guid? ManagerId { get; set; }
+        public string? Currency { get; set; } = "GBP";
+        public decimal? HoursPerWeek { get; set; }
+        public decimal? Fte { get; set; }
+        public DateOnly? ResponseDeadline { get; set; }
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (!IsInternal)
+                yield break;
+
+            if (OfferedSalary is null or <= 0)
+                yield return new ValidationResult("Please enter an offered salary greater than zero.", [nameof(OfferedSalary)]);
+
+            if (ProposedStartDate is null)
+                yield return new ValidationResult("Please select a proposed start date.", [nameof(ProposedStartDate)]);
+
+            if (ManagerId is null)
+                yield return new ValidationResult("Please select a manager, or choose \"No manager\".", [nameof(ManagerId)]);
+
+            if (string.IsNullOrWhiteSpace(Currency) || Currency.Trim().Length != 3)
+                yield return new ValidationResult("Please enter a 3-letter currency code, e.g. GBP.", [nameof(Currency)]);
+
+            if (HoursPerWeek is <= 0)
+                yield return new ValidationResult("Hours per week must be greater than zero.", [nameof(HoursPerWeek)]);
+
+            if (Fte is < 0 or > 1)
+                yield return new ValidationResult("FTE must be between 0 and 1.", [nameof(Fte)]);
+        }
     }
 }

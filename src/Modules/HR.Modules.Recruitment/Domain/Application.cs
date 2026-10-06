@@ -58,6 +58,33 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     public DateTimeOffset? OfferMadeAt { get; private set; }
     public DateTimeOffset? OfferRespondedAt { get; private set; }
 
+    public int OfferVersion { get; private set; }
+    public Guid? OfferMadeByUserId { get; private set; }
+    public Guid? OfferPositionProfileId { get; private set; }
+    public string? OfferJobTitle { get; private set; }
+    public Guid? OfferDepartmentId { get; private set; }
+    public string? OfferDepartmentName { get; private set; }
+    public Guid? OfferLocationId { get; private set; }
+    public string? OfferLocationName { get; private set; }
+    public Guid? OfferEmploymentTypeId { get; private set; }
+    public string? OfferEmploymentTypeName { get; private set; }
+    public Guid? OfferProposedManagerId { get; private set; }
+    public string? OfferProposedManagerName { get; private set; }
+    public bool OfferNoManager { get; private set; }
+    public string? OfferCurrency { get; private set; }
+    public HR.Modules.Employees.Contracts.WorkingDays? OfferWorkingDays { get; private set; }
+    public decimal? OfferHoursPerDay { get; private set; }
+    public decimal? OfferHoursPerWeek { get; private set; }
+    public decimal? OfferFte { get; private set; }
+    public int? OfferProbationMonths { get; private set; }
+    public DateOnly? OfferResponseDeadline { get; private set; }
+    public DateTimeOffset? OfferTermsSnapshotAt { get; private set; }
+    public Guid? OfferRespondedByUserId { get; private set; }
+    public OfferResponseChannel? OfferResponseChannel { get; private set; }
+    public string? OfferResponseReason { get; private set; }
+
+    public bool HasManagerDecision => OfferProposedManagerId is not null || OfferNoManager;
+
     public DateTimeOffset AppliedAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
@@ -309,7 +336,9 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         DateOnly? offeredStartDate,
         DateOnly offerDate,
         string? offerNotes,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        OfferTermsSnapshot? snapshot = null,
+        Guid madeByUserId = default)
     {
         OfferedSalary          = offeredSalary;
         OfferedSalaryFrequency = offeredSalaryFrequency;
@@ -319,7 +348,49 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         OfferResponseStatus    = Domain.OfferResponseStatus.AwaitingResponse;
         OfferMadeAt            = now;
         OfferRespondedAt       = null;
+        OfferRespondedByUserId = null;
+        OfferResponseChannel   = null;
+        OfferResponseReason    = null;
+        OfferMadeByUserId      = madeByUserId == Guid.Empty ? null : madeByUserId;
+        OfferVersion++;
+        ApplySnapshot(snapshot, now);
         UpdatedAt              = now;
+    }
+
+    private void ApplySnapshot(OfferTermsSnapshot? snapshot, DateTimeOffset now)
+    {
+        OfferPositionProfileId   = snapshot?.PositionProfileId;
+        OfferJobTitle            = snapshot?.JobTitle;
+        OfferDepartmentId        = snapshot?.DepartmentId;
+        OfferDepartmentName      = snapshot?.DepartmentName;
+        OfferLocationId          = snapshot?.LocationId;
+        OfferLocationName        = snapshot?.LocationName;
+        OfferEmploymentTypeId    = snapshot?.EmploymentTypeId;
+        OfferEmploymentTypeName  = snapshot?.EmploymentTypeName;
+        OfferProposedManagerId   = snapshot?.ProposedManagerId;
+        OfferProposedManagerName = snapshot?.ProposedManagerName;
+        OfferNoManager           = snapshot?.NoManager ?? false;
+        OfferCurrency            = snapshot?.Currency;
+        OfferWorkingDays         = snapshot?.WorkingDays;
+        OfferHoursPerDay         = snapshot?.HoursPerDay;
+        OfferHoursPerWeek        = snapshot?.HoursPerWeek;
+        OfferFte                 = snapshot?.Fte;
+        OfferProbationMonths     = snapshot?.ProbationMonths;
+        OfferResponseDeadline    = snapshot?.ResponseDeadline;
+        OfferTermsSnapshotAt     = snapshot is null ? null : now;
+    }
+
+    public bool BackfillLegacyOfferSnapshot(OfferTermsSnapshot snapshot, DateTimeOffset now)
+    {
+        if (OfferResponseStatus is null || OfferTermsSnapshotAt is not null)
+            return false;
+
+        if (OfferVersion == 0)
+            OfferVersion = 1;
+
+        ApplySnapshot(snapshot with { ProposedManagerId = null, ProposedManagerName = null, NoManager = false }, now);
+        UpdatedAt = now;
+        return true;
     }
 
     /// <summary>
@@ -327,11 +398,19 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
     /// (RespondToOfferHandler) must have already checked that <see cref="OfferResponseStatus"/> is
     /// <see cref="Domain.OfferResponseStatus.AwaitingResponse"/> — this method trusts that guard.
     /// </summary>
-    public void RespondToOffer(OfferResponseStatus response, DateTimeOffset now)
+    public void RespondToOffer(
+        OfferResponseStatus response,
+        DateTimeOffset now,
+        Guid? respondedByUserId = null,
+        OfferResponseChannel? channel = null,
+        string? reason = null)
     {
-        OfferResponseStatus = response;
-        OfferRespondedAt    = now;
-        UpdatedAt           = now;
+        OfferResponseStatus    = response;
+        OfferRespondedAt       = now;
+        OfferRespondedByUserId = respondedByUserId;
+        OfferResponseChannel   = channel;
+        OfferResponseReason    = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+        UpdatedAt              = now;
     }
 
     public void ApproveOffer(Guid approvedByUserId, DateTimeOffset now)
@@ -354,6 +433,7 @@ internal sealed class Application : HR.SharedKernel.IVersionedAggregate
         RejectionReason = null;
         CvReviewNotes = null;
         OfferNotes = null;
+        OfferResponseReason = null;
         // Internal recruitment Ticket 1: the purge deletes every CandidateDocument for the candidate,
         // including any submitted CV. cv_document_id is ON DELETE RESTRICT, so the reference must be
         // released here, in the same save, for the purge to succeed.

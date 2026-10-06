@@ -84,12 +84,11 @@ public class AppointInternalCandidateValidatorTests
 
 
     [Fact]
-    public void Validate_Fails_When_Neither_Manager_Nor_NoManager_Chosen()
+    public void Validate_Passes_When_Neither_Manager_Nor_NoManager_Chosen_Because_Accepted_Offer_Supplies_It()
     {
         var result = _validator.Validate(ValidRequest() with { ManagerId = null, NoManager = false });
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.PropertyName == nameof(AppointInternalCandidateRequest.ManagerId));
+        Assert.True(result.IsValid);
     }
 
     [Fact]

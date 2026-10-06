@@ -24,6 +24,7 @@ internal class RecruitmentDbContext : DbContext
     public DbSet<CandidatePurgeAuditDelivery> CandidatePurgeAuditDeliveries => Set<CandidatePurgeAuditDelivery>();
     public DbSet<InterviewTaskCleanup> InterviewTaskCleanups => Set<InterviewTaskCleanup>();
     public DbSet<InterviewTaskEffect> InterviewTaskEffects => Set<InterviewTaskEffect>();
+    public DbSet<InternalOfferTaskEffect> InternalOfferTaskEffects => Set<InternalOfferTaskEffect>();
     public DbSet<InterviewOutcomeTaskReconciliation> InterviewOutcomeTaskReconciliations => Set<InterviewOutcomeTaskReconciliation>();
     public DbSet<InterviewOutcomeRepairAction> InterviewOutcomeRepairActions => Set<InterviewOutcomeRepairAction>();
 

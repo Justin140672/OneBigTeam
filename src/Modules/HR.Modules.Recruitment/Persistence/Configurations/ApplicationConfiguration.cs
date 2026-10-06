@@ -72,6 +72,33 @@ internal sealed class ApplicationConfiguration : IEntityTypeConfiguration<Applic
         builder.Property(a => a.OfferRespondedAt)
             .HasColumnName("offer_responded_at");
 
+        builder.Property(a => a.OfferVersion).HasColumnName("offer_version").IsRequired().HasDefaultValue(0);
+        builder.Property(a => a.OfferMadeByUserId).HasColumnName("offer_made_by_user_id");
+        builder.Property(a => a.OfferPositionProfileId).HasColumnName("offer_position_profile_id");
+        builder.Property(a => a.OfferJobTitle).HasColumnName("offer_job_title").HasMaxLength(500);
+        builder.Property(a => a.OfferDepartmentId).HasColumnName("offer_department_id");
+        builder.Property(a => a.OfferDepartmentName).HasColumnName("offer_department_name").HasMaxLength(500);
+        builder.Property(a => a.OfferLocationId).HasColumnName("offer_location_id");
+        builder.Property(a => a.OfferLocationName).HasColumnName("offer_location_name").HasMaxLength(500);
+        builder.Property(a => a.OfferEmploymentTypeId).HasColumnName("offer_employment_type_id");
+        builder.Property(a => a.OfferEmploymentTypeName).HasColumnName("offer_employment_type_name").HasMaxLength(500);
+        builder.Property(a => a.OfferProposedManagerId).HasColumnName("offer_proposed_manager_id");
+        builder.Property(a => a.OfferProposedManagerName).HasColumnName("offer_proposed_manager_name").HasMaxLength(500);
+        builder.Property(a => a.OfferNoManager).HasColumnName("offer_no_manager").IsRequired().HasDefaultValue(false);
+        builder.Property(a => a.OfferCurrency).HasColumnName("offer_currency").HasMaxLength(3);
+        builder.Property(a => a.OfferWorkingDays).HasColumnName("offer_working_days").HasConversion<int?>();
+        builder.Property(a => a.OfferHoursPerDay).HasColumnName("offer_hours_per_day").HasPrecision(5, 2);
+        builder.Property(a => a.OfferHoursPerWeek).HasColumnName("offer_hours_per_week").HasPrecision(5, 2);
+        builder.Property(a => a.OfferFte).HasColumnName("offer_fte").HasPrecision(4, 3);
+        builder.Property(a => a.OfferProbationMonths).HasColumnName("offer_probation_months");
+        builder.Property(a => a.OfferResponseDeadline).HasColumnName("offer_response_deadline");
+        builder.Property(a => a.OfferTermsSnapshotAt).HasColumnName("offer_terms_snapshot_at");
+        builder.Property(a => a.OfferRespondedByUserId).HasColumnName("offer_responded_by_user_id");
+        builder.Property(a => a.OfferResponseChannel).HasColumnName("offer_response_channel").HasConversion<string>().HasMaxLength(20);
+        builder.Property(a => a.OfferResponseReason).HasColumnName("offer_response_reason").HasMaxLength(1000);
+
+        builder.Ignore(a => a.HasManagerDecision);
+
         builder.Property(a => a.InterviewOutcome)
             .HasColumnName("interview_outcome")
             .HasConversion<string>()

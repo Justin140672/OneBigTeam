@@ -36,6 +36,7 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
     private static readonly Guid BetaCorpId = InternalRecruitmentJourneyApi.BetaCorpId;
 
     private const string InitialStage = "Application Received";
+    private const string OfferStage = "Offer";
     private const string HiredStage = "Hired";
 
     private sealed record SignedInEmployee(InternalVacancyApplyApi.FreshEmployee Employee, HttpClient Api) : IDisposable
@@ -278,11 +279,24 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.NotEqual(vacancyInfo.PositionProfileId, before.PositionProfileId);
         Assert.NotNull(before.ManagerId);
 
+        await InternalOfferApi.ReachOfferStageAsync(recruiterApi, vacancy.Id, application.ApplicationId);
+        using (var foreignManagerOffer = await InternalOfferApi.PostOfferAsync(
+                   recruiterApi, vacancy.Id, application.ApplicationId,
+                   new InternalOfferApi.OfferInput(ManagerId: InternalRecruitmentJourneyApi.BetaAliceEmployeeId)))
+        {
+            await InternalOfferApi.AssertClientErrorAsync(foreignManagerOffer,
+                "Another company's employee must not be accepted as the proposed manager of an offer");
+        }
+
+        await InternalOfferApi.MakeOfferAsync(
+            recruiterApi, vacancy.Id, application.ApplicationId, new InternalOfferApi.OfferInput(NoManager: true));
+        await InternalOfferApi.RespondAsEmployeeAsync(applicant.Api, application.ApplicationId, "Accept");
+
         using (var foreignManager = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    appointerApi, AcmeId, vacancy.Id, application.ApplicationId, InternalRecruitmentJourneyApi.BetaAliceEmployeeId))
         {
-            await InternalRecruitmentJourneyApi.AssertStatusAsync(foreignManager, HttpStatusCode.NotFound,
-                "Another company's employee must not be accepted as the new manager");
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(foreignManager, HttpStatusCode.BadRequest,
+                "A manager other than the accepted one (here another company's employee) must not be accepted at appointment");
         }
 
         using (var foreignApplication = await InternalRecruitmentJourneyApi.PostAppointAsync(
@@ -312,7 +326,7 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Equal(before.LocationId, unchanged.LocationId);
         Assert.Equal(before.ManagerId, unchanged.ManagerId);
         var stillOpen = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
-        Assert.Equal(InitialStage, stillOpen.CurrentStageName);
+        Assert.Equal(OfferStage, stillOpen.CurrentStageName);
 
         // The rejected attempts released the application: a valid appointment now completes.
         using (var valid = await InternalRecruitmentJourneyApi.PostAppointAsync(
@@ -348,6 +362,9 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
 
         var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
 
+        await InternalOfferApi.MakeAcceptedOfferAsync(
+            recruiterApi, applicant.Api, vacancy.Id, application.ApplicationId, new InternalOfferApi.OfferInput(NoManager: true));
+
         using (var forbidden = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    hrAdminApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
         {
@@ -359,7 +376,7 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         Assert.Equal(before.PositionProfileId, unchanged.PositionProfileId);
         Assert.Equal(before.ManagerId, unchanged.ManagerId);
         var stillOpen = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
-        Assert.Equal(InitialStage, stillOpen.CurrentStageName);
+        Assert.Equal(OfferStage, stillOpen.CurrentStageName);
 
         using (var appointed = await InternalRecruitmentJourneyApi.PostAppointAsync(
                    recruiterApi, AcmeId, vacancy.Id, application.ApplicationId, managerId: null))
@@ -371,5 +388,138 @@ public sealed class InternalRecruitmentSecurityBoundaryTests(RecruiterPersonaFix
         var after = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
         Assert.Equal(vacancyInfo.PositionProfileId, after.PositionProfileId);
         Assert.Null(after.ManagerId);
+    }
+
+
+    [Fact]
+    public async Task InternalOffer_ByAnotherEmployeeStaleVersionOrWrongCompany_IsRejected_AndOfferStaysAwaitingResponse()
+    {
+        using var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
+        using var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
+        var vacancy = await InternalVacancyApplyApi.CreateOpenInternalVacancyAsync(hrAdminApi, recruiterApi);
+
+        using var recipient = await CreateSignedInEmployeeAsync(hrAdminApi);
+        using var other = await CreateSignedInEmployeeAsync(hrAdminApi);
+        var application = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
+            recipient.Api, vacancy.Id, $"cv-{recipient.Employee.LastName}.pdf");
+
+        await InternalOfferApi.ReachOfferStageAsync(recruiterApi, vacancy.Id, application.ApplicationId);
+        await InternalOfferApi.MakeOfferAsync(
+            recruiterApi, vacancy.Id, application.ApplicationId, new InternalOfferApi.OfferInput(NoManager: true));
+
+        var offer = await InternalOfferApi.GetInternalOfferAsync(recipient.Api, application.ApplicationId);
+        Assert.True(offer.IsOfferRecipient);
+        Assert.True(offer.CanRespond);
+        Assert.Equal("AwaitingResponse", offer.Terms.OfferResponseStatus);
+        var version = offer.Terms.OfferVersion;
+
+        using (var otherGet = await InternalOfferApi.GetInternalOfferRawAsync(other.Api, AcmeId, application.ApplicationId))
+        {
+            await InternalOfferApi.AssertStatusAsync(otherGet, HttpStatusCode.NotFound,
+                "Another employee must not be able to read someone else's internal offer");
+        }
+
+        using (var otherRespond = await InternalOfferApi.PostEmployeeResponseRawAsync(
+                   other.Api, AcmeId, application.ApplicationId, "Accept", version))
+        {
+            await InternalOfferApi.AssertStatusAsync(otherRespond, HttpStatusCode.NotFound,
+                "Another employee must not be able to respond to someone else's internal offer");
+        }
+
+        using (var foreignRouteGet = await InternalOfferApi.GetInternalOfferRawAsync(recipient.Api, BetaCorpId, application.ApplicationId))
+        {
+            await InternalOfferApi.AssertStatusAsync(foreignRouteGet, HttpStatusCode.Forbidden,
+                "An employee must not be able to address another company's internal offers");
+        }
+
+        using (var foreignRouteRespond = await InternalOfferApi.PostEmployeeResponseRawAsync(
+                   recipient.Api, BetaCorpId, application.ApplicationId, "Accept", version))
+        {
+            await InternalOfferApi.AssertStatusAsync(foreignRouteRespond, HttpStatusCode.Forbidden,
+                "An employee must not be able to respond through another company's route");
+        }
+
+        using (var stale = await InternalOfferApi.PostEmployeeResponseRawAsync(
+                   recipient.Api, AcmeId, application.ApplicationId, "Accept", version + 1))
+        {
+            await InternalOfferApi.AssertStatusAsync(stale, HttpStatusCode.Conflict,
+                "A response to a version other than the current offer must be refused");
+        }
+
+        var recruiterView = await InternalOfferApi.GetInternalOfferAsync(recruiterApi, application.ApplicationId);
+        Assert.False(recruiterView.IsOfferRecipient);
+        Assert.False(recruiterView.CanRespond);
+
+        using (var recruiterRespond = await InternalOfferApi.PostEmployeeResponseRawAsync(
+                   recruiterApi, AcmeId, application.ApplicationId, "Accept", version))
+        {
+            await InternalOfferApi.AssertClientErrorAsync(recruiterRespond,
+                "A recruiter who is not the offer recipient must not be able to accept it through the employee endpoint");
+        }
+
+        var stillAwaiting = await InternalOfferApi.GetInternalOfferAsync(recipient.Api, application.ApplicationId);
+        Assert.Equal("AwaitingResponse", stillAwaiting.Terms.OfferResponseStatus);
+        Assert.True(stillAwaiting.CanRespond);
+
+        await InternalOfferApi.RespondAsEmployeeAsync(recipient.Api, application.ApplicationId, "Accept");
+
+        using (var flip = await InternalOfferApi.PostEmployeeResponseRawAsync(
+                   recipient.Api, AcmeId, application.ApplicationId, "Decline", version, "Changed my mind"))
+        {
+            await InternalOfferApi.AssertStatusAsync(flip, HttpStatusCode.Conflict,
+                "An accepted offer cannot be flipped to declined through the employee endpoint");
+        }
+
+        var accepted = await InternalOfferApi.GetInternalOfferAsync(recipient.Api, application.ApplicationId);
+        Assert.Equal("Accepted", accepted.Terms.OfferResponseStatus);
+        Assert.False(accepted.CanRespond);
+    }
+
+
+    [Fact]
+    public async Task Appoint_WhileOfferIsAwaitingResponseOrDeclined_IsRejected_AndEmployeeUnchanged()
+    {
+        using var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
+        using var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
+        var vacancy = await InternalVacancyApplyApi.CreateOpenInternalVacancyAsync(hrAdminApi, recruiterApi);
+
+        using var applicant = await CreateSignedInEmployeeAsync(hrAdminApi);
+        var application = await InternalVacancyApplyApi.ApplyAsEmployeeAsync(
+            applicant.Api, vacancy.Id, $"cv-{applicant.Employee.LastName}.pdf");
+        var before = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
+
+        using (var noOffer = await InternalRecruitmentJourneyApi.PostAppointAsync(
+                   recruiterApi, AcmeId, vacancy.Id, application.ApplicationId))
+        {
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(noOffer, HttpStatusCode.BadRequest,
+                "Appointing without any internal offer must be refused");
+        }
+
+        await InternalOfferApi.ReachOfferStageAsync(recruiterApi, vacancy.Id, application.ApplicationId);
+        await InternalOfferApi.MakeOfferAsync(
+            recruiterApi, vacancy.Id, application.ApplicationId, new InternalOfferApi.OfferInput(NoManager: true));
+
+        using (var awaiting = await InternalRecruitmentJourneyApi.PostAppointAsync(
+                   recruiterApi, AcmeId, vacancy.Id, application.ApplicationId))
+        {
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(awaiting, HttpStatusCode.BadRequest,
+                "Appointing while the offer is awaiting the employee's response must be refused");
+        }
+
+        await InternalOfferApi.RespondAsEmployeeAsync(applicant.Api, application.ApplicationId, "Decline", "Not for me");
+
+        using (var declined = await InternalRecruitmentJourneyApi.PostAppointAsync(
+                   recruiterApi, AcmeId, vacancy.Id, application.ApplicationId))
+        {
+            await InternalRecruitmentJourneyApi.AssertStatusAsync(declined, HttpStatusCode.BadRequest,
+                "Appointing after the employee declined must be refused");
+        }
+
+        var after = await InternalRecruitmentJourneyApi.GetEmployeeRecordAsync(hrAdminApi, applicant.Employee.Id);
+        Assert.Equal(before.PositionProfileId, after.PositionProfileId);
+        Assert.Equal(before.DepartmentId, after.DepartmentId);
+        Assert.Equal(before.ManagerId, after.ManagerId);
+        var application2 = await InternalRecruitmentJourneyApi.GetApplicationAsync(recruiterApi, vacancy.Id, application.ApplicationId);
+        Assert.Equal(OfferStage, application2.CurrentStageName);
     }
 }

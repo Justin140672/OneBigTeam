@@ -16,7 +16,10 @@ internal sealed class OfferCandidateHandler(
     IPositionProfileReader positionProfileReader,
     RecruitmentStageChangeRecorder recorder,
     ICompanyRecruitmentSettingsReader recruitmentSettingsReader,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    IEmployeeApplicantReader applicantReader,
+    OfferTermsSnapshotFactory snapshotFactory,
+    InternalOfferTaskEffectsService effectsService)
 {
     public async Task<Result<OfferCandidateResponse>> HandleAsync(
         OfferCandidateRequest request,
@@ -36,6 +39,7 @@ internal sealed class OfferCandidateHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<OfferCandidateResponse>(
@@ -60,15 +64,31 @@ internal sealed class OfferCandidateHandler(
 
         // Server-side enforcement (not just UI hiding): an inactive candidate must not be able to
         // pick up new recruitment activity, per the candidate deactivation ticket.
-        var candidateIsActive = await db.Candidates
+        var candidateInfo = await db.Candidates
             .AsNoTracking()
             .Where(c => c.Id == application.CandidateId && c.CompanyId == request.CompanyId)
-            .Select(c => c.IsActive)
+            .Select(c => new { c.IsActive, c.EmployeeId })
             .SingleOrDefaultAsync(cancellationToken);
 
-        if (!candidateIsActive)
+        if (candidateInfo is not { IsActive: true })
             return Result.Failure<OfferCandidateResponse>(
                 Error.Validation("Cannot make an offer to an inactive candidate."));
+
+        if (application.AppointmentStatus is not null)
+            return Result.Failure<OfferCandidateResponse>(
+                Error.Conflict("Cannot revise the offer once the internal appointment has started."));
+
+        var isInternal = application.Source == ApplicationSource.Internal;
+        Guid internalEmployeeId = Guid.Empty;
+
+        if (isInternal)
+        {
+            var internalValidation = await ValidateInternalOfferAsync(request, candidateInfo.EmployeeId, cancellationToken);
+            if (internalValidation.Error is not null)
+                return Result.Failure<OfferCandidateResponse>(internalValidation.Error);
+
+            internalEmployeeId = internalValidation.EmployeeId;
+        }
 
         var currentStage = await db.RecruitmentStages
             .AsNoTracking()
@@ -145,9 +165,41 @@ internal sealed class OfferCandidateHandler(
 
         var offerDate = request.OfferDate ?? today;
 
+        OfferTermsSnapshot? snapshot = null;
+
+        if (isInternal)
+        {
+            if (offeredSalary is null)
+                return Result.Failure<OfferCandidateResponse>(
+                    Error.Validation("An offered salary is required for an internal offer."));
+
+            snapshot = await snapshotFactory.BuildAsync(
+                vacancy,
+                new OfferTermsInput(
+                    request.ProposedManagerId, request.NoManager, request.Currency,
+                    request.HoursPerWeek, request.Fte, request.ResponseDeadline),
+                cancellationToken);
+        }
+
         application.MoveToStage(offerStage.Id, now);
-        application.RecordOfferTerms(offeredSalary, offeredFrequency, request.ProposedStartDate, offerDate, request.OfferNotes, now);
+        application.RecordOfferTerms(
+            offeredSalary, offeredFrequency, request.ProposedStartDate, offerDate, request.OfferNotes, now,
+            snapshot, performedBy);
         recorder.AddHistoryEntry(application, previousStageId, performedBy, now);
+
+        if (isInternal)
+        {
+            db.InternalOfferTaskEffects.Add(InternalOfferTaskEffect.Create(
+                Guid.NewGuid(),
+                application.CompanyId,
+                application.Id,
+                application.OfferVersion,
+                internalEmployeeId,
+                performedBy,
+                snapshot!.JobTitle ?? "your new role",
+                request.ResponseDeadline,
+                now));
+        }
 
         var response = new OfferCandidateResponse(
             application.Id,
@@ -176,7 +228,8 @@ internal sealed class OfferCandidateHandler(
             application.OfferNotes,
             application.OfferResponseStatus?.ToString(),
             application.OfferMadeAt,
-            application.OfferRespondedAt);
+            application.OfferRespondedAt,
+            isInternal ? OfferTermsView.From(application) : null);
 
         // Ticket 14 (P2): SaveIdempotentWithConcurrencyAsync pins/advances application's version and
         // translates a stale-save DbUpdateConcurrencyException the same way the non-idempotent
@@ -192,6 +245,7 @@ internal sealed class OfferCandidateHandler(
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(outcome.Response!);
                 case IdempotencyOutcomeKind.ConcurrencyConflict:
                     return Result.Failure<OfferCandidateResponse>(Error.Concurrency(conflictMessage));
@@ -221,9 +275,53 @@ internal sealed class OfferCandidateHandler(
                 offerDate,
                 request.ProposedStartDate,
                 performedBy,
-                now),
+                now,
+                application.OfferVersion),
             cancellationToken);
 
+        if (isInternal)
+            await effectsService.RunOutstandingForApplicationAsync(application.CompanyId, application.Id, cancellationToken);
+
         return Result.Success(response);
+    }
+
+    private async Task<(Guid EmployeeId, Error? Error)> ValidateInternalOfferAsync(
+        OfferCandidateRequest request,
+        Guid? employeeId,
+        CancellationToken cancellationToken)
+    {
+        if (employeeId is not { } linkedEmployeeId)
+            return (Guid.Empty, Error.Validation("This internal application's candidate is not linked to an employee."));
+
+        var employee = await applicantReader.GetApplicantAsync(request.CompanyId, linkedEmployeeId, cancellationToken);
+        if (employee is null)
+            return (Guid.Empty, Error.Validation("The employee linked to this application was not found in this company."));
+
+        if (employee.EmploymentState != EmployeeApplicantEmploymentState.Active)
+            return (Guid.Empty, Error.Validation("An internal offer can only be made to an active employee."));
+
+        if (request.ProposedStartDate is null)
+            return (Guid.Empty, Error.Validation("A proposed effective date is required for an internal offer."));
+
+        if (string.IsNullOrWhiteSpace(request.Currency))
+            return (Guid.Empty, Error.Validation("A currency is required for an internal offer."));
+
+        if (!request.NoManager && request.ProposedManagerId is null)
+            return (Guid.Empty, Error.Validation("Select a proposed manager, or choose 'No manager'."));
+
+        if (!request.NoManager && request.ProposedManagerId == linkedEmployeeId)
+            return (Guid.Empty, Error.Validation("An employee cannot be their own manager."));
+
+        if (request.ResponseDeadline is { } deadline && deadline < DateOnly.FromDateTime(clock.UtcNowOffset().UtcDateTime))
+            return (Guid.Empty, Error.Validation("The response deadline cannot be in the past."));
+
+        if (!request.NoManager && request.ProposedManagerId is { } managerId)
+        {
+            var manager = await applicantReader.GetApplicantAsync(request.CompanyId, managerId, cancellationToken);
+            if (manager is null)
+                return (Guid.Empty, Error.Validation("The proposed manager was not found in this company."));
+        }
+
+        return (linkedEmployeeId, null);
     }
 }

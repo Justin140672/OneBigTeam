@@ -68,6 +68,8 @@ public class AppointInternalCandidateConcurrencyTests(RecruitmentDatabaseFixture
         var vacancy = Vacancy.Create(Guid.NewGuid(), companyId, positionProfileId, "Engineering Manager", null, Guid.NewGuid(), Now.AddDays(-30));
         db.Vacancies.Add(vacancy);
         var (_, application) = InternalApplicationTestData.AddInternal(db, companyId, vacancy.Id, stages.Offer.Id, employeeId, Now.AddDays(-10));
+        application.RecordOfferTerms(70000m, OfferSalaryFrequency.Annual, null, new DateOnly(2026, 9, 20), null, Now.AddDays(-6));
+        application.RespondToOffer(OfferResponseStatus.Accepted, Now.AddDays(-2));
         await db.SaveChangesAsync();
 
         var service = new FakeEmployeeInternalAppointmentService

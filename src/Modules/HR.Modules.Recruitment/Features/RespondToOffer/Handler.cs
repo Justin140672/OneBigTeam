@@ -1,6 +1,7 @@
 using HR.Infrastructure.Abstractions;
 using HR.Modules.Recruitment.Domain;
 using HR.Modules.Recruitment.Persistence;
+using HR.Modules.Recruitment.Services;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
@@ -18,7 +19,8 @@ namespace HR.Modules.Recruitment.Features.RespondToOffer;
 internal sealed class RespondToOfferHandler(
     RecruitmentDbContext db,
     IClock clock,
-    IAuditEventPublisher auditPublisher)
+    IAuditEventPublisher auditPublisher,
+    InternalOfferTaskEffectsService effectsService)
 {
     public async Task<Result<RespondToOfferResponse>> HandleAsync(
         RespondToOfferRequest request,
@@ -38,6 +40,7 @@ internal sealed class RespondToOfferHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<RespondToOfferResponse>(
@@ -74,7 +77,7 @@ internal sealed class RespondToOfferHandler(
         var previousStatus = application.OfferResponseStatus.Value.ToString();
         var expectedVersion = application.Version;
 
-        application.RespondToOffer(target, now);
+        application.RespondToOffer(target, now, performedBy, OfferResponseChannel.Recruiter, request.Reason);
 
         var response = new RespondToOfferResponse(
             application.Id,
@@ -101,6 +104,7 @@ internal sealed class RespondToOfferHandler(
             switch (outcome.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await effectsService.RunOutstandingForApplicationAsync(request.CompanyId, request.ApplicationId, cancellationToken);
                     return Result.Success(outcome.Response!);
                 case IdempotencyOutcomeKind.ConcurrencyConflict:
                     return Result.Failure<RespondToOfferResponse>(Error.Concurrency(conflictMessage));
@@ -124,8 +128,12 @@ internal sealed class RespondToOfferHandler(
                 previousStatus,
                 target.ToString(),
                 performedBy,
-                now),
+                now,
+                application.OfferVersion,
+                nameof(OfferResponseChannel.Recruiter)),
             cancellationToken);
+
+        await effectsService.RunOutstandingForApplicationAsync(application.CompanyId, application.Id, cancellationToken);
 
         return Result.Success(response);
     }

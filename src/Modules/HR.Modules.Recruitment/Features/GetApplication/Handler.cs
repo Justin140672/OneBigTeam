@@ -55,6 +55,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
                 InternalEmployeeId = a.Source == Domain.ApplicationSource.Internal ? c.EmployeeId : null,
                 a.AppointmentStatus,
                 a.AppointmentEffectiveDate,
+                Offer = a,
             })
             .SingleOrDefaultAsync(cancellationToken);
 
@@ -152,6 +153,7 @@ internal sealed class GetApplicationHandler(RecruitmentDbContext db)
             row.IsInternal,
             row.InternalEmployeeId,
             row.AppointmentStatus?.ToString(),
-            row.AppointmentEffectiveDate));
+            row.AppointmentEffectiveDate,
+            row.Offer.OfferResponseStatus is null ? null : Services.OfferTermsView.From(row.Offer)));
     }
 }

@@ -46,6 +46,10 @@ public class NotificationEventMappingContractTests
         // not something NotificationActionRouteBuilder can derive from type/company/employee/source
         // ids alone — so BuildActionUrl deliberately returns null for this type.
         NotificationType.ProductUpdate,
+
+        // InternalOfferResponded: the vacancy-applications destination needs the vacancy id, which the
+        // writer does not receive, so the sender passes an explicit ActionUrl to WriteAsync instead.
+        NotificationType.InternalOfferResponded,
     ];
 
     public static IEnumerable<object[]> AllNotificationTypes() =>

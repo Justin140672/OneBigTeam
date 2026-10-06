@@ -273,6 +273,15 @@ public static class RecruitmentModule
         services.AddScoped<Jobs.InternalAppointmentReconciliationJob>();
         services.AddScoped<InterviewTaskCleanupService>();
         services.AddScoped<InterviewTaskEffectsService>();
+        services.AddScoped<OfferTermsSnapshotFactory>();
+        services.AddScoped<InternalOfferTaskEffectsService>();
+        services.AddScoped<InternalOfferSnapshotBackfillService>();
+        services.AddScoped<Jobs.InternalOfferTaskReconciliationJob>();
+
+        services.AddScoped<Features.GetInternalOffer.GetInternalOfferHandler>();
+        services.AddScoped<IValidator<Features.GetInternalOffer.GetInternalOfferRequest>, Features.GetInternalOffer.GetInternalOfferValidator>();
+        services.AddScoped<Features.RespondToInternalOffer.RespondToInternalOfferHandler>();
+        services.AddScoped<IValidator<Features.RespondToInternalOffer.RespondToInternalOfferRequest>, Features.RespondToInternalOffer.RespondToInternalOfferValidator>();
         services.AddScoped<InterviewOutcomeTaskReconciliationService>();
         services.AddScoped<Jobs.InterviewTaskCleanupReconciliationJob>();
 
@@ -423,6 +432,10 @@ public static class RecruitmentModule
             "*/10 * * * *");
         jobManager.AddOrUpdate<Jobs.InterviewTaskCleanupReconciliationJob>(
             "recruitment-interview-task-cleanup-reconciliation",
+            job => job.ExecuteAsync(),
+            "*/5 * * * *");
+        jobManager.AddOrUpdate<Jobs.InternalOfferTaskReconciliationJob>(
+            "recruitment-internal-offer-task-reconciliation",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
         return app;

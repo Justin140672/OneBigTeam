@@ -739,17 +739,49 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await (await ApplicationsToolbarButtonAsync("Schedule Interview", reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
     }
 
-    public async Task ClickOfferForAsync(string candidateNameFragment)
+    public async Task ClickOfferForAsync(string candidateNameFragment, InternalOfferTerms? internalOffer = null)
     {
         await SelectApplicationRowAsync(candidateNameFragment);
         await (await ApplicationsToolbarButtonAsync("Offer", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
+        await CompleteOfferDialogAsync(internalOffer);
+    }
 
-        var offerDialog = page.GetByRole(AriaRole.Dialog, new() { Name = "Make an Offer" });
-        await offerDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-        await offerDialog.GetByRole(AriaRole.Button, new() { Name = "Make Offer" }).ClickAsync();
+    public async Task<InternalOfferDialog> OpenReviseOfferDialogAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await (await ApplicationsToolbarButtonAsync("Revise Offer", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
+        var dialog = new InternalOfferDialog(page);
+        await dialog.WaitForOpenAsync();
+        return dialog;
+    }
 
-        await Assertions.Expect(page.Locator("[data-testid='vacancy-applications-tab'] .alert-success"))
-            .ToHaveTextAsync("Offer made to candidate.", new() { Timeout = 10_000 });
+    public async Task<InternalOfferDialog> OpenInternalOfferDialogAsync(string candidateNameFragment)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await (await ApplicationsToolbarButtonAsync("Offer", exact: true, reselectCandidateNameFragment: candidateNameFragment)).ClickAsync();
+        var dialog = new InternalOfferDialog(page);
+        await dialog.WaitForOpenAsync();
+        return dialog;
+    }
+
+    private async Task CompleteOfferDialogAsync(InternalOfferTerms? internalOffer)
+    {
+        var offerDialog = new InternalOfferDialog(page);
+        await offerDialog.WaitForOpenAsync();
+        if (await offerDialog.IsInternalAsync())
+            await offerDialog.FillAsync(internalOffer ?? new InternalOfferTerms());
+        await offerDialog.SubmitExpectingSuccessAsync();
+    }
+
+    public Task ExpectOfferResponseBadgeAsync(string candidateNameFragment, string expectedText) =>
+        Assertions.Expect(ApplicationRow(candidateNameFragment).First.Locator("[data-testid='offer-response-badge']"))
+            .ToContainTextAsync(expectedText, new() { Timeout = 30_000 });
+
+    public async Task ExpectToolbarItemDisabledForRowAsync(string candidateNameFragment, string itemText)
+    {
+        await SelectApplicationRowAsync(candidateNameFragment);
+        await ApplicationsToolbarButtonAsync(itemText, exact: true);
+        await ExpectToolbarItemDisabledAsync(itemText);
     }
 
     public async Task ClickRejectForAsync(string candidateNameFragment)
@@ -767,7 +799,8 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
             .ToHaveTextAsync("Application withdrawn.", new() { Timeout = 10_000 });
     }
 
-    public async Task ReachAcceptedOfferAsync(string candidateNameFragment, string interviewerFragment = "James")
+    public async Task ReachAcceptedOfferAsync(
+        string candidateNameFragment, string interviewerFragment = "James", InternalOfferTerms? internalOffer = null)
     {
         await ClickScheduleInterviewForAsync(candidateNameFragment);
         await WaitForScheduleDialogAsync();
@@ -782,7 +815,7 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         await SubmitOutcomeAsync();
 
         await OpenApplicationsTabAsync();
-        await ClickOfferForAsync(candidateNameFragment);
+        await ClickOfferForAsync(candidateNameFragment, internalOffer);
 
         await OpenRecordOfferResponseDialogAsync(candidateNameFragment);
         await SelectOfferResponseStatusAsync("Accepted");

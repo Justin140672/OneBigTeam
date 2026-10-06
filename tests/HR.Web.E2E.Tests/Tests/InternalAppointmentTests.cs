@@ -71,7 +71,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     }
 
     private async Task<(Arranged Arranged, VacancyDetailPage VacancyDetail)> ArrangeAsync(
-        bool withExternalApplication = false, bool withEmployeeProfileAccess = false)
+        bool withExternalApplication = false, bool withEmployeeProfileAccess = false, InternalOfferTerms? offer = null)
     {
         var hrAdminApi = await InternalVacancyApplyApi.CreateHrAdminApiClientAsync(_fixture.ApiBaseUrl);
         var recruiterApi = await CandidateCvApi.CreateRecruiterApiClientAsync(_fixture.ApiBaseUrl);
@@ -119,7 +119,7 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await page.GoToAsync(AcmeId, vacancy.Id);
         await page.OpenApplicationsTabAsync();
         await page.ExpectApplicationRowInternalAsync(arranged.InternalApplicationId, isInternal: true);
-        await page.ReachAcceptedOfferAsync(applicant.LastName);
+        await page.ReachAcceptedOfferAsync(applicant.LastName, internalOffer: offer);
         await page.OpenApplicationsTabAsync();
 
         return (arranged, page);
@@ -206,6 +206,8 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
         await dialog.ExpectFutureDateHintAsync(visible: false);
         await dialog.ExpectBackdatedConfirmationAsync(visible: false);
         await dialog.ExpectCompensationFieldsHiddenAsync();
+        await dialog.ExpectAcceptedTermsAsync(Today, JamesFullName, "GBP 42,000.00");
+        await dialog.ExpectAcceptedTermsWithoutCompensationChangeAsync();
 
         await dialog.CancelAsync();
     }
@@ -216,14 +218,15 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     {
         var newManager = await E2eEmployeeApi.CreateAcmeEmployeeAsync(_fixture.ApiBaseUrl, "AppointMgr", activate: true);
 
-        var (arranged, vacancyDetail) = await ArrangeAsync(withEmployeeProfileAccess: true);
+        var (arranged, vacancyDetail) = await ArrangeAsync(
+            withEmployeeProfileAccess: true, offer: new InternalOfferTerms(Manager: newManager.LastName));
         using var _ = arranged;
         var applicant = arranged.Applicant;
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
         await dialog.ExpectEffectiveDateAsync(Today);
-        await dialog.SelectManagerAsync(newManager.LastName);
         await dialog.ExpectManagerAsync(newManager.FullName);
+        await dialog.ExpectAcceptedTermsAsync(Today, newManager.FullName, "GBP 42,000.00");
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();
@@ -247,15 +250,16 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     [Fact]
     public async Task Appoint_WithNoManager_CompletesAndProfileShowsNoManager()
     {
-        var (arranged, vacancyDetail) = await ArrangeAsync(withEmployeeProfileAccess: true);
+        var (arranged, vacancyDetail) = await ArrangeAsync(
+            withEmployeeProfileAccess: true, offer: new InternalOfferTerms(Manager: "No manager"));
         using var _ = arranged;
         var applicant = arranged.Applicant;
 
         Assert.NotNull(arranged.ApplicantBefore.ManagerId);
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
-        await dialog.SelectManagerAsync("No manager");
         await dialog.ExpectManagerAsync("No manager");
+        await dialog.ExpectAcceptedTermsAsync(Today, "No manager", "GBP 42,000.00");
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();
@@ -275,15 +279,13 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     [Fact]
     public async Task Appoint_FutureEffectiveDate_ShowsHint_BannerMentionsDate_AndEmployeeUnchangedUntilThen()
     {
-        var (arranged, vacancyDetail) = await ArrangeAsync();
+        var effectiveDate = Today.AddDays(14);
+        var (arranged, vacancyDetail) = await ArrangeAsync(offer: new InternalOfferTerms(StartDate: effectiveDate));
         using var _ = arranged;
         var applicant = arranged.Applicant;
-        var effectiveDate = Today.AddDays(14);
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
-        await dialog.ExpectFutureDateHintAsync(visible: false);
-
-        await dialog.SetEffectiveDateAsync(effectiveDate);
+        await dialog.ExpectEffectiveDateAsync(effectiveDate);
         await dialog.ExpectFutureDateHintAsync(visible: true);
         await dialog.ExpectBackdatedConfirmationAsync(visible: false);
 
@@ -302,15 +304,13 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
     [Fact]
     public async Task Appoint_PastEffectiveDate_RequiresBackdatedConfirmation_ThenAppliesImmediately()
     {
-        var (arranged, vacancyDetail) = await ArrangeAsync();
+        var effectiveDate = Today.AddDays(-7);
+        var (arranged, vacancyDetail) = await ArrangeAsync(offer: new InternalOfferTerms(StartDate: effectiveDate));
         using var _ = arranged;
         var applicant = arranged.Applicant;
-        var effectiveDate = Today.AddDays(-7);
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
-        await dialog.ExpectBackdatedConfirmationAsync(visible: false);
-
-        await dialog.SetEffectiveDateAsync(effectiveDate);
+        await dialog.ExpectEffectiveDateAsync(effectiveDate);
         await dialog.ExpectBackdatedConfirmationAsync(visible: true);
         await dialog.ExpectFutureDateHintAsync(visible: false);
 
@@ -330,34 +330,24 @@ public sealed class InternalAppointmentTests(RecruiterPersonaFixture fixture)
 
 
     [Fact]
-    public async Task Appoint_WithCompensationChange_RevealsFields_RequiresSalary_AndRecordsRoleChangeCompensation()
+    public async Task Appoint_WithAcceptedOffer_HidesCompensationFields_AndAppliesTheAcceptedCompensation()
     {
-        var (arranged, vacancyDetail) = await ArrangeAsync();
+        var (arranged, vacancyDetail) = await ArrangeAsync(offer: new InternalOfferTerms(Salary: "51000"));
         using var _ = arranged;
         var applicant = arranged.Applicant;
-        var notes = $"E2E appointment pay {applicant.LastName}";
 
         var dialog = await OpenAppointDialogAsync(vacancyDetail, arranged);
-        await dialog.ExpectCompensationFieldsHiddenAsync();
-
-        await dialog.SetChangeCompensationAsync(true);
-        await dialog.ExpectCompensationFieldsVisibleAsync();
-
-        await dialog.SubmitExpectingErrorAsync("Please enter a salary greater than zero.");
-
-        await dialog.FillSalaryAsync("42000");
-        await dialog.FillCompensationNotesAsync(notes);
+        await dialog.ExpectAcceptedTermsAsync(Today, JamesFullName, "GBP 51,000.00");
+        await dialog.ExpectAcceptedTermsWithoutCompensationChangeAsync();
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, HiredStage);
 
         var compensation = await InternalAppointmentApi.GetCurrentCompensationAsync(arranged.HrAdminApi, applicant.Id);
-        Assert.Equal(42000m, compensation.Salary);
+        Assert.Equal(51000m, compensation.Salary);
         Assert.Equal("Annual", compensation.SalaryType);
         Assert.Equal("GBP", compensation.Currency);
-        Assert.Equal(notes, compensation.Notes);
-        Assert.Equal("RoleChange", compensation.Reason);
         Assert.Equal(Today, compensation.EffectiveFrom);
 
         var after = await InternalAppointmentApi.GetEmployeeAsync(arranged.HrAdminApi, applicant.Id);

@@ -229,8 +229,11 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         Assert.Equal("Passed", await vacancyDetail.GetInterviewOutcomeAsync(applicant.LastName));
 
         await vacancyDetail.OpenApplicationsTabAsync();
-        await vacancyDetail.ClickOfferForAsync(applicant.LastName);
+        await vacancyDetail.ClickOfferForAsync(applicant.LastName, new InternalOfferTerms(Manager: newManager.LastName));
         await vacancyDetail.ExpectApplicationStatusAsync(applicant.LastName, OfferStage);
+        await vacancyDetail.ExpectOfferResponseBadgeAsync(applicant.LastName, "Awaiting response");
+        await vacancyDetail.ExpectToolbarItemEnabledForRowAsync(applicant.LastName, "Record Offer Response");
+        await vacancyDetail.ExpectToolbarItemDisabledAsync("Appoint");
 
         await vacancyDetail.OpenRecordOfferResponseDialogAsync(applicant.LastName);
         await vacancyDetail.SelectOfferResponseStatusAsync("Accepted");
@@ -247,8 +250,8 @@ public sealed class InternalRecruitmentJourneyTests(RecruiterPersonaFixture fixt
         await dialog.ExpectDerivedFieldsAsync(newProfileTitle, newDepartmentName, newLocationName);
         await dialog.ExpectEffectiveDateAsync(Today);
 
-        await dialog.SelectManagerAsync(newManager.LastName);
         await dialog.ExpectManagerAsync(newManager.FullName);
+        await dialog.ExpectAcceptedTermsAsync(Today, newManager.FullName, "GBP 42,000.00");
         await dialog.SubmitExpectingSuccessAsync();
 
         await dialog.ExpectAppliedSuccessBannerAsync();

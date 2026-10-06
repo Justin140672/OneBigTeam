@@ -1114,7 +1114,7 @@
         if (_appointDialog is not null)
             await _appointDialog.OpenAsync(
                 row.Id, $"{row.CandidateFirstName} {row.CandidateLastName}".Trim(), row.EmployeeId,
-                row.InternalAppointmentStatus, row.OfferedStartDate, row.OfferedSalary);
+                row.InternalAppointmentStatus, row.OfferedStartDate, row.OfferedSalary, row.OfferTerms);
     }
 
     private async Task OnAppointedAsync(AppointInternalCandidateDialog.AppointedInfo info)
@@ -1150,6 +1150,7 @@
             if (_canAppoint)
             {
                 items.Insert(6, new ItemModel { Id = "app-appoint", Text = "Appoint", PrefixIcon = "fa-solid fa-user-tie", Disabled = action != KanbanCardAction.Appoint, TooltipText = "Complete internal appointment" });
+                items.Insert(7, new ItemModel { Id = "app-revise-offer", Text = "Revise Offer", PrefixIcon = "fa-solid fa-pen-to-square", Disabled = !CanReviseOffer(_selectedRow), TooltipText = "Issue a revised offer; the employee must accept it again" });
             }
 
             return items;
@@ -1159,6 +1160,11 @@
     private bool CanHire(ApplicationListItemModel? row) => ActionFor(row) == KanbanCardAction.Hire;
 
     private bool CanAppoint(ApplicationListItemModel? row) => ActionFor(row) == KanbanCardAction.Appoint;
+
+    private bool CanReviseOffer(ApplicationListItemModel? row) =>
+        row is { IsInternal: true, IsWithdrawn: false, InternalAppointmentStatus: null }
+        && row.OfferResponseStatus is "AwaitingResponse" or "Accepted"
+        && IsOnOfferStage(row);
 
     private SelectedApplicationMarker? _selectionMarker;
 
@@ -1190,6 +1196,7 @@
         await _grid.EnableToolbarItemsAsync(["app-offer"], action == KanbanCardAction.MakeOffer);
         await _grid.EnableToolbarItemsAsync(["app-hire"], action == KanbanCardAction.Hire);
         if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-appoint"], action == KanbanCardAction.Appoint);
+        if (_canAppoint) await _grid.EnableToolbarItemsAsync(["app-revise-offer"], CanReviseOffer(_selectedRow));
         await _grid.EnableToolbarItemsAsync(["app-reject"], active);
         await _grid.EnableToolbarItemsAsync(["app-withdraw"], active);
         await _grid.EnableToolbarItemsAsync(["app-offer-response"], action == KanbanCardAction.RecordOfferResponse);
@@ -1216,6 +1223,9 @@
                 break;
             case "app-offer":
                 await OpenOfferDialog(row);
+                break;
+            case "app-revise-offer":
+                if (CanReviseOffer(row)) await OpenOfferDialog(row);
                 break;
             case "app-offer-response":
                 OpenOfferResponseDialog(row);
