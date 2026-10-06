@@ -9,7 +9,8 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
 
     public async Task GoToAsync(Guid companyId)
     {
-        await page.GotoAsync($"{baseUrl}/companies/{companyId}/internal-vacancies");
+        await page.GotoAsync($"{baseUrl}/companies/{companyId}/internal-vacancies",
+            new() { WaitUntil = WaitUntilState.DOMContentLoaded });
         await page.WaitForSelectorAsync(".app-shell", new() { Timeout = 30_000 });
         await WaitForInteractiveAsync();
     }

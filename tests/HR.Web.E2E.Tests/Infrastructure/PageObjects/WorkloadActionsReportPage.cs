@@ -50,16 +50,20 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
 
     public async Task SelectGroupByAsync(string groupByLabel)
     {
+        var versionBefore = await LoadRoot.GetAttributeAsync("data-load-version");
         try
         {
             await DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
         }
         catch (Exception ex) when (ex is PlaywrightException or TimeoutException)
         {
-            await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 20_000 });
             await Assertions.Expect(FilterField("Group By").Locator("span[role='combobox'] input").First)
                 .ToHaveValueAsync(groupByLabel, new() { Timeout = 15_000 });
         }
+
+        await Assertions.Expect(LoadRoot)
+            .Not.ToHaveAttributeAsync("data-load-version", versionBefore ?? string.Empty, new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 20_000 });
     }
 
     public async Task SetDueDateRangeAsync(DateOnly from, DateOnly to)

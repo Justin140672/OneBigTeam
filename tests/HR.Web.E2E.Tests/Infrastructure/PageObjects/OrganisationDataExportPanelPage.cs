@@ -29,7 +29,12 @@ public sealed class OrganisationDataExportPanelPage(IPage page, string baseUrl)
     public async Task ClickRequestAsync()
     {
         await RequestButton.ClickAsync();
-        await WaitForReloadAsync();
+        var outcome = Panel.Locator(".alert-success, .alert-danger").First;
+        await outcome.WaitForAsync(new() { Timeout = 30_000 });
+        var cls = await outcome.GetAttributeAsync("class") ?? string.Empty;
+        if (cls.Contains("alert-danger"))
+            throw new InvalidOperationException($"Export request failed: {(await outcome.TextContentAsync())?.Trim()}");
+        await Panel.Locator("dl.row").WaitForAsync(new() { Timeout = 15_000 });
     }
 
     public async Task ClickRefreshAsync()
@@ -38,16 +43,28 @@ public sealed class OrganisationDataExportPanelPage(IPage page, string baseUrl)
         await WaitForReloadAsync();
     }
 
-    private async Task WaitForReloadAsync() =>
+    private async Task WaitForReloadAsync()
+    {
         await Panel.Locator("dl.row")
             .Or(Panel.GetByText("No export has been requested yet."))
             .First
             .WaitForAsync(new() { Timeout = 15_000 });
+        await Assertions.Expect(RefreshButton).ToBeEnabledAsync(new() { Timeout = 15_000 });
+    }
 
     public async Task<string?> StatusTextAsync()
     {
         var dd = Panel.Locator("dl dd").First;
-        return await dd.CountAsync() > 0 ? (await dd.TextContentAsync())?.Trim() : null;
+        try
+        {
+            await dd.WaitForAsync(new() { Timeout = 15_000 });
+        }
+        catch (TimeoutException)
+        {
+            return null;
+        }
+
+        return (await dd.TextContentAsync())?.Trim();
     }
 
     public ILocator HistoryGrid => Panel.Locator(".e-grid");

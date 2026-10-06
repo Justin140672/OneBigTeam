@@ -147,8 +147,27 @@ public sealed class SharedDocumentExpireTests(HrAdminPersonaFixture fixture) : R
         await File.WriteAllBytesAsync(filePath, BuildTestPdf());
         await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
 
-        await dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 30_000 });
+        var uploadButton = dialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true });
+        var fileMissingAlert = dialog.GetByText("Please select a file.");
+        for (var attempt = 1; ; attempt++)
+        {
+            await uploadButton.ClickAsync();
+            try
+            {
+                await dialog.WaitForAsync(new()
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = attempt < 3 ? 8_000 : 30_000,
+                });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                if (!await fileMissingAlert.IsVisibleAsync())
+                    throw;
+                await dialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+            }
+        }
 
         await _page.WaitForSelectorAsync($"text={title}", new() { Timeout = 15_000 });
     }

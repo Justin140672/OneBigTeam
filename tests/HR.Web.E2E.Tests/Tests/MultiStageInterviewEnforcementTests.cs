@@ -69,9 +69,7 @@ public sealed class MultiStageInterviewEnforcementTests(RecruiterPersonaFixture 
 
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await kanban.GoToStandaloneAsync(AcmeId, vacancyId);
-        await _page.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateLast }).First
-            .Locator("[data-testid='kanban-card-move-stage-btn']").ClickAsync();
-        await _page.Locator("[data-testid='kanban-card-make-offer']").WaitForAsync(new() { Timeout = 10_000 });
+        await kanban.ExpectCardMenuItemAsync(candidateLast, "kanban-card-make-offer");
     }
 
     [Fact]

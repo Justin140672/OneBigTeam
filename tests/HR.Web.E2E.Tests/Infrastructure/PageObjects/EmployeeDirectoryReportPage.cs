@@ -163,7 +163,7 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
         await combobox.ClickAsync();
         await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
 
-        var items = await page.Locator(".e-popup.e-ddl .e-list-item").AllAsync();
+        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllAsync();
         var result = new List<string>();
         foreach (var item in items)
             result.Add((await item.TextContentAsync())?.Trim() ?? "");

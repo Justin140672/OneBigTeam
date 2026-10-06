@@ -73,13 +73,8 @@ public sealed class LeaveSummaryReportPage(IPage page, string baseUrl)
     }
 
 
-    public async Task<IDownload> ExportAsync(string formatLabel)
-    {
-        var downloadTask = page.WaitForDownloadAsync();
-        await page.GetByRole(AriaRole.Button, new() { Name = "Export" }).ClickAsync();
-        await page.GetByRole(AriaRole.Menuitem, new() { Name = formatLabel }).ClickAsync();
-        return await downloadTask;
-    }
+    public Task<IDownload> ExportAsync(string formatLabel) =>
+        ReportExport.ExportAsync(page, formatLabel);
 
     public async Task<bool> HasLoadErrorAsync() => await page.Locator(".alert-danger").IsVisibleAsync();
 }

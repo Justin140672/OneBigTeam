@@ -4,6 +4,7 @@
 @inject ApplicationService ApplicationService
 @inject CompanyService CompanyService
 @inject EmployeeService EmployeeService
+@inject EmployeeDirectoryService EmployeeDirectoryService
 @inject EmploymentTypeService EmploymentTypeService
 @inject VacancyService VacancyService
 
@@ -282,10 +283,10 @@
         var option = _managerOptions.FirstOrDefault(m => m.Id == id);
         if (option is null)
         {
-            var hiringManager = await EmployeeService.GetEmployeeAsync(CompanyId, id);
-            if (hiringManager is not null && hiringManager.Status != "FormerEmployee")
+            var hiringManager = await EmployeeDirectoryService.GetAsync(CompanyId, id);
+            if (hiringManager is not null)
             {
-                option = new ManagerOption(hiringManager.Id, hiringManager.FullName);
+                option = new ManagerOption(hiringManager.Id, hiringManager.DisplayName);
                 _managerOptions = _managerOptions.Append(option).ToList();
             }
         }

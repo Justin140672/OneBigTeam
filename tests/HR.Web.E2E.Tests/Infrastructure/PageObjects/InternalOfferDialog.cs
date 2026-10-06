@@ -163,11 +163,25 @@ public sealed class InternalOfferDialog(IPage page)
 
     private async Task FillNumericAsync(ILocator input, string value)
     {
-        await input.ClickAsync();
-        await page.Keyboard.PressAsync("Control+A");
-        await page.Keyboard.PressAsync("Delete");
-        await input.PressSequentiallyAsync(value, new() { Delay = 10 });
-        await page.Keyboard.PressAsync("Tab");
-        await Assertions.Expect(input).Not.ToHaveValueAsync("", new() { Timeout = 10_000 });
+        var expected = decimal.Parse(value, CultureInfo.InvariantCulture);
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await input.ClickAsync();
+            await page.Keyboard.PressAsync("Control+A");
+            await page.Keyboard.PressAsync("Delete");
+            await page.WaitForTimeoutAsync(150);
+            await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+            await page.Keyboard.PressAsync("Tab");
+            await page.WaitForTimeoutAsync(200);
+
+            var text = await input.InputValueAsync();
+            var digits = new string(text.Where(c => char.IsDigit(c) || c == '.').ToArray());
+            if (decimal.TryParse(digits, NumberStyles.Number, CultureInfo.InvariantCulture, out var actual) && actual == expected)
+                return;
+        }
+
+        await Assertions.Expect(input).ToHaveValueAsync(
+            new Regex(Regex.Escape(expected.ToString("N0", CultureInfo.InvariantCulture))),
+            new() { Timeout = 10_000 });
     }
 }

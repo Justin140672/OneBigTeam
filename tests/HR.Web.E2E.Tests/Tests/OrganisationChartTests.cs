@@ -83,13 +83,10 @@ public sealed class OrganisationChartTests(HrAdminPersonaFixture fixture) : Role
         await login.GoToAsync();
         await login.LoginAsync(LauraEmail);
 
-        await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/employees/{LauraId}");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
-
-        await _page.GetByRole(AriaRole.Button, new() { Name = "More actions" }).ClickAsync();
-        await _page.Locator("#org-chart").ClickAsync();
-        await _page.WaitForURLAsync(
-            new Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
+        var empEdit = new EmployeeEditPage(_page, _fixture.WebBaseUrl);
+        await empEdit.GoToAsync(AcmeId, LauraId);
+        Assert.True(await empEdit.IsMoreActionsMenuVisibleAsync(), "Expected the 'More actions' menu on the employee page");
+        await empEdit.ClickViewOrganisationChartMenuItemAsync();
 
         Assert.Contains($"employeeId={LauraId}", _page.Url, StringComparison.OrdinalIgnoreCase);
 

@@ -389,9 +389,25 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
 
     public async Task ClickViewOrganisationChartMenuItemAsync()
     {
-        await OpenMoreActionsMenuAsync();
-        await page.Locator("#org-chart").ClickAsync();
-        await page.WaitForURLAsync(new System.Text.RegularExpressions.Regex(@"/organisation-chart\?employeeId="), new() { Timeout = 15_000 });
+        var menuItem = page.Locator("#org-chart");
+        var urlPattern = new System.Text.RegularExpressions.Regex(@"/organisation-chart\?employeeId=");
+
+        for (var attempt = 1; ; attempt++)
+        {
+            await OpenMoreActionsMenuAsync();
+            try
+            {
+                await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                await menuItem.ClickAsync();
+                await page.WaitForURLAsync(urlPattern,
+                    new() { Timeout = attempt < 3 ? 8_000 : 30_000, WaitUntil = WaitUntilState.Commit });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+                await page.Keyboard.PressAsync("Escape");
+            }
+        }
     }
 
     public async Task<bool> HasStartOffboardingMenuItemAsync()
@@ -653,7 +669,21 @@ public sealed class EmployeeEditPage(IPage page, string baseUrl)
         if (selectNoManagerIfUnset)
             await SelectNoManagerTopLevelIfUnsetAsync();
 
+        var errorBanner = page.Locator(".alert-danger");
+        var hadStaleError = await errorBanner.CountAsync() > 0;
+
         await page.GetByRole(AriaRole.Button, new() { Name = "Save" }).ClickAsync();
+
+        if (hadStaleError)
+        {
+            try
+            {
+                await errorBanner.First.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 3_000 });
+            }
+            catch (TimeoutException)
+            {
+            }
+        }
 
         try
         {

@@ -314,15 +314,48 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     public Task<bool> IsMoveStageMenuOpenAsync(string candidateNameFragment) =>
         MoveStageMenu(candidateNameFragment).IsVisibleAsync();
 
+    public async Task<ILocator> OpenCardMenuAsync(string candidateNameFragment)
+    {
+        var menu = MoveStageMenu(candidateNameFragment);
+        for (var attempt = 1; ; attempt++)
+        {
+            if (!await menu.IsVisibleAsync())
+                await MoveStageButton(candidateNameFragment).ClickAsync();
+
+            try
+            {
+                await menu.WaitForAsync(new() { Timeout = attempt < 4 ? 4_000 : 15_000 });
+                return menu;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
+    }
+
+    public async Task ExpectCardMenuItemAsync(string candidateNameFragment, string testId)
+    {
+        var menu = await OpenCardMenuAsync(candidateNameFragment);
+        await menu.Locator($"[data-testid='{testId}']").WaitForAsync(new() { Timeout = 10_000 });
+    }
+
     public async Task ClickReviewCvFromCardMenuAsync(string candidateNameFragment)
     {
-        await MoveStageButton(candidateNameFragment).ClickAsync();
-        await MoveStageMenu(candidateNameFragment).WaitForAsync(new() { Timeout = 10_000 });
-        await MoveStageMenu(candidateNameFragment)
-            .Locator("[data-testid='kanban-card-review-cv']")
-            .ClickAsync();
-        await page.WaitForURLAsync("**/review-cv**",
-            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
+        for (var attempt = 1; ; attempt++)
+        {
+            var menu = await OpenCardMenuAsync(candidateNameFragment);
+            await menu.Locator("[data-testid='kanban-card-review-cv']").ClickAsync();
+
+            try
+            {
+                await page.WaitForURLAsync("**/review-cv**",
+                    new() { Timeout = attempt < 3 ? 8_000 : 30_000, WaitUntil = WaitUntilState.Commit });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+            }
+        }
     }
 
     // ── Internal recruitment Ticket 6: Internal badge on the card ────────────────

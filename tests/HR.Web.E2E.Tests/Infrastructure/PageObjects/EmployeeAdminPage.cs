@@ -90,13 +90,36 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
     public async Task SelectUploadDialogFileAsync(string filePath)
     {
         await UploadDocumentDialog.GetByRole(AriaRole.Tab, new() { Name = "File" }).ClickAsync();
+        _uploadDialogFilePath = filePath;
         await UploadDocumentDialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
     }
 
+    private string? _uploadDialogFilePath;
+
     public async Task SubmitUploadDocumentDialogAsync()
     {
-        await UploadDocumentDialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true }).ClickAsync();
-        await UploadDocumentDialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
+        var uploadButton = UploadDocumentDialog.GetByRole(AriaRole.Button, new() { Name = "Upload", Exact = true });
+        var fileMissingAlert = UploadDocumentDialog.GetByText("Please select a file.");
+
+        for (var attempt = 1; ; attempt++)
+        {
+            await uploadButton.ClickAsync();
+            try
+            {
+                await UploadDocumentDialog.WaitForAsync(new()
+                {
+                    State = WaitForSelectorState.Hidden,
+                    Timeout = attempt < 3 ? 6_000 : 15_000,
+                });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3 && _uploadDialogFilePath is not null)
+            {
+                if (!await fileMissingAlert.IsVisibleAsync())
+                    throw;
+                await UploadDocumentDialog.Locator("input[type='file']").SetInputFilesAsync(_uploadDialogFilePath);
+            }
+        }
     }
 
     public async Task<bool> HasDocumentRequestsSectionAsync() =>
@@ -352,11 +375,22 @@ public sealed class EmployeeAdminPage(IPage page, string baseUrl)
         if (hours.HasValue)
         {
             var hoursInput = dialog.Locator("input.e-numerictextbox");
-            await hoursInput.ClickAsync();
-            await page.Keyboard.PressAsync("Control+A");
-            await page.Keyboard.PressAsync("Delete");
-            await hoursInput.PressSequentiallyAsync(hours.Value.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            await page.Keyboard.PressAsync("Tab");
+            var text = hours.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            for (var attempt = 1; attempt <= 3; attempt++)
+            {
+                await hoursInput.ClickAsync();
+                await page.Keyboard.PressAsync("Control+A");
+                await page.Keyboard.PressAsync("Delete");
+                await page.WaitForTimeoutAsync(150);
+                await hoursInput.PressSequentiallyAsync(text, new() { Delay = 30 });
+                await page.Keyboard.PressAsync("Tab");
+                await page.WaitForTimeoutAsync(200);
+
+                var typed = (await hoursInput.InputValueAsync()).Replace(",", "");
+                if (decimal.TryParse(typed, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var actual)
+                    && actual == hours.Value)
+                    break;
+            }
         }
 
         if (!string.IsNullOrEmpty(reason))

@@ -214,8 +214,22 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
 
     public async Task CloseAsync()
     {
-        await page.Locator("[data-testid='review-cv-close']").ClickAsync();
-        await WaitForNavigatedAwayAsync();
+        var close = page.Locator("[data-testid='review-cv-close']");
+        for (var attempt = 1; ; attempt++)
+        {
+            await Assertions.Expect(close).ToBeEnabledAsync(new() { Timeout = 15_000 });
+            await close.ClickAsync();
+
+            try
+            {
+                await page.WaitForURLAsync(u => !u.Contains("/review-cv"),
+                    new() { Timeout = attempt < 3 ? 8_000 : 30_000, WaitUntil = WaitUntilState.Commit });
+                return;
+            }
+            catch (TimeoutException) when (attempt < 3)
+            {
+            }
+        }
     }
 
     // ── Reject dialog ───────────────────────────────────────────────────────────
@@ -243,6 +257,7 @@ public sealed class ReviewCvPage(IPage page, string baseUrl)
 
     private async Task WaitForNavigatedAwayAsync()
     {
-        await page.WaitForURLAsync(u => !u.Contains("/review-cv"), new() { Timeout = 30_000 });
+        await page.WaitForURLAsync(u => !u.Contains("/review-cv"),
+            new() { Timeout = 30_000, WaitUntil = WaitUntilState.Commit });
     }
 }

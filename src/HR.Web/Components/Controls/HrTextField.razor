@@ -38,7 +38,7 @@
     {
         <div id="@HelpId" class="form-text">@HelpText</div>
     }
-    @if (ValueExpression is not null)
+    @if (ValueExpression is not null && EditContext is not null)
     {
         <div id="@ErrorId" role="alert">
             <ValidationMessage For="@ValueExpression" class="@ValidationMessageClass" />
