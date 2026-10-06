@@ -9,9 +9,11 @@ namespace HR.Modules.Identity.Services;
 
 /// <summary>
 /// Undoes the externally visible effects of an incomplete signup operation: deactivates the company
-/// shell and deletes the Supabase account, but only when that account is proven to belong to this
-/// operation (recorded id, or provisioning-operation metadata match). The caller must hold the
-/// operation's lease so a slow original owner is fenced out by the version check.
+/// shell and deletes the Supabase account, but only when that account carries this operation's
+/// correlation id. The caller must have just taken the operation's lease; the first thing done is a
+/// fenced save that persists the compensating state, so a worker that lost the lease (or a normal
+/// processing run) cannot advance or complete the operation afterwards, and a stale caller never
+/// reaches a destructive step.
 /// </summary>
 internal sealed class SignUpOperationCompensator(
     IdentityDbContext dbContext,
@@ -21,6 +23,8 @@ internal sealed class SignUpOperationCompensator(
     IClock clock,
     ILogger<SignUpOperationCompensator> logger)
 {
+    internal static readonly TimeSpan CompensationLease = TimeSpan.FromMinutes(3);
+
     public async Task<bool> CompensateAsync(
         SignUpOperation operation,
         string failureCode,
@@ -28,13 +32,37 @@ internal sealed class SignUpOperationCompensator(
         bool releaseKey,
         CancellationToken cancellationToken)
     {
+        if (!operation.IsCompensating)
+        {
+            var begin = operation.Version;
+            operation.BeginCompensation(failureCode, releaseKey, clock.UtcNowOffset(), CompensationLease);
+            var started = await dbContext.SaveChangesWithConcurrencyAsync(
+                operation, begin, "The signup operation changed before it could be compensated.", cancellationToken);
+            if (started.IsFailure)
+            {
+                logger.LogWarning("Signup operation {OperationId} is owned by another worker; compensation skipped.", operation.Id);
+                return false;
+            }
+        }
+        else
+        {
+            failureCode = operation.CompensationCode ?? failureCode;
+            releaseKey = operation.CompensationReleaseKey;
+        }
+
+        if (!await RenewAsync(operation, cancellationToken))
+        {
+            return false;
+        }
+
         await companyProvisioner.DeactivateCompanyAsync(operation.CompanyId, cancellationToken);
 
-        var supabaseUserId = operation.SupabaseAuthUserId ?? await ResolveOwnedSupabaseUserAsync(operation, cancellationToken);
-        if (supabaseUserId is { } id)
+        if (!await RenewAsync(operation, cancellationToken))
         {
-            await supabaseAuthGateway.DeleteUserAsync(id, cancellationToken);
+            return false;
         }
+
+        var identityRemoved = await DeleteOwnedSupabaseUserAsync(operation, cancellationToken);
 
         var now = clock.UtcNowOffset();
         var expectedVersion = operation.Version;
@@ -49,8 +77,8 @@ internal sealed class SignUpOperationCompensator(
         }
 
         logger.LogInformation(
-            "Signup operation {OperationId} compensated at stage transition to {Stage}: company {CompanyId} deactivated, identity removed: {IdentityRemoved}.",
-            operation.Id, operation.Stage, operation.CompanyId, supabaseUserId is not null);
+            "Signup operation {OperationId} compensated: company {CompanyId} deactivated, identity removed: {IdentityRemoved}.",
+            operation.Id, operation.CompanyId, identityRemoved);
 
         await auditEventPublisher.PublishAsync(
             new RegistrationCreatedAuditEvent(operation.CompanyId, AdminUserId: null, now, Succeeded: false, failureCode),
@@ -59,14 +87,41 @@ internal sealed class SignUpOperationCompensator(
         return true;
     }
 
-    private async Task<Guid?> ResolveOwnedSupabaseUserAsync(SignUpOperation operation, CancellationToken cancellationToken)
+    /// <summary>
+    /// Removes anything a worker that lost its lease may have created after the operation was
+    /// compensated: the (idempotently re-deactivated) company and an owned Supabase account. Safe to
+    /// repeat; never touches resources whose ownership cannot be proven.
+    /// </summary>
+    public async Task RemoveLateResourcesAsync(SignUpOperation operation, CancellationToken cancellationToken)
+    {
+        await companyProvisioner.DeactivateCompanyAsync(operation.CompanyId, cancellationToken);
+        await DeleteOwnedSupabaseUserAsync(operation, cancellationToken);
+    }
+
+    private async Task<bool> RenewAsync(SignUpOperation operation, CancellationToken cancellationToken)
+    {
+        var expectedVersion = operation.Version;
+        operation.RenewLease(clock.UtcNowOffset(), CompensationLease);
+        var renewed = await dbContext.SaveChangesWithConcurrencyAsync(
+            operation, expectedVersion, "The signup operation changed while it was being compensated.", cancellationToken);
+        return renewed.IsSuccess;
+    }
+
+    private async Task<bool> DeleteOwnedSupabaseUserAsync(SignUpOperation operation, CancellationToken cancellationToken)
     {
         var existing = await supabaseAuthGateway.GetUserMetadataByEmailAsync(operation.AdminEmail, cancellationToken);
 
-        return existing is { } found
+        var owned = existing is { } found
             && found.Metadata.TryGetValue(SignUpOperation.ProvisioningMetadataKey, out var correlation)
             && correlation == operation.Id.ToString()
-                ? found.UserId
-                : null;
+            && (operation.SupabaseAuthUserId is null || operation.SupabaseAuthUserId == found.UserId);
+
+        if (!owned)
+        {
+            return false;
+        }
+
+        await supabaseAuthGateway.DeleteUserAsync(existing!.Value.UserId, cancellationToken);
+        return true;
     }
 }

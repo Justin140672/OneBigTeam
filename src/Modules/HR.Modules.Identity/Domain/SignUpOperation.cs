@@ -21,11 +21,19 @@ internal sealed class SignUpOperation : IVersionedAggregate
     public const string StageEmployeeCreated = "employee_created";
     public const string StageIdentityCreated = "identity_created";
     public const string StageCompleted = "completed";
+    public const string StageCompensating = "compensating";
     public const string StageCompensated = "compensated";
 
     public const string ProvisioningMetadataKey = "provisioning_operation_id";
 
     public const string LegacyFingerprint = "legacy";
+
+    /// <summary>Extra time after a lease expires before another worker may take it over or compensate it,
+    /// so a just-expired worker cannot still be inside a legitimate external request.</summary>
+    public static readonly TimeSpan TakeoverSafetyInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>Upper bound for one external side effect; must stay below lease plus safety interval.</summary>
+    public static readonly TimeSpan ExternalCallTimeout = TimeSpan.FromMinutes(2);
 
     /// <summary>
     /// How long a terminal (completed or failed) operation stays replayable before it is purged.
@@ -48,7 +56,11 @@ internal sealed class SignUpOperation : IVersionedAggregate
     public string? FailureMessage { get; private set; }
     public string? LastError { get; private set; }
     public int AttemptCount { get; private set; }
+    public Guid? LeaseToken { get; private set; }
     public DateTimeOffset? LeaseExpiresAt { get; private set; }
+    public string? CompensationCode { get; private set; }
+    public bool CompensationReleaseKey { get; private set; }
+    public DateTimeOffset? SweptAt { get; private set; }
     public DateTimeOffset CreatedAt { get; private set; }
     public DateTimeOffset UpdatedAt { get; private set; }
     public DateTimeOffset? CompletedAt { get; private set; }
@@ -63,7 +75,10 @@ internal sealed class SignUpOperation : IVersionedAggregate
         || RequestFingerprint == fingerprint
         || (RequestFingerprint == LegacyFingerprint && NormalizedEmail == normalizedEmail);
 
-    public bool LeaseIsActive(DateTimeOffset now) => LeaseExpiresAt is { } expires && expires > now;
+    public bool IsCompensating => Stage == StageCompensating;
+
+    public bool LeaseIsActive(DateTimeOffset now) =>
+        LeaseExpiresAt is { } expires && expires + TakeoverSafetyInterval > now;
 
     public static SignUpOperation Claim(
         string? idempotencyKey, string fingerprint, string adminEmail, DateTimeOffset now, TimeSpan lease)
@@ -77,6 +92,7 @@ internal sealed class SignUpOperation : IVersionedAggregate
             NormalizedEmail = Normalize(adminEmail),
             CompanyId = Guid.NewGuid(),
             AttemptCount = 1,
+            LeaseToken = Guid.NewGuid(),
             LeaseExpiresAt = now + lease,
             CreatedAt = now,
             UpdatedAt = now,
@@ -88,6 +104,7 @@ internal sealed class SignUpOperation : IVersionedAggregate
     public void TakeLease(DateTimeOffset now, TimeSpan lease)
     {
         AttemptCount++;
+        LeaseToken = Guid.NewGuid();
         LeaseExpiresAt = now + lease;
         UpdatedAt = now;
     }
@@ -100,10 +117,22 @@ internal sealed class SignUpOperation : IVersionedAggregate
 
     public void ReleaseLease(string? lastError, DateTimeOffset now)
     {
+        LeaseToken = null;
         LeaseExpiresAt = null;
         LastError = lastError;
         UpdatedAt = now;
     }
+
+    public void BeginCompensation(string code, bool releaseKey, DateTimeOffset now, TimeSpan lease)
+    {
+        Stage = StageCompensating;
+        CompensationCode = code;
+        CompensationReleaseKey = releaseKey;
+        LeaseExpiresAt = now + lease;
+        UpdatedAt = now;
+    }
+
+    public void MarkSwept(DateTimeOffset now) => SweptAt = now;
 
     public void MarkCompanyProvisioned(DateTimeOffset now)
     {
@@ -130,6 +159,7 @@ internal sealed class SignUpOperation : IVersionedAggregate
         ResponseJson = responseJson;
         Status = StatusCompleted;
         Stage = StageCompleted;
+        LeaseToken = null;
         LeaseExpiresAt = null;
         LastError = null;
         CompletedAt = now;
@@ -147,6 +177,7 @@ internal sealed class SignUpOperation : IVersionedAggregate
         Stage = StageCompensated;
         FailureCode = code;
         FailureMessage = message;
+        LeaseToken = null;
         LeaseExpiresAt = null;
         CompletedAt = now;
         UpdatedAt = now;

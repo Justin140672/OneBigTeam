@@ -18,26 +18,39 @@ internal sealed class FakeEmployeeProvisioningService : IEmployeeProvisioningSer
 
     public bool ShouldThrowOnMark { get; set; }
 
-    public Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
+    public Func<Task>? BeforeCreateEffect { get; set; }
+
+    public Func<Task>? BeforeMarkEffect { get; set; }
+
+    public async Task MarkAsInitialCompanyAdminAsync(Guid companyId, Guid employeeId, CancellationToken cancellationToken)
     {
+        if (BeforeMarkEffect is { } before)
+        {
+            await before();
+        }
+
         if (ShouldThrowOnMark)
         {
             throw new InvalidOperationException("Simulated mark-as-admin failure.");
         }
 
         MarkedAsInitialCompanyAdmin.Add((companyId, employeeId));
-        return Task.CompletedTask;
     }
 
-    public Task<Result<Guid>> CreateFromCandidateAsync(
+    public async Task<Result<Guid>> CreateFromCandidateAsync(
         EmployeeProvisioningRequest request,
         CancellationToken cancellationToken)
     {
         CallCount++;
         Requests.Add(request);
 
-        return Task.FromResult(ShouldFail
+        if (BeforeCreateEffect is { } before)
+        {
+            await before();
+        }
+
+        return ShouldFail
             ? Result.Failure<Guid>(Error.Validation("Simulated employee provisioning failure."))
-            : Result.Success(EmployeeIdToReturn));
+            : Result.Success(EmployeeIdToReturn);
     }
 }

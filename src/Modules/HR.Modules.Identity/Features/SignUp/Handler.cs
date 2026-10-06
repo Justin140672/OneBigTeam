@@ -25,6 +25,11 @@ namespace HR.Modules.Identity.Features.SignUp;
 // retry resumes from the persisted stage instead of re-provisioning. The final local commit
 // (UserProfile + roles + replayable response) is a single transaction.
 //
+// Every lease carries a unique fencing token (also an EF concurrency token). Each external step is
+// preceded by a fenced lease renewal and followed by a lease re-check; a worker that lost its lease
+// removes any late company/identity it created once the operation is terminal, and compensation first
+// persists a compensating state so normal processing can no longer advance or complete the operation.
+//
 // Failures leave the operation resumable (lease released) until MaxAttempts is reached; abandoned
 // operations are compensated (company deactivated, proven-owned Supabase account deleted) by the
 // retrying request itself or by SignUpOperationReconciliationJob. Passwords and password-derived values are never persisted; the request fingerprint covers
@@ -253,8 +258,16 @@ internal sealed class SignUpHandler(
     private async Task<Result<SignUpResponse>> RunAsync(
         SignUpOperation operation, SignUpRequest request, CancellationToken cancellationToken)
     {
+        var operationId = operation.Id;
+        var leaseToken = operation.LeaseToken;
+
         try
         {
+            if (operation.IsCompensating)
+            {
+                return await CompensateAsync(operation, operation.CompensationCode ?? "registration_failed", operation.CompensationReleaseKey, cancellationToken);
+            }
+
             if (operation.AttemptCount > MaxAttempts)
             {
                 return await CompensateAsync(operation, "registration_failed", releaseKey: true, cancellationToken);
@@ -269,16 +282,29 @@ internal sealed class SignUpHandler(
         }
         catch (SignUpLeaseLostException)
         {
-            return await WaitForOutcomeAsync(operation.Id, cancellationToken);
+            await RemoveLateResourcesAsync(operationId);
+            return await WaitForOutcomeAsync(operationId, cancellationToken);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await ReleaseLeaseAsync(await ReloadAsync(operation), null);
+            if (await ReloadOwnedAsync(operationId, leaseToken) is { } owned)
+            {
+                await ReleaseLeaseAsync(owned, null);
+            }
+
             throw;
         }
         catch (Exception ex)
         {
-            operation = await ReloadAsync(operation);
+            var reloaded = await ReloadOwnedAsync(operationId, leaseToken);
+            if (reloaded is null)
+            {
+                logger.LogWarning(ex, "Self-service registration {OperationId} failed after its lease was lost.", operationId);
+                await RemoveLateResourcesAsync(operationId);
+                return await WaitForOutcomeAsync(operationId, cancellationToken);
+            }
+
+            operation = reloaded;
             logger.LogError(ex, "Self-service registration {OperationId} failed at stage {Stage} (attempt {Attempt}).",
                 operation.Id, operation.Stage, operation.AttemptCount);
 
@@ -307,28 +333,32 @@ internal sealed class SignUpHandler(
 
         if (operation.Stage == SignUpOperation.StageClaimed)
         {
-            await companyProvisioner.ProvisionCompanyAsync(
-                request.CompanyName.Trim(), adminAccount, cancellationToken, operation.CompanyId);
+            await SideEffectAsync(operation, ct => companyProvisioner.ProvisionCompanyAsync(
+                request.CompanyName.Trim(), adminAccount, ct, operation.CompanyId), cancellationToken);
             await AdvanceAsync(operation, o => o.MarkCompanyProvisioned(clock.UtcNowOffset()), cancellationToken);
         }
 
         if (operation.Stage == SignUpOperation.StageCompanyProvisioned)
         {
-            var defaults = await companyDefaultDataSeeder.SeedDefaultsAsync(operation.CompanyId, cancellationToken);
+            var defaults = await SideEffectAsync(operation, ct => companyDefaultDataSeeder.SeedDefaultsAsync(operation.CompanyId, ct), cancellationToken);
 
-            var employeeResult = await CreateAdminEmployeeAsync(operation, defaults, request, cancellationToken);
+            var employeeResult = await SideEffectAsync(operation, ct => CreateAdminEmployeeAsync(operation, defaults, request, ct), cancellationToken);
             if (!employeeResult.IsSuccess)
             {
                 throw new InvalidOperationException(employeeResult.Error.Message);
             }
 
-            await employeeProvisioningService.MarkAsInitialCompanyAdminAsync(operation.CompanyId, employeeResult.Value, cancellationToken);
+            await SideEffectAsync(operation, async ct =>
+            {
+                await employeeProvisioningService.MarkAsInitialCompanyAdminAsync(operation.CompanyId, employeeResult.Value, ct);
+                return true;
+            }, cancellationToken);
             await AdvanceAsync(operation, o => o.MarkEmployeeCreated(employeeResult.Value, clock.UtcNowOffset()), cancellationToken);
         }
 
         if (operation.Stage == SignUpOperation.StageEmployeeCreated)
         {
-            var supabaseUserId = await EnsureSupabaseUserAsync(operation, request, cancellationToken);
+            var supabaseUserId = await SideEffectAsync(operation, ct => EnsureSupabaseUserAsync(operation, request, ct), cancellationToken);
             await AdvanceAsync(operation, o => o.MarkIdentityCreated(supabaseUserId, clock.UtcNowOffset()), cancellationToken);
         }
 
@@ -464,7 +494,7 @@ internal sealed class SignUpHandler(
         var done = await compensator.CompensateAsync(operation, code, message, releaseKey, cancellationToken);
         if (!done)
         {
-            return InProgress();
+            return await WaitForOutcomeAsync(operation.Id, cancellationToken);
         }
 
         return code == "conflict"
@@ -472,10 +502,67 @@ internal sealed class SignUpHandler(
             : Failed();
     }
 
-    private async Task<SignUpOperation> ReloadAsync(SignUpOperation operation)
+    private async Task<SignUpOperation?> ReloadOwnedAsync(Guid operationId, Guid? leaseToken)
     {
         dbContext.ChangeTracker.Clear();
-        return await dbContext.SignUpOperations.SingleOrDefaultAsync(o => o.Id == operation.Id) ?? operation;
+        var current = await dbContext.SignUpOperations.SingleOrDefaultAsync(o => o.Id == operationId);
+        return current is { IsInProgress: true } && current.LeaseToken is not null && current.LeaseToken == leaseToken
+            ? current
+            : null;
+    }
+
+    private async Task<T> SideEffectAsync<T>(
+        SignUpOperation operation, Func<CancellationToken, Task<T>> effect, CancellationToken cancellationToken)
+    {
+        var expectedVersion = operation.Version;
+        operation.RenewLease(clock.UtcNowOffset(), Lease);
+        var renewed = await dbContext.SaveChangesWithConcurrencyAsync(
+            operation, expectedVersion, "Signup operation lost its lease before an external step.", cancellationToken);
+        if (renewed.IsFailure)
+        {
+            throw new SignUpLeaseLostException();
+        }
+
+        T result;
+        using (var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+        {
+            bounded.CancelAfter(SignUpOperation.ExternalCallTimeout);
+            result = await effect(bounded.Token);
+        }
+
+        var stillHeld = await dbContext.SignUpOperations.AsNoTracking().AnyAsync(
+            o => o.Id == operation.Id
+                && o.LeaseToken == operation.LeaseToken
+                && o.Status == SignUpOperation.StatusInProgress
+                && o.Stage != SignUpOperation.StageCompensating,
+            cancellationToken);
+        if (!stillHeld)
+        {
+            throw new SignUpLeaseLostException();
+        }
+
+        return result;
+    }
+
+    private async Task RemoveLateResourcesAsync(Guid operationId)
+    {
+        try
+        {
+            dbContext.ChangeTracker.Clear();
+            var current = await dbContext.SignUpOperations.AsNoTracking().SingleOrDefaultAsync(o => o.Id == operationId);
+            if (current is null
+                || current.Status == SignUpOperation.StatusCompleted
+                || (current.IsInProgress && !current.IsCompensating))
+            {
+                return;
+            }
+
+            await compensator.RemoveLateResourcesAsync(current, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not remove late resources of signup operation {OperationId}; reconciliation will retry.", operationId);
+        }
     }
 
     private async Task ReleaseLeaseAsync(SignUpOperation operation, Exception? cause)

@@ -38,7 +38,11 @@ internal sealed class SignUpOperationConfiguration : IEntityTypeConfiguration<Si
         builder.Property(o => o.FailureMessage).HasColumnName("failure_message").HasMaxLength(512);
         builder.Property(o => o.LastError).HasColumnName("last_error").HasMaxLength(512);
         builder.Property(o => o.AttemptCount).HasColumnName("attempt_count").IsRequired();
+        builder.Property(o => o.LeaseToken).HasColumnName("lease_token").IsConcurrencyToken();
         builder.Property(o => o.LeaseExpiresAt).HasColumnName("lease_expires_at");
+        builder.Property(o => o.CompensationCode).HasColumnName("compensation_code").HasMaxLength(64);
+        builder.Property(o => o.CompensationReleaseKey).HasColumnName("compensation_release_key").HasDefaultValue(false).IsRequired();
+        builder.Property(o => o.SweptAt).HasColumnName("swept_at");
         builder.Property(o => o.CreatedAt).HasColumnName("created_at").IsRequired();
         builder.Property(o => o.UpdatedAt).HasColumnName("updated_at").IsRequired();
         builder.Property(o => o.CompletedAt).HasColumnName("completed_at");

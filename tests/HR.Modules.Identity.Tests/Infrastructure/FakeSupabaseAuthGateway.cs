@@ -30,11 +30,20 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
 
     public Func<string, Exception?>? FailAfterCreate { get; set; }
 
-    public Task<Guid> CreateUserAsync(
+    public Func<Task>? BeforeCreateEffect { get; set; }
+
+    public Func<Task>? AfterCreateEffect { get; set; }
+
+    public async Task<Guid> CreateUserAsync(
         string email, string password, string redirectTo, CancellationToken cancellationToken,
         IReadOnlyDictionary<string, string>? metadata = null)
     {
         CreateUserCallCount++;
+
+        if (BeforeCreateEffect is { } before)
+        {
+            await before();
+        }
 
         if (ShouldThrowEmailAlreadyRegistered || UserIdsByEmail.ContainsKey(email.Trim()))
         {
@@ -57,7 +66,12 @@ internal sealed class FakeSupabaseAuthGateway : ISupabaseAuthGateway
         if (FailAfterCreate?.Invoke(email) is { } failure)
             throw failure;
 
-        return Task.FromResult(userId);
+        if (AfterCreateEffect is { } after)
+        {
+            await after();
+        }
+
+        return userId;
     }
 
     public Task DeleteUserAsync(Guid supabaseUserId, CancellationToken cancellationToken)

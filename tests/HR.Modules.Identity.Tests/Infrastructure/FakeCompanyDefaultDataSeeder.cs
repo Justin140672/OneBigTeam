@@ -13,16 +13,23 @@ internal sealed class FakeCompanyDefaultDataSeeder : ICompanyDefaultDataSeeder
     public CompanyDefaultDataResult ResultToReturn { get; set; } = new(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
-    public Task<CompanyDefaultDataResult> SeedDefaultsAsync(Guid companyId, CancellationToken cancellationToken)
+    public Func<Task>? BeforeEffect { get; set; }
+
+    public async Task<CompanyDefaultDataResult> SeedDefaultsAsync(Guid companyId, CancellationToken cancellationToken)
     {
         CallCount++;
         SeededCompanyIds.Add(companyId);
+
+        if (BeforeEffect is { } before)
+        {
+            await before();
+        }
 
         if (ShouldThrow)
         {
             throw new InvalidOperationException("Simulated default data seeding failure.");
         }
 
-        return Task.FromResult(ResultToReturn);
+        return ResultToReturn;
     }
 }

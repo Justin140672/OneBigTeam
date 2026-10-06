@@ -17,7 +17,15 @@ internal sealed class FakeCompanyProvisioner : ICompanyProvisioner
 
     public List<CompanyProvisioningAdmin> ProvisionedAdmins { get; } = [];
 
-    public Task<Guid> ProvisionCompanyAsync(
+    public Func<Task>? BeforeProvisionEffect { get; set; }
+
+    public Func<Task>? AfterProvisionEffect { get; set; }
+
+    public bool ShouldThrowOnDeactivate { get; set; }
+
+    public HashSet<Guid> LiveCompanyIds { get; } = [];
+
+    public async Task<Guid> ProvisionCompanyAsync(
         string companyName, CompanyProvisioningAdmin admin, CancellationToken cancellationToken, Guid? companyId = null)
     {
         CallCount++;
@@ -29,14 +37,33 @@ internal sealed class FakeCompanyProvisioner : ICompanyProvisioner
             throw provisionFailure;
         }
 
-        return Task.FromResult(CompanyIdToReturn ?? companyId ?? Guid.NewGuid());
+        if (BeforeProvisionEffect is { } before)
+        {
+            await before();
+        }
+
+        var id = CompanyIdToReturn ?? companyId ?? Guid.NewGuid();
+        LiveCompanyIds.Add(id);
+
+        if (AfterProvisionEffect is { } after)
+        {
+            await after();
+        }
+
+        return id;
     }
 
     public List<Guid> DeactivatedCompanyIds { get; } = [];
 
     public Task DeactivateCompanyAsync(Guid companyId, CancellationToken cancellationToken)
     {
+        if (ShouldThrowOnDeactivate)
+        {
+            throw new InvalidOperationException("Simulated deactivate failure.");
+        }
+
         DeactivatedCompanyIds.Add(companyId);
+        LiveCompanyIds.Remove(companyId);
         return Task.CompletedTask;
     }
 
