@@ -210,7 +210,7 @@ public sealed class EmployeeListBulkUpdateTests(HrAdminPersonaFixture fixture) :
         await empEdit.SelectDropdownAsync("Gender", "Male");
         await empEdit.SelectDropdownAsync("Nationality", "British");
         await empEdit.FillDateOfBirthAsync("15/06/1990");
-        await empEdit.FillStartDateAsync("01/03/2026");
+        await empEdit.FillStartDateAsync("01/03/2027");
         await empEdit.FillEmployeeNumberAsync($"E2E-BLN-{unique}");
         await empEdit.SelectDropdownAsync("Employment Type", "Permanent");
         await empEdit.SelectDropdownAsync("Position Profile", "QA Engineer");

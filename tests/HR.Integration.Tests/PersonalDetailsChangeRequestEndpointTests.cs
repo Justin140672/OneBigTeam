@@ -90,7 +90,7 @@ public class PersonalDetailsChangeRequestEndpointTests
         var changePayload = await changeResp.Content.ReadFromJsonAsync<ChangeRequestPayload>();
 
         var tasksResp = await adminClient.GetAsync(
-            $"/api/companies/{SeededCompanyId}/tasks/unassigned");
+            $"/api/companies/{SeededCompanyId}/tasks/unassigned?search=Personal%20Details%20Change%20Request");
         Assert.Equal(HttpStatusCode.OK, tasksResp.StatusCode);
 
         var tasks = await tasksResp.Content.ReadFromJsonAsync<UnassignedTasksPayload>();

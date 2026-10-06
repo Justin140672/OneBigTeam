@@ -36,14 +36,39 @@ public sealed class PromoteEmployeeDialog(IPage page)
 
     public async Task<IReadOnlyList<string>> GetNewPositionProfileDropdownOptionsAsync()
     {
-        var field = Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First;
-        await field.Locator("span[role='combobox']").First.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
-        await page.Locator(".e-popup.e-ddl:visible .e-list-item").First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
-        var titles = (await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllTextContentsAsync())
-            .Select(t => t.Trim()).ToList();
+        var combobox = Dialog.Locator(".col-12").Filter(new() { HasText = "New Position Profile" }).First
+            .Locator("span[role='combobox']").First;
+        var openPopup = page.Locator(".e-popup.e-ddl:visible");
+        var items = openPopup.Locator(".e-list-item");
 
-        await page.Keyboard.PressAsync("Escape");
+        await combobox.HoverAsync();
+        await page.WaitForTimeoutAsync(350);
+
+        for (var attempt = 1; attempt <= 5; attempt++)
+        {
+            await combobox.ClickAsync();
+            try
+            {
+                await openPopup.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 6_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 5)
+            {
+                if (await openPopup.First.IsVisibleAsync()) break;
+            }
+        }
+
+        List<string> titles = [];
+        for (var attempt = 1; attempt <= 10; attempt++)
+        {
+            titles = (await items.AllTextContentsAsync()).Select(t => t.Trim()).ToList();
+            if (titles.Count > 0)
+                break;
+
+            await page.WaitForTimeoutAsync(1_000);
+        }
+
+        await Dialog.Locator("label.form-label").Filter(new() { HasText = "New Position Profile" }).First.ClickAsync();
         return titles;
     }
 

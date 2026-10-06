@@ -10,7 +10,7 @@
 <PageTitle>HR Settings</PageTitle>
 
 <div class="container py-4 hr-settings-page">
-    @if (IsLoading)
+    @if (IsLoading || _accessDenied)
     {
         <HrLoadingIndicator />
     }
@@ -426,7 +426,7 @@
     private WorkEmailNamingConvention _weConvention = WorkEmailNamingConvention.FirstNameDotLastName;
     private int _weVersion;
     private List<WorkEmailConventionExampleModel> _weExamples = [];
-    private string _weBaseline = string.Empty;
+    private string? _weBaseline;
     private bool _workEmailSaving;
     private bool _workEmailConflict;
     private string? _workEmailError;
@@ -435,7 +435,7 @@
     private string WorkEmailSnapshot() =>
         string.Join('|', _weEnabled, _wePrimaryDomain.Trim(), _weConvention);
 
-    private bool WorkEmailDirty => WorkEmailSnapshot() != _weBaseline;
+    private bool WorkEmailDirty => _weBaseline is not null && WorkEmailSnapshot() != _weBaseline;
 
     protected override bool HasUnsavedChanges => base.HasUnsavedChanges || WorkEmailDirty;
 
@@ -545,6 +545,7 @@
     private int _activeTabIndex;
 
     private bool _initialised;
+    private bool _accessDenied;
 
     private static readonly (int Tab, string Field)[] TabFieldMap =
     [
@@ -670,6 +671,7 @@
         await Session.InitialiseAsync();
         if (!Session.CanManageHrSettings)
         {
+            _accessDenied = true;
             Navigation.NavigateTo("/access-denied", replace: true);
             return;
         }

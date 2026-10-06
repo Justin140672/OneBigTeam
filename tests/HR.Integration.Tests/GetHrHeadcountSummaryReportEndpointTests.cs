@@ -104,7 +104,7 @@ public class GetHrHeadcountSummaryReportEndpointTests
     }
 
     [Fact]
-    public async Task Get_HrHeadcountSummary_TotalFte_Is_Genuine_Sum_Across_Employees_Including_One_With_No_Compensation()
+    public async Task Get_HrHeadcountSummary_TotalFte_Is_Genuine_Sum_Across_Employees_Including_One_On_Default_Working_Pattern()
     {
         var userId = Guid.NewGuid();
         var companyId = Guid.NewGuid();
@@ -135,8 +135,7 @@ public class GetHrHeadcountSummaryReportEndpointTests
             EmployeeReferenceDataSeeder.BuildCreateEmployeeRequest(
                 companyId, refData, "Carl", "NoComp", $"carl.{Guid.NewGuid():N}@example.com"));
         emp3Response.EnsureSuccessStatusCode();
-        // Carl keeps only his initial compensation record, which carries no FTE.
-
+        // Carl keeps only his initial compensation record, whose FTE comes from the default working pattern (1.0).
 
         var response = await client.GetAsync($"/api/companies/{companyId}/reporting/hr-headcount-summary");
 
@@ -144,7 +143,7 @@ public class GetHrHeadcountSummaryReportEndpointTests
         var payload = await response.Content.ReadFromJsonAsync<ReportPayload>();
         Assert.NotNull(payload);
         Assert.Equal(3, payload!.TotalHeadcount);
-        Assert.Equal(1.5m, payload.TotalFte);
+        Assert.Equal(2.5m, payload.TotalFte);
         Assert.NotEqual(payload.TotalHeadcount, payload.TotalFte);
     }
 

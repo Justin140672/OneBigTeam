@@ -205,21 +205,21 @@ public class IdentityModuleArchitectureTests
     }
 
     [Fact]
-    public void Position_Entity_Has_Tenant_And_NormalizedName_Unique_Index()
+    public void Position_Entity_Has_Tenant_And_NormalizedName_NonUnique_Index()
     {
         using var context = BuildContext();
 
         var entityType = context.Model.FindEntityType(typeof(Position))!;
 
-        var uniqueIndex = entityType
+        var index = entityType
             .GetIndexes()
             .SingleOrDefault(i =>
-                i.IsUnique &&
                 i.Properties.Count == 2 &&
                 i.Properties.Any(p => p.Name == nameof(Position.TenantId)) &&
                 i.Properties.Any(p => p.Name == nameof(Position.NormalizedName)));
 
-        Assert.NotNull(uniqueIndex);
+        Assert.NotNull(index);
+        Assert.False(index!.IsUnique);
     }
 
     [Fact]
