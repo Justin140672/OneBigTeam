@@ -48,6 +48,14 @@ jobs:
           pw=$(find tests/HR.Web.E2E.Tests -name 'playwright.ps1' | head -n1)
           pwsh "$pw" install --with-deps chromium
 
+      # The E2E database is recreated for every run, so use a fresh key rather than
+      # storing test encryption material in the repository or GitHub secrets.
+      - name: Configure ephemeral E2E encryption key
+        shell: bash
+        run: |
+          echo "Infrastructure__SensitiveDataProtection__ActiveKeyId=ci" >> "$GITHUB_ENV"
+          echo "Infrastructure__SensitiveDataProtection__Keys__ci=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+
       - name: Run E2E tests
         shell: bash
         env:
