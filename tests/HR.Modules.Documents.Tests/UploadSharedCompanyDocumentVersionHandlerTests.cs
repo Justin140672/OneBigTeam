@@ -730,6 +730,24 @@ public class UploadSharedCompanyDocumentVersionHandlerTests
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
             throw new DbUpdateException("Simulated database failure.");
     }
+    [Fact]
+    public async Task HandleAsync_Persists_Scan_Work_For_Document_And_Version_And_Still_Succeeds_When_Enqueue_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var category   = await SeedCategory(db, companyId);
+        var doc        = await SeedDocument(db, companyId, category.Id);
+        var handler    = BuildHandler(db, backgroundJobClient: new ThrowingBackgroundJobClient());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, doc.Id, file: FakePdfFile("policy-v2.pdf"), versionNote: "Updated"),
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var work = await db.FileScanWork.ToListAsync();
+        Assert.Contains(work, w => w.TargetType == FileScanTargetType.SharedCompanyDocument && w.EntityId == doc.Id);
+        Assert.Contains(work, w => w.TargetType == FileScanTargetType.SharedCompanyDocumentVersion);
+    }
 }
 
 public class UploadSharedCompanyDocumentVersionValidatorTests
@@ -881,4 +899,5 @@ public class SharedCompanyDocumentVersionDomainTests
 
         Assert.Null(version.AcknowledgementStatement);
     }
+
 }

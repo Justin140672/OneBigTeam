@@ -133,6 +133,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         db.SharedCompanyDocumentVersions.Add(version);
         db.SharedCompanyDocumentAudienceRules.AddRange(ruleBuildResult.Value!);
 
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId, now, cancellationToken);
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId, now, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -150,10 +152,8 @@ internal sealed class UploadSharedCompanyDocumentHandler(
         await auditPublisher.PublishAsync(new SharedCompanyDocumentFileUploadedAuditEvent(
             document.CompanyId, document.Id, document.Title, safeFileName, file.Length, document.VersionNumber, uploadedBy, now), cancellationToken);
 
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId, null));
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId, null));
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId);
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId);
 
         return Result.Success(new UploadSharedCompanyDocumentResponse(
             document.Id,

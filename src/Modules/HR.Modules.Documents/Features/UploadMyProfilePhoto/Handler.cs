@@ -81,6 +81,7 @@ internal sealed class UploadMyProfilePhotoHandler(
             db.PendingProfilePhotos.Add(pendingPhoto);
         }
 
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.PendingProfilePhoto, pendingPhoto.Id, pendingPhoto.CompanyId, now, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -125,8 +126,7 @@ internal sealed class UploadMyProfilePhotoHandler(
             employeeId,
             now), cancellationToken);
 
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, pendingPhoto.Id, pendingPhoto.CompanyId, null));
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.PendingProfilePhoto, pendingPhoto.Id, pendingPhoto.CompanyId);
 
         return Result.Success(new UploadMyProfilePhotoResponse(
             pendingPhoto.Id,

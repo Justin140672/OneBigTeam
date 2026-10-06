@@ -82,6 +82,9 @@ internal sealed class EmployeeProfilePhoto : IScannableFile, IPromotableStorageF
 
     public void MarkScanClean(DateTimeOffset now)
     {
+        if (ScanStatus is FileScanStatus.Infected or FileScanStatus.Failed)
+            return;
+
         ScanStatus = FileScanStatus.Clean;
         ScanCompletedAt = now;
         ScanFailureReason = null;

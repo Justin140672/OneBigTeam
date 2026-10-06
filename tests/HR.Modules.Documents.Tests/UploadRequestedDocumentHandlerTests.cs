@@ -325,4 +325,22 @@ public class UploadRequestedDocumentHandlerTests
 
         Assert.Equal(0, taskCompleter.CallCount);
     }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Scan_Work_And_Still_Succeeds_When_Enqueue_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var dt         = await SeedDocumentType(db, companyId);
+        var req        = await SeedRequest(db, companyId, employeeId, dt.Id);
+        var (handler, _, _) = BuildHandler(db, backgroundJobClient: new ThrowingBackgroundJobClient());
+
+        var result = await handler.HandleAsync(BuildRequest(companyId, employeeId, req.Id), employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var work = await db.FileScanWork.SingleAsync();
+        Assert.Equal(FileScanTargetType.Document, work.TargetType);
+        Assert.Equal(FileScanWorkState.Pending, work.State);
+    }
 }

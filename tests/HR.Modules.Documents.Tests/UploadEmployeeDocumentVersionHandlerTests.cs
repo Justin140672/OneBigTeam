@@ -261,4 +261,23 @@ public class UploadEmployeeDocumentVersionHandlerTests
         Assert.Null(newVersion.ExpiryReminder30SentAt);
         Assert.Null(newVersion.ExpiryReminder7SentAt);
     }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Scan_Work_And_Still_Succeeds_When_Enqueue_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var (_, _, previous) = await Seed(db, companyId, employeeId);
+        var handler    = BuildHandler(db, backgroundJobClient: new ThrowingBackgroundJobClient());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, employeeId, previous.Id, expiryDate: new DateOnly(2030, 1, 1)),
+            Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var work = await db.FileScanWork.SingleAsync();
+        Assert.Equal(FileScanTargetType.Document, work.TargetType);
+        Assert.Equal(FileScanWorkState.Pending, work.State);
+    }
 }

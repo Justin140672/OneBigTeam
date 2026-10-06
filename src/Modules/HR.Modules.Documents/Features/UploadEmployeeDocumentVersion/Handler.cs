@@ -126,6 +126,7 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
 
         outstandingRequest?.MarkUploaded(request.EmployeeId, now);
 
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.Document, newDocument.Id, newDocument.CompanyId, now, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -175,8 +176,7 @@ internal sealed class UploadEmployeeDocumentVersionHandler(
                 newDocument.CompanyId, request.EmployeeId, newVersion.Id, documentType.Name, now),
             cancellationToken);
 
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.Document, newDocument.Id, newDocument.CompanyId, null));
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.Document, newDocument.Id, newDocument.CompanyId);
 
         return Result.Success(new UploadEmployeeDocumentVersionResponse(
             newDocument.Id,

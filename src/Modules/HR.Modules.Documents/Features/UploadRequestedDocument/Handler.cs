@@ -107,6 +107,7 @@ internal sealed class UploadRequestedDocumentHandler(
         db.Documents.Add(document);
         db.EmployeeDocuments.Add(employeeDocument);
 
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.Document, document.Id, document.CompanyId, now, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -148,8 +149,7 @@ internal sealed class UploadRequestedDocumentHandler(
             uploadedBy,
             now), cancellationToken);
 
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.Document, document.Id, document.CompanyId, null));
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.Document, document.Id, document.CompanyId);
 
         return Result.Success(new UploadRequestedDocumentResponse(
             document.Id,

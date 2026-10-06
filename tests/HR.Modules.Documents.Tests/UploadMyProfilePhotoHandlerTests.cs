@@ -437,4 +437,35 @@ public class UploadMyProfilePhotoHandlerTests
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
             throw new DbUpdateException("Simulated database failure.");
     }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Scan_Work_And_Still_Succeeds_When_Enqueue_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var handler    = BuildHandler(db, backgroundJobClient: new ThrowingBackgroundJobClient());
+
+        var result = await handler.HandleAsync(BuildRequest(companyId), employeeId, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var work = await db.FileScanWork.SingleAsync();
+        Assert.Equal(FileScanTargetType.PendingProfilePhoto, work.TargetType);
+        Assert.Equal(result.Value!.Id, work.EntityId);
+        Assert.Equal(FileScanWorkState.Pending, work.State);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ReUpload_Restages_The_Same_Scan_Work_Item()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        var handler    = BuildHandler(db);
+
+        await handler.HandleAsync(BuildRequest(companyId), employeeId, CancellationToken.None);
+        await handler.HandleAsync(BuildRequest(companyId), employeeId, CancellationToken.None);
+
+        Assert.Single(await db.FileScanWork.ToListAsync());
+    }
 }

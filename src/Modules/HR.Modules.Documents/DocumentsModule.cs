@@ -361,6 +361,10 @@ public static class DocumentsModule
         services.AddScoped<DocumentExpiryReminderJob>();
         services.AddHttpClient();
         services.AddScoped<ScanUploadedFileJob>();
+        services.AddScoped<ReconcileFileScansJob>();
+        services.AddScoped<FileScanBacklogReader>();
+        services.AddHealthChecks().AddCheck<FileScanBacklogHealthCheck>(
+            "document-scan-backlog", failureStatus: HealthStatus.Degraded, tags: ["degraded"]);
         services.AddScoped<IdempotencyMaintenanceJob>();
 
         services.AddScoped<ISharedCompanyDocumentAcknowledgementHistoryReplayer, SharedCompanyDocumentAcknowledgementHistoryReplayer>();
@@ -393,6 +397,10 @@ public static class DocumentsModule
             "documents-idempotency-maintenance",
             job => job.ExecuteAsync(),
             "*/5 * * * *");
+        jobManager.AddOrUpdate<ReconcileFileScansJob>(
+            "documents-reconcile-file-scans",
+            job => job.ExecuteAsync(),
+            "*/2 * * * *");
         jobManager.AddOrUpdate<ReconcileMissingProfilePhotoReviewTasksJob>(
             "reconcile-missing-profile-photo-review-tasks",
             job => job.ExecuteAsync(),

@@ -23,6 +23,7 @@ internal class DocumentsDbContext : DbContext
     public DbSet<SharedCompanyDocumentReviewHistory> SharedCompanyDocumentReviewHistories => Set<SharedCompanyDocumentReviewHistory>();
     public DbSet<SharedCompanyDocumentAcknowledgement> SharedCompanyDocumentAcknowledgements => Set<SharedCompanyDocumentAcknowledgement>();
     public DbSet<SharedCompanyDocumentAudienceRule> SharedCompanyDocumentAudienceRules => Set<SharedCompanyDocumentAudienceRule>();
+    public DbSet<FileScanWork> FileScanWork => Set<FileScanWork>();
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

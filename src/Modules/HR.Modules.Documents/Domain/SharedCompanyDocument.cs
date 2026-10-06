@@ -197,6 +197,9 @@ internal sealed class SharedCompanyDocument : IScannableFile, IVersionedAggregat
 
     public void MarkScanClean(DateTimeOffset now)
     {
+        if (ScanStatus is FileScanStatus.Infected or FileScanStatus.Failed)
+            return;
+
         ScanStatus = FileScanStatus.Clean;
         ScanCompletedAt = now;
         ScanFailureReason = null;

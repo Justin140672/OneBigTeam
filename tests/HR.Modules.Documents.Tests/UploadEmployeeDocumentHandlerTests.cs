@@ -25,14 +25,15 @@ public class UploadEmployeeDocumentHandlerTests
         FileUploadOptions? options = null,
         FakeAuditPublisher? auditPublisher = null,
         HR.SharedKernel.IIntegrationEventPublisher? integrationEventPublisher = null,
-        Microsoft.Extensions.Logging.ILogger<UploadEmployeeDocumentHandler>? logger = null) =>
+        Microsoft.Extensions.Logging.ILogger<UploadEmployeeDocumentHandler>? logger = null,
+        Hangfire.IBackgroundJobClient? backgroundJobClient = null) =>
         new(db,
             storage ?? new FakeDocumentStorageService(),
             new FileUploadValidator(Options.Create(options ?? new FileUploadOptions())),
             new FakeClock(FixedUtcNow),
             auditPublisher ?? new FakeAuditPublisher(),
             integrationEventPublisher ?? new NoOpIntegrationEventPublisher(),
-            new NoOpBackgroundJobClient(),
+            backgroundJobClient ?? new NoOpBackgroundJobClient(),
             logger);
 
     [Fact]
@@ -588,5 +589,23 @@ public class UploadEmployeeDocumentHandlerTests
 
         public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
             throw new DbUpdateException("Simulated database failure.");
+    }
+
+    [Fact]
+    public async Task HandleAsync_Persists_Scan_Work_And_Still_Succeeds_When_Enqueue_Fails()
+    {
+        await using var db = BuildContext();
+        var companyId  = Guid.NewGuid();
+        var docType    = await SeedDocumentType(db, companyId);
+        var handler    = BuildHandler(db, backgroundJobClient: new ThrowingBackgroundJobClient());
+
+        var result = await handler.HandleAsync(
+            BuildRequest(companyId, Guid.NewGuid(), docType.Id), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var work = await db.FileScanWork.SingleAsync();
+        Assert.Equal(FileScanTargetType.Document, work.TargetType);
+        Assert.Equal(result.Value!.DocumentId, work.EntityId);
+        Assert.Equal(FileScanWorkState.Pending, work.State);
     }
 }

@@ -77,6 +77,10 @@ public class UploadMyProfilePhotoEndpointTests
         var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
         var pending = await db.PendingProfilePhotos.SingleAsync(p => p.EmployeeId == employeeId);
         Assert.Equal(payload.Id, pending.Id);
+
+        var work = await db.FileScanWork.SingleAsync(w => w.EntityId == payload.Id);
+        Assert.Equal(HR.Modules.Documents.Domain.FileScanTargetType.PendingProfilePhoto, work.TargetType);
+        Assert.Equal(companyId, work.CompanyId);
     }
 
     [Fact]

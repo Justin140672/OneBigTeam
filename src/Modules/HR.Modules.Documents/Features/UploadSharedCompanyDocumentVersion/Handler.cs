@@ -174,6 +174,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
             }
         }
 
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId, now, cancellationToken);
+        await FileScanDispatch.StageAsync(db, FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId, now, cancellationToken);
         try
         {
             await db.SaveChangesAsync(cancellationToken);
@@ -189,10 +191,8 @@ internal sealed class UploadSharedCompanyDocumentVersionHandler(
             document.CompanyId, document.Id, document.Title, safeFileName, file.Length, document.VersionNumber,
             versionNote, request.RequiresReacknowledgement, uploadedBy, now), cancellationToken);
 
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId, null));
-        backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
-            job.ExecuteAsync(FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId, null));
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.SharedCompanyDocument, document.Id, document.CompanyId);
+        FileScanDispatch.TryEnqueue(backgroundJobClient, logger, FileScanTargetType.SharedCompanyDocumentVersion, version.Id, document.CompanyId);
 
         return Result.Success(new UploadSharedCompanyDocumentVersionResponse(
             document.Id,

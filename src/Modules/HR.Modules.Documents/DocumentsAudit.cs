@@ -756,3 +756,25 @@ internal sealed record ProfilePhotoRejectedAuditEvent(
     object? IAuditEvent.After           => new { Status = "Rejected", RejectionReason };
     object? IAuditEvent.Metadata        => new { ReviewedBy, RejectionReason };
 }
+
+internal sealed record FileScanRecoveredAuditEvent(
+    Guid CompanyId,
+    string EntityTypeName,
+    Guid FileEntityId,
+    string Action,
+    int AttemptCount,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string  IAuditEvent.EventType       => "document.scan_recovered";
+    string  IAuditEvent.EntityType      => EntityTypeName;
+    Guid    IAuditEvent.EntityId        => FileEntityId;
+    Guid?   IAuditEvent.EmployeeId      => null;
+    Guid?   IAuditEvent.ActorUserId     => null;
+    Guid?   IAuditEvent.ActorEmployeeId => null;
+    Guid?   IAuditEvent.CorrelationId   => null;
+    AuditActorType IAuditEvent.ActorType => AuditActorType.ScheduledJob;
+    string? IAuditEvent.Summary         => $"{EntityTypeName} {FileEntityId} malware scan recovered by reconciliation: {Action} (attempt {AttemptCount})";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { Action, AttemptCount };
+    object? IAuditEvent.Metadata        => null;
+}
