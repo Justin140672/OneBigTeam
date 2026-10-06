@@ -7,6 +7,6 @@ internal sealed record UploadMyProfilePhotoResponse(
     string FileName,
     long FileSize,
     string ContentType,
-    string DownloadUrl,
+    string ScanStatus,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);

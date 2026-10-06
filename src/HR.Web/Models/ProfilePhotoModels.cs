@@ -28,7 +28,7 @@ public sealed record UploadMyProfilePhotoResponse(
     string FileName,
     long FileSize,
     string ContentType,
-    string DownloadUrl,
+    string ScanStatus,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 
@@ -40,7 +40,7 @@ public sealed record UploadEmployeeProfilePhotoResponse(
     string FileName,
     long FileSize,
     string ContentType,
-    string DownloadUrl,
+    string ScanStatus,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt);
 

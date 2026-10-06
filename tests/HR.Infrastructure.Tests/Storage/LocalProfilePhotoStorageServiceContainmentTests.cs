@@ -63,4 +63,27 @@ public sealed class LocalProfilePhotoStorageServiceContainmentTests
             Directory.Delete(siblingDir, recursive: true);
         }
     }
+
+    [Fact]
+    public async Task PromoteToCleanAsync_Copies_Quarantined_File_To_A_Clean_Key_Readable_Through_OpenReadAsync()
+    {
+        var sut = CreateSut();
+        var folder = HR.Infrastructure.Abstractions.ProfilePhotoStorageKeys.QuarantineFolder($"test-{Guid.NewGuid():N}");
+        using var upload = new MemoryStream([4, 5, 6]);
+        var quarantineKey = await sut.UploadAsync(upload, "photo.png", "image/png", folder, CancellationToken.None);
+
+        var cleanKey = await sut.PromoteToCleanAsync(quarantineKey, CancellationToken.None);
+
+        Assert.StartsWith("clean/", cleanKey);
+        await using (var stream = await sut.OpenReadAsync(cleanKey, CancellationToken.None))
+        {
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer);
+            Assert.Equal([4, 5, 6], buffer.ToArray());
+        }
+
+        await sut.DeleteAsync(quarantineKey, CancellationToken.None);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => sut.OpenReadAsync(quarantineKey, CancellationToken.None));
+        await sut.DeleteAsync(cleanKey, CancellationToken.None);
+    }
 }

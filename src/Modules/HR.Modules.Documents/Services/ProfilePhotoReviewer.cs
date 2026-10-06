@@ -70,6 +70,10 @@ internal sealed class ProfilePhotoReviewer(
             return (Result.Failure<ApproveProfilePhotoResponse>(
                 Error.NotFound("No pending profile photo submission was found.")), null);
 
+        var scanError = ScanStatusAccessGuard.CheckDownloadable(pendingPhoto.ScanStatus);
+        if (scanError is not null)
+            return (Result.Failure<ApproveProfilePhotoResponse>(scanError), null);
+
         var now = clock.UtcNowOffset();
 
         var existingLivePhoto = await db.EmployeeProfilePhotos

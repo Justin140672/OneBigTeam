@@ -1,6 +1,6 @@
 namespace HR.Modules.Documents.Domain;
 
-internal sealed class EmployeeProfilePhoto : IScannableFile
+internal sealed class EmployeeProfilePhoto : IScannableFile, IPromotableStorageFile
 {
     private EmployeeProfilePhoto() { }
 
@@ -65,6 +65,12 @@ internal sealed class EmployeeProfilePhoto : IScannableFile
         ScanCompletedAt  = null;
         ScanFailureReason = null;
         ScanAttemptCount = 0;
+    }
+
+    public void PromoteStorageKey(string storageKey, DateTimeOffset now)
+    {
+        StorageKey = storageKey.Trim();
+        UpdatedAt = now;
     }
 
     public void MarkScanning(DateTimeOffset now)

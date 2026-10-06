@@ -160,6 +160,120 @@ public class ScanUploadedFileJobTests
         Assert.Empty(audit.Published);
     }
 
+
+    private static async Task<PendingProfilePhoto> SeedQuarantinedPhoto(DocumentsDbContext db, Guid companyId)
+    {
+        var employeeId = Guid.NewGuid();
+        var photo = PendingProfilePhoto.Create(
+            Guid.NewGuid(), companyId, employeeId, "avatar.png", 100, "image/png",
+            $"quarantine/{companyId}/{employeeId}/pending/abc/avatar.png", employeeId, DateTimeOffset.UtcNow);
+        db.PendingProfilePhotos.Add(photo);
+        await db.SaveChangesAsync();
+        return photo;
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Photo_Reads_With_Internal_Credentials_And_Never_Requests_A_Download_Url()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var photo = await SeedQuarantinedPhoto(db, companyId);
+        var originalKey = photo.StorageKey;
+        var (job, _, photoStorage, _, httpHandler, _, _) = BuildJob(db);
+
+        await job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, photo.Id, companyId);
+
+        Assert.Equal([originalKey], photoStorage.OpenedForRead);
+        Assert.Empty(photoStorage.DownloadUrlRequests);
+        Assert.Equal(0, httpHandler.RequestCount);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Clean_Photo_Is_Promoted_Out_Of_Quarantine_And_Source_Deleted()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var photo = await SeedQuarantinedPhoto(db, companyId);
+        var originalKey = photo.StorageKey;
+        var (job, _, photoStorage, _, _, _, _) = BuildJob(db);
+
+        await job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, photo.Id, companyId);
+
+        var stored = await db.PendingProfilePhotos.SingleAsync(p => p.Id == photo.Id);
+        Assert.Equal(FileScanStatus.Clean, stored.ScanStatus);
+        Assert.StartsWith("clean/", stored.StorageKey);
+        Assert.NotEqual(originalKey, stored.StorageKey);
+        Assert.Equal((originalKey, stored.StorageKey), Assert.Single(photoStorage.Promotions));
+        Assert.Equal([originalKey], photoStorage.Deletions);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Infected_Photo_Is_Never_Promoted_And_Stays_In_Quarantine_Until_Deleted()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var photo = await SeedQuarantinedPhoto(db, companyId);
+        var (job, _, photoStorage, virusScanner, _, _, _) = BuildJob(db);
+        virusScanner.ReturnInfected = true;
+
+        await job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, photo.Id, companyId);
+
+        var stored = await db.PendingProfilePhotos.SingleAsync(p => p.Id == photo.Id);
+        Assert.Equal(FileScanStatus.Infected, stored.ScanStatus);
+        Assert.StartsWith("quarantine/", stored.StorageKey);
+        Assert.Empty(photoStorage.Promotions);
+        Assert.Empty(photoStorage.DownloadUrlRequests);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Photo_Promotion_Failure_Does_Not_Mark_Clean()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var photo = await SeedQuarantinedPhoto(db, companyId);
+        var (job, _, photoStorage, _, _, _, _) = BuildJob(db);
+        photoStorage.ThrowOnPromote = true;
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, photo.Id, companyId));
+
+        var stored = await db.PendingProfilePhotos.SingleAsync(p => p.Id == photo.Id);
+        Assert.NotEqual(FileScanStatus.Clean, stored.ScanStatus);
+        Assert.StartsWith("quarantine/", stored.StorageKey);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Discards_Result_When_Photo_Was_Replaced_While_Scanning()
+    {
+        var dbName = Guid.NewGuid().ToString("N");
+        DocumentsDbContext Open() => new(new DbContextOptionsBuilder<DocumentsDbContext>()
+            .UseInMemoryDatabase(dbName)
+            .Options);
+
+        await using var db = Open();
+        var companyId = Guid.NewGuid();
+        var photo = await SeedQuarantinedPhoto(db, companyId);
+        var (job, _, photoStorage, virusScanner, _, audit, _) = BuildJob(db);
+        virusScanner.ReturnInfected = true;
+        virusScanner.OnScan = () =>
+        {
+            using var other = Open();
+            var current = other.PendingProfilePhotos.Single(p => p.Id == photo.Id);
+            current.Replace("new.png", 10, "image/png", $"quarantine/{companyId}/new/new.png", photo.EmployeeId, DateTimeOffset.UtcNow);
+            other.SaveChanges();
+        };
+
+        await job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, photo.Id, companyId);
+
+        await using var verify = Open();
+        var stored = await verify.PendingProfilePhotos.SingleAsync(p => p.Id == photo.Id);
+        Assert.Equal(FileScanStatus.Pending, stored.ScanStatus);
+        Assert.EndsWith("new.png", stored.StorageKey);
+        Assert.Empty(audit.Published);
+        Assert.Empty(photoStorage.Promotions);
+        Assert.Empty(photoStorage.Deletions);
+    }
+
     [Fact]
     public async Task ExecuteAsync_Marks_Entity_Scanning_Before_Downloading()
     {

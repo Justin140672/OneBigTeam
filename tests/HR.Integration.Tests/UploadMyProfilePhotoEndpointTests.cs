@@ -70,7 +70,8 @@ public class UploadMyProfilePhotoEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal("avatar.png", payload.FileName);
         Assert.Equal("image/png", payload.ContentType);
-        Assert.False(string.IsNullOrWhiteSpace(payload.DownloadUrl));
+        Assert.Equal("Pending", payload.ScanStatus);
+        Assert.DoesNotContain("downloadUrl", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
@@ -305,7 +306,7 @@ public class UploadMyProfilePhotoEndpointTests
         string FileName,
         long FileSize,
         string ContentType,
-        string DownloadUrl,
+        string ScanStatus,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 }

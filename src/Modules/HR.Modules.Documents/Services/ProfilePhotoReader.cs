@@ -1,3 +1,4 @@
+using HR.Modules.Documents.Domain;
 using HR.Modules.Documents.Persistence;
 using HR.Infrastructure.Abstractions;
 using Microsoft.EntityFrameworkCore;
@@ -20,7 +21,7 @@ internal sealed class ProfilePhotoReader(
 
         var photos = await dbContext.EmployeeProfilePhotos
             .AsNoTracking()
-            .Where(p => p.CompanyId == companyId && ids.Contains(p.EmployeeId))
+            .Where(p => p.CompanyId == companyId && ids.Contains(p.EmployeeId) && p.ScanStatus == FileScanStatus.Clean)
             .Select(p => new { p.EmployeeId, p.StorageKey })
             .ToListAsync(cancellationToken);
 

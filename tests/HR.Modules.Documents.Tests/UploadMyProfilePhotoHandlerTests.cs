@@ -72,7 +72,7 @@ public class UploadMyProfilePhotoHandlerTests
         };
 
     [Fact]
-    public async Task HandleAsync_FirstUpload_CreatesNewPendingProfilePhoto_And_ReturnsDownloadUrl()
+    public async Task HandleAsync_FirstUpload_CreatesNewPendingProfilePhoto_And_Returns_Pending_Status_Without_Minting_A_Download_Url()
     {
         await using var db = BuildContext();
         var storage        = new FakeProfilePhotoStorageService();
@@ -99,8 +99,11 @@ public class UploadMyProfilePhotoHandlerTests
         Assert.Equal(employeeId, saved.UploadedBy);
 
         Assert.Single(storage.Uploads);
+        Assert.StartsWith("quarantine/", storage.Uploads[0].StorageKey);
         Assert.Contains($"{companyId}/{employeeId}/pending", storage.Uploads[0].StorageKey);
-        Assert.Contains(storage.Uploads[0].StorageKey, result.Value.DownloadUrl);
+        Assert.Equal("Pending", result.Value.ScanStatus);
+        Assert.Empty(storage.DownloadUrlRequests);
+        Assert.DoesNotContain("storage.example.com", System.Text.Json.JsonSerializer.Serialize(result.Value));
     }
 
     [Fact]

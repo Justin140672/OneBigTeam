@@ -34,11 +34,16 @@ public class ApproveProfilePhotoHandlerTests
 
     private static PendingProfilePhoto SeedPendingPhoto(
         DocumentsDbContext db, Guid companyId, Guid employeeId, string storageKey = "pending/key.png",
-        string fileName = "pending.png", Guid? uploadedBy = null)
+        string fileName = "pending.png", Guid? uploadedBy = null, bool clean = true)
     {
         var pending = PendingProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, fileName, 222, "image/png",
             storageKey, uploadedBy ?? employeeId, DateTimeOffset.UtcNow);
+        if (clean)
+        {
+            pending.MarkScanClean(DateTimeOffset.UtcNow);
+        }
+
         db.PendingProfilePhotos.Add(pending);
         db.SaveChanges();
         return pending;
@@ -83,6 +88,24 @@ public class ApproveProfilePhotoHandlerTests
 
         Assert.Equal(live.Id, result.Value!.Id);
         Assert.Contains(pending.StorageKey, result.Value.DownloadUrl);
+    }
+
+    [Fact]
+    public async Task HandleAsync_Refuses_To_Approve_A_Photo_That_Has_Not_Passed_The_Scan()
+    {
+        await using var db = BuildContext();
+        var companyId = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+        SeedPendingPhoto(db, companyId, employeeId, "quarantine/pending.png", clean: false);
+        var (handler, storage, _, _, _) = BuildHandler(db);
+
+        var result = await handler.HandleAsync(
+            new ApproveProfilePhotoRequest(companyId, employeeId), Guid.NewGuid(), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Empty(db.EmployeeProfilePhotos);
+        Assert.Single(db.PendingProfilePhotos);
+        Assert.Empty(storage.DownloadUrlRequests);
     }
 
     [Fact]

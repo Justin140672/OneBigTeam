@@ -63,6 +63,52 @@ internal sealed class SupabaseProfilePhotoStorageService : IProfilePhotoStorageS
             : new Uri($"{_options.SupabaseUrl.TrimEnd('/')}{signedUrl}");
     }
 
+    public async Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"{_options.SupabaseUrl}/storage/v1/object/authenticated/{_options.BucketName}/{storageKey}");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+
+        var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        try
+        {
+            response.EnsureSuccessStatusCode();
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            return new ResponseOwningStream(stream, response, request);
+        }
+        catch
+        {
+            response.Dispose();
+            request.Dispose();
+            throw;
+        }
+    }
+
+    public async Task<string> PromoteToCleanAsync(string quarantineStorageKey, CancellationToken cancellationToken)
+    {
+        if (!ProfilePhotoStorageKeys.IsQuarantine(quarantineStorageKey))
+        {
+            return quarantineStorageKey;
+        }
+
+        var cleanKey = ProfilePhotoStorageKeys.ToCleanKey(quarantineStorageKey);
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"{_options.SupabaseUrl}/storage/v1/object/copy");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _options.ServiceRoleKey);
+        request.Content = JsonContent.Create(new
+        {
+            bucketId = _options.BucketName,
+            sourceKey = quarantineStorageKey,
+            destinationKey = cleanKey,
+        });
+
+        using var response = await _httpClient.SendAsync(request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        return cleanKey;
+    }
+
     public async Task DeleteAsync(
         string storageKey,
         CancellationToken cancellationToken)
@@ -76,6 +122,36 @@ internal sealed class SupabaseProfilePhotoStorageService : IProfilePhotoStorageS
 
         var response = await _httpClient.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    private sealed class ResponseOwningStream(Stream inner, params IDisposable[] owners) : Stream
+    {
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+        public override void Flush() => inner.Flush();
+        public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => inner.ReadAsync(buffer, cancellationToken);
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => inner.ReadAsync(buffer, offset, count, cancellationToken);
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                inner.Dispose();
+                foreach (var owner in owners)
+                {
+                    owner.Dispose();
+                }
+            }
+
+            base.Dispose(disposing);
+        }
     }
 
     private sealed record SignedUrlResponse(

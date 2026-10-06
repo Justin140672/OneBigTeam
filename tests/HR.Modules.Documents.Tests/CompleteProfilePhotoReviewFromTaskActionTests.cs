@@ -49,6 +49,7 @@ public class CompleteProfilePhotoReviewFromTaskActionTests
         var pending = PendingProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, fileName, 222, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        pending.MarkScanClean(DateTimeOffset.UtcNow);
         db.PendingProfilePhotos.Add(pending);
         db.SaveChanges();
         return pending;

@@ -7,12 +7,14 @@ internal sealed class FakeHttpClientFactory(HttpMessageHandler handler) : IHttpC
 
 internal sealed class StubHttpMessageHandler : HttpMessageHandler
 {
+    public int RequestCount { get; private set; }
     public byte[] ResponseBytes { get; set; } = "file-bytes"u8.ToArray();
     public Exception? ThrowException { get; set; }
 
     protected override Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request, CancellationToken cancellationToken)
     {
+        RequestCount++;
         if (ThrowException is not null)
             return Task.FromException<HttpResponseMessage>(ThrowException);
 

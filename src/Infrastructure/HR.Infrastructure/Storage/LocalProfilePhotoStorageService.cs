@@ -53,6 +53,30 @@ internal sealed class LocalProfilePhotoStorageService(
         return Task.FromResult<Stream?>(File.Exists(fullPath) ? File.OpenRead(fullPath) : null);
     }
 
+    public async Task<Stream> OpenReadAsync(string storageKey, CancellationToken cancellationToken)
+    {
+        await Task.CompletedTask;
+        var fullPath = ToFullPath(storageKey);
+        return File.Exists(fullPath)
+            ? File.OpenRead(fullPath)
+            : throw new FileNotFoundException("The stored profile photo was not found.");
+    }
+
+    public Task<string> PromoteToCleanAsync(string quarantineStorageKey, CancellationToken cancellationToken)
+    {
+        if (!ProfilePhotoStorageKeys.IsQuarantine(quarantineStorageKey))
+        {
+            return Task.FromResult(quarantineStorageKey);
+        }
+
+        var cleanKey = ProfilePhotoStorageKeys.ToCleanKey(quarantineStorageKey);
+        var destination = ToFullPath(cleanKey);
+        Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+        File.Copy(ToFullPath(quarantineStorageKey), destination, overwrite: false);
+
+        return Task.FromResult(cleanKey);
+    }
+
     private string GetServerBaseUrl()
     {
         var addresses = serviceProvider.GetService<IServer>()?.Features.Get<IServerAddressesFeature>()?.Addresses;

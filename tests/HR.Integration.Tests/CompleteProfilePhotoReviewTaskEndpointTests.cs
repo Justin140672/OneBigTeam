@@ -32,6 +32,7 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("submitted.png"));
             Assert.Equal(System.Net.HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var managerClient = await ManagerClient(companyId);
@@ -66,6 +67,7 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("submitted.png"));
             Assert.Equal(System.Net.HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var managerClient = await ManagerClient(companyId);
@@ -104,6 +106,7 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("submitted.png"));
             Assert.Equal(System.Net.HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var managerClient = await ManagerClient(companyId);
@@ -133,6 +136,7 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("submitted.png"));
             Assert.Equal(System.Net.HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var managerClient = await ManagerClient(companyId);
@@ -155,6 +159,15 @@ public class CompleteProfilePhotoReviewTaskEndpointTests
     {
         await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.HrAdministrator, companyId);
         await TestRoleSeeder.AssignRoleAsync(_factory, ManagerUser, SystemRoles.Employee);
+    }
+
+    private async Task MarkPendingPhotoCleanAsync(Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+        var pending = await db.PendingProfilePhotos.SingleAsync(p => p.EmployeeId == employeeId);
+        pending.MarkScanClean(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
     }
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)

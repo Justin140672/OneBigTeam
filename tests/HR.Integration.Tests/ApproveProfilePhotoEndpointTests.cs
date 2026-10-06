@@ -114,6 +114,7 @@ public class ApproveProfilePhotoEndpointTests
                 $"/api/companies/{companyB}/employees/me/profile-photo",
                 BuildPngUpload("company-b.png"));
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         // An HR caller genuinely belonging to Company A (their own claim matches the route) tries
@@ -140,6 +141,34 @@ public class ApproveProfilePhotoEndpointTests
     }
 
     [Fact]
+    public async Task Post_Approve_Rejects_A_Photo_That_Has_Not_Passed_The_Scan()
+    {
+        var companyId  = Guid.NewGuid();
+        var employeeId = Guid.NewGuid();
+
+        using (var selfClient = await SelfClient(companyId, employeeId))
+        {
+            var upload = await selfClient.PostAsync(
+                $"/api/companies/{companyId}/employees/me/profile-photo",
+                BuildPngUpload("submitted.png"));
+            Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+        }
+
+        using var client = await ManagerClient(companyId);
+
+        var response = await client.PostAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/profile-photo/pending/approve",
+            EmptyJson());
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+        Assert.Single(await db.PendingProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync());
+        Assert.Empty(await db.EmployeeProfilePhotos.Where(p => p.EmployeeId == employeeId).ToListAsync());
+    }
+
+    [Fact]
     public async Task Post_Approve_Returns_Ok_Removes_Pending_And_Creates_Live_Photo()
     {
         var companyId  = Guid.NewGuid();
@@ -151,6 +180,7 @@ public class ApproveProfilePhotoEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("submitted.png"));
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var client = await ManagerClient(companyId);
@@ -201,6 +231,7 @@ public class ApproveProfilePhotoEndpointTests
                 $"/api/companies/{companyId}/employees/me/profile-photo",
                 BuildPngUpload("new-submission.png"));
             Assert.Equal(HttpStatusCode.OK, upload.StatusCode);
+            await MarkPendingPhotoCleanAsync(employeeId);
         }
 
         using var client = await ManagerClient(companyId);
@@ -222,6 +253,15 @@ public class ApproveProfilePhotoEndpointTests
         Assert.Empty(pendingRows);
     }
 
+
+    private async Task MarkPendingPhotoCleanAsync(Guid employeeId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<DocumentsDbContext>();
+        var pending = await db.PendingProfilePhotos.SingleAsync(p => p.EmployeeId == employeeId);
+        pending.MarkScanClean(DateTimeOffset.UtcNow);
+        await db.SaveChangesAsync();
+    }
 
     private async Task<HttpClient> SelfClient(Guid companyId, Guid employeeId)
     {

@@ -38,6 +38,7 @@ internal sealed class ScanUploadedFileJob(
             return;
         }
 
+        var scannedStorageKey = target.StorageKey;
         var now = clock.UtcNowOffset();
         target.MarkScanning(now);
         await db.SaveChangesAsync();
@@ -48,6 +49,11 @@ internal sealed class ScanUploadedFileJob(
             if (virusScanner is NoOpVirusScanService)
             {
                 scanResult = await virusScanner.ScanAsync(System.IO.Stream.Null, target.FileName, CancellationToken.None);
+            }
+            else if (IsProfilePhoto(targetType))
+            {
+                await using var content = await profilePhotoStorage.OpenReadAsync(scannedStorageKey, CancellationToken.None);
+                scanResult = await virusScanner.ScanAsync(content, target.FileName, CancellationToken.None);
             }
             else if (GetStorage(targetType) is ILocalStorageFileReader localReader)
             {
@@ -66,11 +72,34 @@ internal sealed class ScanUploadedFileJob(
 
             now = clock.UtcNowOffset();
 
+            if (!await IsStillCurrentAsync(target, scannedStorageKey))
+            {
+                logger.LogWarning(
+                    "ScanUploadedFileJob: {TargetType} {EntityId} was replaced or removed while scanning - discarding stale result.",
+                    targetType, entityId);
+                return;
+            }
+
             if (scanResult.IsClean)
             {
                 var previousStatus = target.ScanStatus.ToString();
+                string? promotedFromKey = null;
+                if (target is IPromotableStorageFile promotable
+                    && IsProfilePhoto(targetType)
+                    && ProfilePhotoStorageKeys.IsQuarantine(target.StorageKey))
+                {
+                    var cleanKey = await profilePhotoStorage.PromoteToCleanAsync(target.StorageKey, CancellationToken.None);
+                    promotedFromKey = target.StorageKey;
+                    promotable.PromoteStorageKey(cleanKey, now);
+                }
+
                 target.MarkScanClean(now);
                 await db.SaveChangesAsync();
+
+                if (promotedFromKey is not null)
+                {
+                    await TryDeleteQuarantineAsync(promotedFromKey, entityId);
+                }
 
                 await auditPublisher.PublishAsync(new FileScanStatusChangedAuditEvent(
                     companyId, targetType.ToString(), entityId, target.EmployeeId,
@@ -129,6 +158,30 @@ internal sealed class ScanUploadedFileJob(
             }
 
             throw;
+        }
+    }
+
+    private async Task<bool> IsStillCurrentAsync(IScannableFile target, string scannedStorageKey)
+    {
+        var entry = db.Entry(target);
+        await entry.ReloadAsync();
+        return entry.State != EntityState.Detached
+            && target.StorageKey == scannedStorageKey
+            && target.ScanStatus == FileScanStatus.Scanning;
+    }
+
+    private static bool IsProfilePhoto(FileScanTargetType targetType) =>
+        targetType is FileScanTargetType.EmployeeProfilePhoto or FileScanTargetType.PendingProfilePhoto;
+
+    private async Task TryDeleteQuarantineAsync(string storageKey, Guid entityId)
+    {
+        try
+        {
+            await profilePhotoStorage.DeleteAsync(storageKey, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "ScanUploadedFileJob: failed to delete quarantined object after promotion for {EntityId}.", entityId);
         }
     }
 

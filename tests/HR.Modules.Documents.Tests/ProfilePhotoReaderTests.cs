@@ -18,11 +18,16 @@ public class ProfilePhotoReaderTests
         new(db, storage ?? new FakeProfilePhotoStorageService());
 
     private static EmployeeProfilePhoto SeedLivePhoto(
-        DocumentsDbContext db, Guid companyId, Guid employeeId, string storageKey)
+        DocumentsDbContext db, Guid companyId, Guid employeeId, string storageKey, bool clean = true)
     {
         var photo = EmployeeProfilePhoto.Create(
             Guid.NewGuid(), companyId, employeeId, "avatar.png", 111, "image/png",
             storageKey, employeeId, DateTimeOffset.UtcNow);
+        if (clean)
+        {
+            photo.MarkScanClean(DateTimeOffset.UtcNow);
+        }
+
         db.EmployeeProfilePhotos.Add(photo);
         db.SaveChanges();
         return photo;
@@ -42,6 +47,26 @@ public class ProfilePhotoReaderTests
 
         Assert.True(result.ContainsKey(employeeId));
         Assert.Contains(photo.StorageKey, result[employeeId]);
+    }
+
+    [Fact]
+    public async Task GetCurrentPhotoUrlsAsync_Never_Mints_A_Url_For_A_Photo_That_Is_Not_Clean()
+    {
+        await using var db = BuildContext();
+        var storage = new FakeProfilePhotoStorageService();
+        var companyId = Guid.NewGuid();
+        var pendingEmployee = Guid.NewGuid();
+        var infectedEmployee = Guid.NewGuid();
+        SeedLivePhoto(db, companyId, pendingEmployee, "quarantine/pending.png", clean: false);
+        var infected = SeedLivePhoto(db, companyId, infectedEmployee, "quarantine/infected.png", clean: false);
+        infected.MarkScanInfected("EICAR", DateTimeOffset.UtcNow);
+        db.SaveChanges();
+
+        var result = await BuildReader(db, storage).GetCurrentPhotoUrlsAsync(
+            companyId, [pendingEmployee, infectedEmployee], CancellationToken.None);
+
+        Assert.Empty(result);
+        Assert.Empty(storage.DownloadUrlRequests);
     }
 
     [Fact]

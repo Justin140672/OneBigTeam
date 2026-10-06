@@ -46,7 +46,7 @@ internal sealed class UploadMyProfilePhotoHandler(
             fileStream,
             file.FileName,
             file.ContentType,
-            $"{request.CompanyId}/{employeeId}/pending",
+            ProfilePhotoStorageKeys.QuarantineFolder($"{request.CompanyId}/{employeeId}/pending"),
             cancellationToken);
 
         var now = clock.UtcNowOffset();
@@ -128,8 +128,6 @@ internal sealed class UploadMyProfilePhotoHandler(
         backgroundJobClient.Enqueue<ScanUploadedFileJob>(job =>
             job.ExecuteAsync(FileScanTargetType.PendingProfilePhoto, pendingPhoto.Id, pendingPhoto.CompanyId, null));
 
-        var downloadUrl = await storage.GetDownloadUrlAsync(pendingPhoto.StorageKey, cancellationToken);
-
         return Result.Success(new UploadMyProfilePhotoResponse(
             pendingPhoto.Id,
             pendingPhoto.CompanyId,
@@ -137,7 +135,7 @@ internal sealed class UploadMyProfilePhotoHandler(
             pendingPhoto.FileName,
             pendingPhoto.FileSize,
             pendingPhoto.ContentType,
-            downloadUrl.ToString(),
+            pendingPhoto.ScanStatus.ToString(),
             pendingPhoto.CreatedAt,
             pendingPhoto.UpdatedAt));
     }

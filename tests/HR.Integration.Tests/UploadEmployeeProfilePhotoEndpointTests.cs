@@ -105,7 +105,8 @@ public class UploadEmployeeProfilePhotoEndpointTests
         Assert.Equal(employeeId, payload.EmployeeId);
         Assert.Equal("avatar.png", payload.FileName);
         Assert.Equal("image/png", payload.ContentType);
-        Assert.False(string.IsNullOrWhiteSpace(payload.DownloadUrl));
+        Assert.Equal("Pending", payload.ScanStatus);
+        Assert.DoesNotContain("downloadUrl", await response.Content.ReadAsStringAsync(), StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -292,7 +293,7 @@ public class UploadEmployeeProfilePhotoEndpointTests
         string FileName,
         long FileSize,
         string ContentType,
-        string DownloadUrl,
+        string ScanStatus,
         DateTimeOffset CreatedAt,
         DateTimeOffset UpdatedAt);
 }
