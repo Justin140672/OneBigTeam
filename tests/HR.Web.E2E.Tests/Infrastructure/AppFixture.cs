@@ -3,6 +3,7 @@ using Aspire.Hosting;
 using Aspire.Hosting.ApplicationModel;
 using Aspire.Hosting.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Infrastructure;
@@ -35,6 +36,11 @@ public sealed class AppFixture : IAsyncLifetime
 
         _builder = await DistributedApplicationTestingBuilder
             .CreateAsync<Projects.HR_AppHost>();
+        // Aspire mirrors every child-resource console line through HR.AppHost.Resources.*.
+        // Keep warnings/errors in the CI console; full resource tails are captured explicitly
+        // by CaptureStartupDiagnosticsAsync when startup fails.
+        _builder.Services.AddLogging(logging =>
+            logging.AddFilter("HR.AppHost.Resources", LogLevel.Warning));
         _builder.Services.AddSingleton<Microsoft.Extensions.Logging.ILoggerProvider>(_appHostLog);
 
         _app = await _builder.BuildAsync();

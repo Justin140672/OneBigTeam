@@ -6,7 +6,7 @@ namespace HR.Web.E2E.Tests.Infrastructure;
 /// Lightweight, always-on timing diagnostics for the login/app-shell path. Console.WriteLine (not
 /// ITestOutputHelper) deliberately — the callers here (PersonaLoginCache, LoginPage) run outside any
 /// single test's lifetime (shared bootstrap logins, cross-class cache gates), so there is no single
-/// test's output sink to write to. `dotnet test ... --logger "console;verbosity=detailed"` captures
+/// test's output sink to write to. The `dotnet test` console logger captures
 /// process Console output interleaved with the rest of the run, which is exactly what's needed to see
 /// WHERE time actually goes (waiting on a gate/semaphore vs. real network/app-shell latency) instead of
 /// only ever seeing the final class duration or a bare TimeoutException.

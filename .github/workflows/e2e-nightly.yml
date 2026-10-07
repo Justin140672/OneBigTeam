@@ -48,13 +48,20 @@ jobs:
           pw=$(find tests/HR.Web.E2E.Tests -name 'playwright.ps1' | head -n1)
           pwsh "$pw" install --with-deps chromium
 
-      # The E2E database is recreated for every run, so use a fresh key rather than
-      # storing test encryption material in the repository or GitHub secrets.
-      - name: Configure ephemeral E2E encryption key
+      # The E2E database is recreated for every run, so use a fresh data-protection
+      # key. The Syncfusion licence remains a repository secret and is never logged.
+      - name: Configure E2E secrets
         shell: bash
+        env:
+          SYNCFUSION_LICENSE_KEY: ${{ secrets.SYNCFUSION_LICENSE_KEY }}
         run: |
+          if [[ -z "$SYNCFUSION_LICENSE_KEY" ]]; then
+            echo "::error::Repository secret SYNCFUSION_LICENSE_KEY is required for browser tests."
+            exit 1
+          fi
           echo "Infrastructure__SensitiveDataProtection__ActiveKeyId=ci" >> "$GITHUB_ENV"
           echo "Infrastructure__SensitiveDataProtection__Keys__ci=$(openssl rand -base64 32)" >> "$GITHUB_ENV"
+          echo "Syncfusion__LicenseKey=$SYNCFUSION_LICENSE_KEY" >> "$GITHUB_ENV"
 
       - name: Run E2E tests
         shell: bash
@@ -65,7 +72,7 @@ jobs:
           dotnet test tests/HR.Web.E2E.Tests/HR.Web.E2E.Tests.csproj \
             -c Release --no-build \
             --logger "trx;LogFileName=e2e.trx" \
-            --logger "console;verbosity=detailed" 2>&1 | tee "$E2E_DIAG_DIR/dotnet-test-console.log"
+            --logger "console;verbosity=normal" 2>&1 | tee "$E2E_DIAG_DIR/dotnet-test-console.log"
 
       - name: Upload results
         if: always()
