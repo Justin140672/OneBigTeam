@@ -85,6 +85,7 @@ using HR.Modules.Employees.Features.GetLocation;
 using HR.Modules.Employees.Features.ListLocations;
 using HR.Modules.Employees.Features.StartLeavingProcess;
 using HR.Modules.Employees.Features.GetLeavingProcess;
+using HR.Modules.Employees.Features.GetProposedLastWorkingDay;
 using HR.Modules.Employees.Features.AmendLeavingProcess;
 using HR.Modules.Employees.Features.CancelLeavingProcess;
 using HR.Modules.Employees.Features.GetLeavingProcessHistory;
@@ -386,6 +387,9 @@ public static class EmployeesModule
         services.AddScoped<IValidator<StartLeavingProcessRequest>, StartLeavingProcessValidator>();
 
         services.AddScoped<GetLeavingProcessHandler>();
+
+        services.AddScoped<GetProposedLastWorkingDayHandler>();
+        services.AddScoped<IValidator<GetProposedLastWorkingDayRequest>, GetProposedLastWorkingDayValidator>();
 
         services.AddScoped<AmendLeavingProcessHandler>();
         services.AddScoped<IValidator<AmendLeavingProcessRequest>, AmendLeavingProcessValidator>();

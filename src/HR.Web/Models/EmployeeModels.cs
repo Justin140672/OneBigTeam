@@ -501,6 +501,8 @@ public sealed record LeavingProcessResponse(
     string? CancellationReason = null,
     string? Notes = null);
 
+public sealed record ProposedLastWorkingDayResponse(DateOnly ProposedLastWorkingDay);
+
 public sealed record LeavingProcessLookupResult(LeavingProcessResponse? Process, bool NotFound, bool Failed)
 {
     public static LeavingProcessLookupResult SuccessResult(LeavingProcessResponse? process) => new(process, false, false);

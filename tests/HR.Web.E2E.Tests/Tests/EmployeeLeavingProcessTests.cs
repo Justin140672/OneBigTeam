@@ -205,6 +205,8 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
         Assert.False(string.IsNullOrWhiteSpace(leavingDateRaw));
         await dialog.ClickNextAsync();
 
+        await dialog.ClearLastWorkingDayAsync();
+
         // Deliberately leave "Last Working Day" unset and try to advance to the Leaving Reason step.
         await dialog.ClickNextAsync();
 

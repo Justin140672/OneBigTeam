@@ -440,6 +440,25 @@ public class EmployeeService(HrApiHttpClientFactory httpClientFactory)
         }
     }
 
+    public async Task<DateOnly?> GetProposedLastWorkingDayAsync(Guid companyId, Guid employeeId, DateOnly leavingDate)
+    {
+        try
+        {
+            var response = await Http.GetAsync(
+                $"api/companies/{companyId}/employees/{employeeId}/proposed-last-working-day?leavingDate={leavingDate:yyyy-MM-dd}");
+
+            if (!response.IsSuccessStatusCode)
+                return null;
+
+            var body = await response.Content.ReadFromJsonAsync<ProposedLastWorkingDayResponse>(HrApiJsonOptions.Default);
+            return body?.ProposedLastWorkingDay;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     public async Task<AmendLeavingProcessResult> AmendLeavingProcessAsync(
         Guid companyId, Guid employeeId, AmendLeavingProcessRequest request)
     {

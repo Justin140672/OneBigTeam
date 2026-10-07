@@ -191,6 +191,42 @@ public static class E2eEmployeeApi
             $"Expected cancel-leaving-process to succeed, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
     }
 
+    public static async Task SetWorkingPatternAsync(
+        string apiBaseUrl, Guid employeeId, int workingDaysFlags, decimal hoursPerDay = 7.5m)
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var response = await http.PutAsJsonAsync(
+            $"/api/companies/{AcmeId}/employees/{employeeId}/working-pattern",
+            new
+            {
+                companyId = AcmeId,
+                employeeId,
+                workingDaysOverride = workingDaysFlags,
+                hoursPerDayOverride = hoursPerDay,
+            });
+        Assert.True(response.IsSuccessStatusCode,
+            $"Expected set-working-pattern to succeed, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+    }
+
+    public static async Task EnsurePublicHolidayAsync(string apiBaseUrl, DateOnly date, string name)
+    {
+        using var http = await CreateHrAdminClientAsync(apiBaseUrl);
+
+        var response = await http.PostAsJsonAsync(
+            $"/api/companies/{AcmeId}/public-holidays",
+            new
+            {
+                companyId = AcmeId,
+                date = date.ToString("yyyy-MM-dd"),
+                name,
+                countryCode = "GB",
+            });
+        Assert.True(
+            response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Conflict,
+            $"Expected public holiday creation to succeed or already exist, got {(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
+    }
+
     private static async Task<HttpClient> CreateHrAdminClientAsync(string apiBaseUrl)
     {
         var http = new HttpClient { BaseAddress = new Uri(apiBaseUrl) };

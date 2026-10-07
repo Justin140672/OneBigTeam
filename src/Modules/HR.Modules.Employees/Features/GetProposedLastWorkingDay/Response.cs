@@ -1,0 +1,3 @@
+namespace HR.Modules.Employees.Features.GetProposedLastWorkingDay;
+
+internal sealed record GetProposedLastWorkingDayResponse(DateOnly ProposedLastWorkingDay);

@@ -4,7 +4,7 @@
 @using HR.Infrastructure.Abstractions
 @inject EmployeeService EmployeeService
 
-<SfDialog Visible="IsOpen" IsModal="true" Width="656px" ShowCloseIcon="false">
+<SfDialog Visible="IsOpen" IsModal="true" Width="820px" ShowCloseIcon="false">
     <DialogTemplates>
         <Header>Start Leaving Process</Header>
         <Content>
@@ -52,10 +52,14 @@
                 }
                 else if (_step == 3)
                 {
+                    <p class="text-muted small">
+                        Proposed as the last working day on or before the leaving date, based on this employee's work pattern and bank holidays. Amend if needed.
+                    </p>
                     <div class="mb-3">
                         <label class="form-label">Last Working Day <span class="text-danger">*</span></label>
                         <HrDatePicker TValue="DateOnly?"
-                                      @bind-Value="_model.LastWorkingDay"
+                                      Value="_model.LastWorkingDay"
+                                      ValueChanged="OnLastWorkingDayChanged"
                                       Format="dd/MM/yyyy"
                                       Placeholder="dd/mm/yyyy" />
                         <ValidationMessage For="@(() => _model.LastWorkingDay)" />
@@ -89,12 +93,6 @@
                 }
                 else if (_step == 5)
                 {
-                    <p class="text-muted small">
-                        @ReasonConfirmationWording(_model.LeavingReason)
-                        Confirming automatically creates the offboarding checklist below — there is no
-                        separate "start offboarding" step. This action can be amended or cancelled later
-                        from the Leaving &amp; Offboarding workspace if needed.
-                    </p>
                     <dl class="row mb-0">
                         <dt class="col-sm-5 text-muted fw-normal">Resignation Received Date</dt>
                         <dd class="col-sm-7">@_model.ResignationReceivedDate?.ToString("dd MMM yyyy")</dd>
@@ -121,11 +119,11 @@
         <FooterTemplate>
             @if (_step > 1)
             {
-                <SfButton Disabled="@_submitting" OnClick="GoBack">Back</SfButton>
+                <SfButton Disabled="@(_submitting || _loadingProposal)" OnClick="GoBack">Back</SfButton>
             }
             @if (_step < 5)
             {
-                <SfButton IsPrimary="true" Disabled="@_submitting" OnClick="GoNext">Next</SfButton>
+                <SfButton IsPrimary="true" Disabled="@(_submitting || _loadingProposal)" OnClick="GoNext">Next</SfButton>
             }
             else
             {
@@ -159,6 +157,8 @@
     private readonly StartLeavingProcessFormModel _model = new();
     private EditContext _editContext = default!;
     private bool _leavingDateManuallyEdited;
+    private bool _lastWorkingDayManuallyEdited;
+    private bool _loadingProposal;
 
     private static readonly Dictionary<int, string[]> _stepFields = new()
     {
@@ -199,8 +199,10 @@
     {
         _step = 1;
         _submitting = false;
+        _loadingProposal = false;
         _globalError = null;
         _leavingDateManuallyEdited = false;
+        _lastWorkingDayManuallyEdited = false;
         _model.ResignationReceivedDate = null;
         _model.LeavingDate = null;
         _model.ConfirmBackdatedLeavingDate = false;
@@ -209,18 +211,6 @@
         _model.Notes = null;
         _editContext = new EditContext(_model);
     }
-
-    private static string ReasonConfirmationWording(string? reason) => reason switch
-    {
-        "Resignation" => "This employee has resigned. Confirming records their resignation and starts the leaving process.",
-        "Redundancy" => "This employee is being made redundant. Confirming records the redundancy and starts the leaving process.",
-        "Dismissal" => "This employee is being dismissed. Confirming records the dismissal and starts the leaving process.",
-        "Retirement" => "This employee is retiring. Confirming records their retirement and starts the leaving process.",
-        "EndOfContract" => "This employee's contract is ending. Confirming records the end of contract and starts the leaving process.",
-        "MutualAgreement" => "This departure is by mutual agreement. Confirming records the agreed departure and starts the leaving process.",
-        "Other" => "Confirming records this departure and starts the leaving process.",
-        _ => "Confirming starts this employee's leaving process."
-    };
 
     private static string ReasonNotesPlaceholder(string? reason) =>
         reason == "Other"
@@ -236,10 +226,26 @@
             _model.ConfirmBackdatedLeavingDate = false;
     }
 
+    private void OnLastWorkingDayChanged(DateOnly? value)
+    {
+        _model.LastWorkingDay = value;
+        _lastWorkingDayManuallyEdited = true;
+    }
+
+    private static DateOnly ComputeFallbackLastWorkingDay(DateOnly leavingDate) => leavingDate.DayOfWeek switch
+    {
+        DayOfWeek.Saturday => leavingDate.AddDays(-1),
+        DayOfWeek.Sunday   => leavingDate.AddDays(-2),
+        _                  => leavingDate
+    };
+
     private static bool IsBackdated(DateOnly? date) => date is not null && date < DateOnly.FromDateTime(DateTime.Today);
 
-    private void GoNext()
+    private async Task GoNext()
     {
+        if (_loadingProposal)
+            return;
+
         _globalError = null;
 
         if (_step == 1 && _model.ResignationReceivedDate is { } received && !_leavingDateManuallyEdited)
@@ -262,6 +268,22 @@
             {
                 _globalError = firstMessage;
                 return;
+            }
+        }
+
+        if (_step == 2 && _model.LeavingDate is { } leaving && !_lastWorkingDayManuallyEdited)
+        {
+            _loadingProposal = true;
+            StateHasChanged();
+
+            try
+            {
+                _model.LastWorkingDay = await EmployeeService.GetProposedLastWorkingDayAsync(CompanyId, EmployeeId, leaving)
+                    ?? ComputeFallbackLastWorkingDay(leaving);
+            }
+            finally
+            {
+                _loadingProposal = false;
             }
         }
 

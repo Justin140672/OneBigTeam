@@ -105,6 +105,20 @@ public sealed class StartLeavingProcessDialog(IPage page)
     }
 
 
+    public Task ExpectLastWorkingDayAsync(string ddMMyyyy) =>
+        Assertions.Expect(Dialog.Locator(".e-date-wrapper input.e-input").First)
+            .ToHaveValueAsync(ddMMyyyy, new() { Timeout = 10_000 });
+
+    public async Task ClearLastWorkingDayAsync()
+    {
+        var input = Dialog.Locator(".e-date-wrapper input.e-input").First;
+        await input.ClickAsync();
+        await page.Keyboard.PressAsync("Control+A");
+        await page.Keyboard.PressAsync("Delete");
+        await page.Keyboard.PressAsync("Tab");
+        await Assertions.Expect(input).ToHaveValueAsync("", new() { Timeout = 10_000 });
+    }
+
     public async Task FillLastWorkingDayAsync(string ddMMyyyy)
     {
         var input = Dialog.Locator(".e-date-wrapper input.e-input").First;
