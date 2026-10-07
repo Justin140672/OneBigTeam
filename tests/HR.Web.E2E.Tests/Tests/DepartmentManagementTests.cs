@@ -184,7 +184,7 @@ public sealed class DepartmentManagementTests(HrAdminPersonaFixture fixture) : R
         await login.LoginAsync(tomEmail);
 
         await _page.GotoAsync($"{_fixture.WebBaseUrl}/companies/{AcmeId}/departments");
-        await _page.WaitForLoadStateAsync(LoadState.NetworkIdle, new() { Timeout = 15_000 });
+        await _page.WaitForURLAsync("**/access-denied", new() { Timeout = 30_000 });
 
         var finalUrl = _page.Url;
         Assert.False(finalUrl.Contains("/departments"),

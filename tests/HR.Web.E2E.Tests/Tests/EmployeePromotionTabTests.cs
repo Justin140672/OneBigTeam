@@ -225,7 +225,7 @@ public sealed class EmployeePromotionTabTests(HrAdminPersonaFixture fixture) : R
 
         await wizard.CheckCreateCompensationChangeAsync();
 
-        await wizard.FillCompensationSalaryAsync("");
+        await wizard.ClearCompensationSalaryAsync();
         await wizard.ClickNextAsync();
 
         Assert.Equal("3. Compensation", await wizard.GetActiveStepLabelAsync());

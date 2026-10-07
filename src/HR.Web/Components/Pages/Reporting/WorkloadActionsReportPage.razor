@@ -26,16 +26,17 @@
         </div>
     }
 
-    @if (_isLoading)
+    @if (_isLoading && !_hasLoaded)
     {
         <HrLoadingIndicator Label="Loading workload actions report…" />
     }
-    else if (_error is not null)
-    {
-        <div class="alert alert-danger" role="alert">@_error</div>
-    }
     else
     {
+        @if (_error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@_error</div>
+        }
+
         <div class="row g-3 mb-3">
             <div class="col-md-3">
                 <div class="card"><div class="card-body"><div class="text-muted small">Total Outstanding</div><div class="fs-4">@_summary.TotalOutstanding</div></div></div>
@@ -225,7 +226,14 @@
             </div>
         </div>
 
-        @if (_totalItemCount == 0)
+        @if (_isLoading)
+        {
+            <HrLoadingIndicator Label="Loading workload actions report…" />
+        }
+        else if (_error is not null)
+        {
+        }
+        else if (_totalItemCount == 0)
         {
             <div class="alert alert-info">No outstanding actions. Everything is up to date.</div>
         }
@@ -257,6 +265,7 @@
     private int _totalItemCount;
 
     private bool _isLoading = true;
+    private bool _hasLoaded;
     private int _loadVersion;
     private string? _error;
 
@@ -617,6 +626,7 @@
         }
 
         _isLoading = false;
+        _hasLoaded = true;
         _loadVersion++;
         StateHasChanged();
     }

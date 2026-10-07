@@ -48,6 +48,10 @@
                 <InputFile class="form-control" OnChange="OnFileSelected"
                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" />
                 <div class="form-text">PDF, Word, or image files up to 20 MB.</div>
+                @if (_selectedFile is not null)
+                {
+                    <div class="form-text" data-testid="review-renewed-file-selected">Selected file: @_selectedFile.Name</div>
+                }
             </div>
             @if (Document?.RequiresAcknowledgement == true && _selectedFile is not null)
             {

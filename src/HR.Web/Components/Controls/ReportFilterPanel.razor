@@ -352,11 +352,11 @@
             return;
         }
 
-        _newViewName = string.Empty;
-        _showSaveAs = false;
         await LoadSavedViewsAsync();
         _selectedViewId = result.Id;
         _selectedView = _savedViews.FirstOrDefault(v => v.Id == result.Id);
+        _newViewName = string.Empty;
+        _showSaveAs = false;
     }
 
     private void StartRenameAsync()
@@ -379,9 +379,9 @@
             return;
         }
 
-        _showRename = false;
         await LoadSavedViewsAsync();
         _selectedView = _savedViews.FirstOrDefault(v => v.Id == result.Id);
+        _showRename = false;
     }
 
     private async Task SetDefaultAsync()

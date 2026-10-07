@@ -476,7 +476,7 @@ public sealed class RecruitmentStageManagementTests(RecruiterPersonaFixture fixt
         await stageList.GoToAsync(AcmeId);
         await stageList.ShowInactiveAsync();
 
-        var allNames = await stageList.GetNamesInOrderAsync();
+        var allNames = await stageList.GetNamesAcrossAllPagesAsync();
         var activeWithOutcome = new List<string>();
         foreach (var name in allNames.Distinct())
         {

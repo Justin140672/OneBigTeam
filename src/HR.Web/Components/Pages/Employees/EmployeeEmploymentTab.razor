@@ -343,6 +343,8 @@ else
 
     public Guid? CorrelationId { get; set; }
 
+    public bool IsReady => !IsLoading;
+
     // Ticket 2: optimistic concurrency is handled by EditSectionBase — LoadedVersion is captured
     // in LoadAsync, ExpectedVersionOverride is set by EmployeeEdit.razor to the token returned by
     // the profile save that runs first in the combined Save, SaveConflict is raised by

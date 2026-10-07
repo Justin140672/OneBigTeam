@@ -135,6 +135,28 @@ public sealed class PromoteEmployeeDialog(IPage page)
     public Task FillCompensationSalaryAsync(string value) =>
         TypeIntoNumericInputAsync(Dialog.Locator("input.e-numerictextbox").Nth(0), value);
 
+    public async Task ClearCompensationSalaryAsync()
+    {
+        var salary = Dialog.Locator("input.e-numerictextbox").Nth(0);
+        var toggle = Dialog.GetByLabel("Create compensation change");
+        var salaryTypeLabel = Dialog.GetByText("Salary Type");
+
+        for (var attempt = 1; attempt <= 3; attempt++)
+        {
+            await FillCompensationSalaryAsync("");
+
+            await toggle.UncheckAsync();
+            await salaryTypeLabel.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
+            await toggle.CheckAsync();
+            await salaryTypeLabel.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+
+            if ((await salary.InputValueAsync()).Length == 0)
+                return;
+        }
+
+        throw new PlaywrightException("Compensation salary was not cleared in the form model after 3 attempts.");
+    }
+
     public async Task FillCompensationCurrencyAsync(string value)
     {
         await Dialog.GetByPlaceholder("e.g. GBP").FillAsync(value);

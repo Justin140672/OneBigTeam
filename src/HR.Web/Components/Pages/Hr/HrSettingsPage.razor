@@ -593,19 +593,34 @@
 
     private void SyncActiveTabFromQuery()
     {
+        if (_queryTabObserved && Tab == _lastObservedQueryTab)
+            return;
+
+        _queryTabObserved = true;
+        _lastObservedQueryTab = Tab;
+
         if (Tab is >= 1 and <= 7)
+        {
+            if (_selfPushedTabs.Remove(Tab.Value))
+                return;
+
             _activeTabIndex = Tab.Value - 1;
+        }
 
         _lastSyncedTabIndex = _activeTabIndex;
     }
 
     private int _lastSyncedTabIndex;
+    private bool _queryTabObserved;
+    private int? _lastObservedQueryTab;
+    private readonly List<int> _selfPushedTabs = [];
 
     protected override Task OnAfterRenderAsync(bool firstRender)
     {
         if (_activeTabIndex != _lastSyncedTabIndex)
         {
             _lastSyncedTabIndex = _activeTabIndex;
+            _selfPushedTabs.Add(_activeTabIndex + 1);
             var uri = Navigation.GetUriWithQueryParameter("tab", _activeTabIndex + 1);
 
             // This only updates the "?tab=" query string to reflect the already-active tab — not

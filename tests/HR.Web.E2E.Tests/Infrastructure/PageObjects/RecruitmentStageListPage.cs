@@ -124,6 +124,21 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
         return names;
     }
 
+    public async Task<IReadOnlyList<string>> GetNamesAcrossAllPagesAsync()
+    {
+        await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
+        var names = new List<string>();
+        await page.VisitAllGridPagesAsync(async () =>
+        {
+            var rows = page.Locator(".e-grid .e-row");
+            var count = await rows.CountAsync();
+            for (var i = 0; i < count; i++)
+                names.Add((await rows.Nth(i).Locator("a").First.TextContentAsync())?.Trim() ?? "");
+            return false;
+        }, TimeSpan.FromSeconds(60));
+        return names;
+    }
+
     public async Task MoveUpAsync(string nameFragment) => await MoveAsync(nameFragment, "Move up", delta: -1);
 
     public async Task MoveDownAsync(string nameFragment) => await MoveAsync(nameFragment, "Move down", delta: +1);
@@ -186,6 +201,9 @@ public sealed class RecruitmentStageListPage(IPage page, string baseUrl)
     private async Task ClickShowInactiveAsync()
     {
         await page.GetByRole(AriaRole.Button, new() { Name = "Show Inactive" }).ClickAsync();
+        await page.GetByRole(AriaRole.Button, new() { Name = "Show Active" })
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        await page.WaitForSpinnerToClearAsync();
         await page.WaitForSelectorAsync(RowsRenderedSelector, new() { Timeout = 15_000 });
     }
 

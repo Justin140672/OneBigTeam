@@ -160,13 +160,29 @@ public sealed class EmployeeDirectoryReportPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetSavedViewOptionTextsAsync()
     {
         var combobox = SavedViewsField.Locator("span[role='combobox']").First;
-        await combobox.ClickAsync();
-        await page.WaitForSelectorAsync(".e-popup.e-ddl:visible", new() { Timeout = 10_000 });
+        var popup = page.Locator(".e-popup.e-ddl:visible");
+        var listContent = popup.Locator(".e-list-item, .e-nodata").First;
+        List<string> result = [];
 
-        var items = await page.Locator(".e-popup.e-ddl:visible .e-list-item").AllAsync();
-        var result = new List<string>();
-        foreach (var item in items)
-            result.Add((await item.TextContentAsync())?.Trim() ?? "");
+        for (var attempt = 1; attempt <= 4; attempt++)
+        {
+            if (!await popup.First.IsVisibleAsync())
+                await combobox.ClickAsync();
+
+            try
+            {
+                await listContent.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+                continue;
+            }
+
+            result = (await popup.Locator(".e-list-item").AllTextContentsAsync())
+                .Select(t => t.Trim())
+                .ToList();
+            break;
+        }
 
         await page.Keyboard.PressAsync("Escape");
         return result;

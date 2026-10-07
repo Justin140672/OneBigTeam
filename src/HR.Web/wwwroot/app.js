@@ -235,12 +235,17 @@ function hrFocusById(id) {
 }
 
 function downloadFileFromBase64(fileName, contentType, base64Content) {
+    const binary = atob(base64Content);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([bytes], { type: contentType }));
     const link = document.createElement('a');
-    link.href = `data:${contentType};base64,${base64Content}`;
+    link.href = url;
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
 // Opens a document download/view URL in a new tab from a Blazor Server button click handler.

@@ -475,7 +475,18 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         {
             await page.ReloadAsync();
             await page.WaitForSelectorAsync(".e-tab, span[role='combobox']", new() { Timeout = 20_000 });
-            await publishButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+            try
+            {
+                await publishButton.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+            }
+            catch (TimeoutException ex)
+            {
+                var alerts = string.Join(" | ", await page.Locator(".alert").AllInnerTextsAsync());
+                var heading = await page.Locator("h1").First.InnerTextAsync();
+                var badge = await page.Locator(".vacancy-header-actions").First.InnerTextAsync();
+                throw new InvalidOperationException(
+                    $"Publish Vacancy button not shown at {page.Url}. Heading: '{heading}'. Header actions: '{badge}'. Alerts: '{alerts}'.", ex);
+            }
         }
         await publishButton.ClickAsync();
         await Assertions.Expect(publishButton).Not.ToBeVisibleAsync(new() { Timeout = 15_000 });

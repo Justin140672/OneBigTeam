@@ -13,11 +13,8 @@ public sealed class LeavePolicyListPage(IPage page, string baseUrl)
         await page.WaitForSpinnerToClearAsync();
     }
 
-    public async Task ClickNewAsync()
-    {
-        await page.GetByRole(AriaRole.Button, new() { Name = "Add" }).ClickAsync();
-        await page.WaitForURLAsync("**/leave-policies/new**", new() { Timeout = 30_000 });
-    }
+    public Task ClickNewAsync() =>
+        page.ClickGridAddAndWaitForCreateRouteAsync("**/leave-policies/new**");
 
     public Task<bool> HasItemAsync(string nameFragment) =>
         page.Locator(".e-rowcell")

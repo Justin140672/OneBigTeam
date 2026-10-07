@@ -1457,11 +1457,12 @@
         }
         else
         {
-            if (_employmentTab is not null && !_employmentTab.ValidateSection())
+            var loadedEmploymentTab = _employmentTab is { IsReady: true } ? _employmentTab : null;
+            if (loadedEmploymentTab is not null && !loadedEmploymentTab.ValidateSection())
                 return "Please fix the highlighted errors on the Employment tab.";
 
             var correlationId = Guid.NewGuid();
-            var employment = _employmentTab?.GetEmploymentPortion();
+            var employment = loadedEmploymentTab?.GetEmploymentPortion();
 
             var request = new UpdateEmployeeProfileAndEmploymentRequest(
                 CompanyId,

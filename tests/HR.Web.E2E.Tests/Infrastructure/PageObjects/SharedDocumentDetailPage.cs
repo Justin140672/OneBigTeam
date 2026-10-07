@@ -722,8 +722,12 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
             null, new PageWaitForFunctionOptions { Timeout = 15_000 });
     }
 
-    public Task SetReviewRenewedFileAsync(string filePath) =>
-        ReviewDialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+    public async Task SetReviewRenewedFileAsync(string filePath)
+    {
+        await ReviewDialog.Locator("input[type='file']").SetInputFilesAsync(filePath);
+        await ReviewDialog.Locator("[data-testid='review-renewed-file-selected']")
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+    }
 
     private ILocator ReviewReacknowledgementCheckbox => ReviewDialog.Locator(".e-checkbox-wrapper")
         .Filter(new() { HasText = "Requires employees to acknowledge this version again" });
