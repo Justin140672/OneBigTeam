@@ -103,21 +103,39 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
 
     public void Dispose() => EditContext.OnValidationStateChanged -= OnValidationStateChanged;
 
+    private object? _loadingKey;
+    private bool _loadInFlight;
+
     protected override async Task OnParametersSetAsync()
     {
-        if (_hasLoaded && Equals(_loadedKey, LoadKey))
+        var key = LoadKey;
+
+        if (_hasLoaded && Equals(_loadedKey, key))
             return;
 
+        if (_loadInFlight && Equals(_loadingKey, key))
+            return;
+
+        _loadInFlight = true;
+        _loadingKey = key;
         IsLoading = true;
         GlobalError = null;
         SuccessMsg = null;
 
-        await LoadAsync();
-        CaptureBaseline();
+        try
+        {
+            await LoadAsync();
+            CaptureBaseline();
 
-        _loadedKey = LoadKey;
-        _hasLoaded = true;
-        IsLoading = false;
+            _loadedKey = key;
+            _hasLoaded = true;
+            IsLoading = false;
+        }
+        finally
+        {
+            if (Equals(_loadingKey, key))
+                _loadInFlight = false;
+        }
     }
 
     protected abstract Task LoadAsync();

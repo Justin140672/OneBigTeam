@@ -90,18 +90,24 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     private async Task<bool> HasMoreActionsItemAsync(string itemName)
     {
-        await MoreActionsButton.ClickAsync();
-        bool visible;
-        try
+        var popup = page.Locator(".e-dropdown-popup:visible");
+        var anyItem = popup.Locator("li").First;
+
+        for (var attempt = 1; ; attempt++)
         {
-            await page.Locator($"#{MoreActionsItemId(itemName)}")
-                .WaitForAsync(new() { Timeout = 3_000 });
-            visible = true;
+            await MoreActionsButton.ClickAsync();
+            try
+            {
+                await anyItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+                await page.Keyboard.PressAsync("Escape");
+            }
         }
-        catch (TimeoutException)
-        {
-            visible = false;
-        }
+
+        var visible = await page.Locator($"#{MoreActionsItemId(itemName)}").IsVisibleAsync();
 
         await page.Keyboard.PressAsync("Escape");
         return visible;
@@ -305,6 +311,9 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     public Task WaitForReviewOwnerTextAsync(string expected) =>
         Assertions.Expect(page.Locator("dt:has-text('Review Owner') + dd")).ToHaveTextAsync(expected, new() { Timeout = 15_000 });
 
+    public Task WaitForReviewOwnerRowHiddenAsync() =>
+        Assertions.Expect(page.Locator("dt:has-text('Review Owner') + dd")).ToBeHiddenAsync(new() { Timeout = 15_000 });
+
     public async Task<string?> GetReviewOwnerTextAsync()
     {
         var row = page.Locator("dt:has-text('Review Owner') + dd");
@@ -399,8 +408,18 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public async Task OpenAuditHistoryDialogAsync()
     {
-        await ClickMoreActionsItemAsync("Audit History");
-        await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        for (var attempt = 1; ; attempt++)
+        {
+            await ClickMoreActionsItemAsync("Audit History");
+            try
+            {
+                await AuditHistoryDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                break;
+            }
+            catch (TimeoutException) when (attempt < 4)
+            {
+            }
+        }
 
         await AuditHistoryDialog.Locator(
             "[data-testid='document-audit-history-grid'] .e-row, [data-testid='document-audit-history-grid'] .e-emptyrow")

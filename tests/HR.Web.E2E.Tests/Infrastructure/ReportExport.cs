@@ -27,6 +27,19 @@ public static class ReportExport
         }
 
         await menuItem.ClickAsync();
-        return await downloadTask;
+
+        var errorBanner = page.Locator(".alert-danger").First;
+        var errorTask = errorBanner.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 60_000 });
+
+        var finished = await Task.WhenAny(downloadTask, errorTask);
+        if (finished == downloadTask || errorTask.IsFaulted)
+        {
+            _ = errorTask.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+            return await downloadTask;
+        }
+
+        _ = downloadTask.ContinueWith(static t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        var message = (await errorBanner.TextContentAsync())?.Trim();
+        throw new InvalidOperationException($"Export did not produce a download; the page showed an error: '{message}'.");
     }
 }

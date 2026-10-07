@@ -43,6 +43,14 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
     public async Task<int> CountVisibleCardsAsync() =>
         await Board.Locator(".kanban-candidate-card").CountAsync();
 
+    public Task WaitForCardPresentAsync(string candidateNameFragment) =>
+        Assertions.Expect(Board.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment }))
+            .Not.ToHaveCountAsync(0, new() { Timeout = 15_000 });
+
+    public Task WaitForCardAbsentAsync(string candidateNameFragment) =>
+        Assertions.Expect(Board.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment }))
+            .ToHaveCountAsync(0, new() { Timeout = 15_000 });
+
     public async Task<bool> HasCardForNameAsync(string candidateNameFragment) =>
         await Board.Locator(".kanban-candidate-card").Filter(new() { HasText = candidateNameFragment }).CountAsync() > 0;
 
@@ -249,21 +257,32 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
         var card = Card(candidateNameFragment);
         await card.ScrollIntoViewIfNeededAsync();
 
-        await card.EvaluateAsync(@"el => {
-            const dt = new DataTransfer();
-            el.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
-        }");
-
         var duringDrag = false;
-        var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline)
+        for (var attempt = 1; attempt <= 4 && !duringDrag; attempt++)
         {
-            if (await HasDraggingClassAsync())
+            await card.EvaluateAsync(@"el => {
+                const dt = new DataTransfer();
+                el.dispatchEvent(new DragEvent('dragstart', { bubbles: true, cancelable: true, dataTransfer: dt }));
+            }");
+
+            var deadline = DateTime.UtcNow.AddSeconds(4);
+            while (DateTime.UtcNow < deadline)
             {
-                duringDrag = true;
-                break;
+                if (await HasDraggingClassAsync())
+                {
+                    duringDrag = true;
+                    break;
+                }
+                await card.Page.WaitForTimeoutAsync(100);
             }
-            await card.Page.WaitForTimeoutAsync(100);
+
+            if (!duringDrag)
+            {
+                await card.EvaluateAsync(@"el => {
+                    const dt = new DataTransfer();
+                    el.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
+                }");
+            }
         }
 
         await card.EvaluateAsync(@"el => {
@@ -271,8 +290,8 @@ public sealed class VacancyKanbanBoardPage(IPage page, string baseUrl)
             el.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
         }");
 
-        deadline = DateTime.UtcNow.AddSeconds(5);
-        while (DateTime.UtcNow < deadline && await HasDraggingClassAsync())
+        var endDeadline = DateTime.UtcNow.AddSeconds(5);
+        while (DateTime.UtcNow < endDeadline && await HasDraggingClassAsync())
             await card.Page.WaitForTimeoutAsync(100);
 
         return duringDrag;

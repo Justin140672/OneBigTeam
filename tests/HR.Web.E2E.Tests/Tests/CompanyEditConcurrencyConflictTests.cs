@@ -25,6 +25,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// tab's save and the finally-block restore; unique GUID-derived values keep assertions
 /// unambiguous within this test.
 /// </summary>
+[Collection("AcmeCompanyProfileEdits")]
 public sealed class CompanyEditConcurrencyConflictTests(PriyaShahPersonaFixture fixture)
     : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {

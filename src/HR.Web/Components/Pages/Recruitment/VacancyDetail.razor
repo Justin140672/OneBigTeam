@@ -391,7 +391,8 @@
             return;
         }
 
-        _vacancy = await VacancyService.GetVacancyAsync(CompanyId, _vacancy.Id);
+        var published = _vacancy with { Status = result.Status };
+        _vacancy = await VacancyService.GetVacancyAsync(CompanyId, _vacancy.Id) ?? published;
     }
 
     private static StatusBadgeVariant StatusVariant(string status) => status switch

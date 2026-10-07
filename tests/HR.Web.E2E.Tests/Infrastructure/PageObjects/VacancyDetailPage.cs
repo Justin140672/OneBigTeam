@@ -56,10 +56,19 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public async Task SelectPositionProfileAsync(string titleFragment)
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
+        var valueInput = group.Locator(".e-input-group input").First;
+        var alreadySelected = Regex.IsMatch(await valueInput.InputValueAsync(), Regex.Escape(titleFragment));
+
         await DropDownSelector.SelectAsync(page, group, titleFragment);
 
-        await Assertions.Expect(group.Locator(".e-input-group input").First)
+        await Assertions.Expect(valueInput)
             .ToHaveValueAsync(new Regex(Regex.Escape(titleFragment)), new() { Timeout = 10_000 });
+
+        if (!alreadySelected)
+        {
+            await page.Locator("[data-testid='position-profile-defaults-summary']")
+                .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        }
     }
 
     public async Task OpenPositionProfileDropdownAsync()
@@ -83,6 +92,16 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     {
         var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
         return await group.Locator(".e-input-group input").First.InputValueAsync();
+    }
+
+    public async Task ExpectPositionProfileDisabledAsync(bool disabled)
+    {
+        var group = page.Locator(".col-md-8").Filter(new() { HasText = "Position Profile" }).First;
+        var input = group.Locator("input.e-input").First;
+        if (disabled)
+            await Assertions.Expect(input).ToBeDisabledAsync(new() { Timeout = 10_000 });
+        else
+            await Assertions.Expect(input).ToBeEnabledAsync(new() { Timeout = 10_000 });
     }
 
     public async Task<bool> IsPositionProfileDisabledAsync()
@@ -166,18 +185,12 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
         // @onchange and re-rendered the Correction Reason field / Position Profile dropdown yet.
         // Wait for the reason field to actually match the expected reveal/hide state before
         // returning so callers don't race that re-render.
-        if (value)
-            await CorrectionReasonInput.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
-        else
+        await CorrectionReasonInput.WaitForAsync(new()
         {
-            try
-            {
-                await CorrectionReasonInput.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 5_000 });
-            }
-            catch (TimeoutException)
-            {
-            }
-        }
+            State = value ? WaitForSelectorState.Visible : WaitForSelectorState.Hidden,
+            Timeout = 15_000,
+        });
+        await ExpectPositionProfileDisabledAsync(!value);
     }
 
     /// <summary>
@@ -496,17 +509,39 @@ public sealed class VacancyDetailPage(IPage page, string baseUrl)
     public Task<bool> HasTabAsync(string name) =>
         page.GetByRole(AriaRole.Tab, new() { Name = name, Exact = true }).IsVisibleAsync();
 
-    public async Task OpenApplicationsTabAsync()
+    private async Task OpenVacancyTabAsync(string tabName, string contentTestId)
     {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Applications" }).ClickAsync();
-        await page.WaitForSelectorAsync("[data-testid='vacancy-applications-tab']", new() { Timeout = 15_000 });
+        var tab = page.GetByRole(AriaRole.Tab, new() { Name = tabName });
+
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await tab.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+                break;
+            }
+            catch (TimeoutException ex) when (attempt >= 3)
+            {
+                var tabs = string.Join(" | ", await page.GetByRole(AriaRole.Tab).AllInnerTextsAsync());
+                var heading = await page.Locator("h1").First.InnerTextAsync();
+                var alerts = string.Join(" | ", await page.Locator(".alert").AllInnerTextsAsync());
+                throw new InvalidOperationException(
+                    $"Vacancy tab '{tabName}' never appeared at {page.Url}. Heading: '{heading}'. Tabs: '{tabs}'. Alerts: '{alerts}'.", ex);
+            }
+            catch (TimeoutException)
+            {
+                await page.ReloadAsync();
+                await page.WaitForSelectorAsync(".e-tab", new() { Timeout = 20_000 });
+            }
+        }
+
+        await tab.ClickAsync();
+        await page.WaitForSelectorAsync($"[data-testid='{contentTestId}']", new() { Timeout = 15_000 });
     }
 
-    public async Task OpenInterviewsTabAsync()
-    {
-        await page.GetByRole(AriaRole.Tab, new() { Name = "Interviews" }).ClickAsync();
-        await page.WaitForSelectorAsync("[data-testid='vacancy-interviews-tab']", new() { Timeout = 15_000 });
-    }
+    public Task OpenApplicationsTabAsync() => OpenVacancyTabAsync("Applications", "vacancy-applications-tab");
+
+    public Task OpenInterviewsTabAsync() => OpenVacancyTabAsync("Interviews", "vacancy-interviews-tab");
 
 
     public async Task ClickAddCandidateAsync()

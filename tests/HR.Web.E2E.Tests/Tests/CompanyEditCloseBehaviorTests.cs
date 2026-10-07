@@ -16,6 +16,7 @@ namespace HR.Web.E2E.Tests.Tests;
 /// now, so the base <c>HasUnsavedChanges</c> (a snapshot diff of <c>Model</c> — see
 /// EditPageBase&lt;TModel&gt;) already covers both without any page-specific override.
 /// </summary>
+[Collection("AcmeCompanyProfileEdits")]
 public sealed class CompanyEditCloseBehaviorTests(PriyaShahPersonaFixture fixture) : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {
     private static readonly Guid AcmeId = Guid.Parse("00000000-0000-0000-0000-000000000001");

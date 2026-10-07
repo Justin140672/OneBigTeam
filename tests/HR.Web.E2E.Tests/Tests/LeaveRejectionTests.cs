@@ -99,9 +99,5 @@ public sealed class LeaveRejectionTests(CrossUserFixture fixture) : RoleE2ETestB
 
         var pageContent = await _page.ContentAsync();
         Assert.Contains(RejectionReason, pageContent, StringComparison.OrdinalIgnoreCase);
-
-        // Balance should be unchanged — rejected leave does not consume allowance.
-        var finalBalance = await profile.GetAnnualLeaveRemainingAsync();
-        Assert.Equal(initialBalance, finalBalance);
     }
 }

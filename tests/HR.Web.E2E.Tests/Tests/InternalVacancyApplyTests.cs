@@ -87,18 +87,14 @@ public sealed class InternalVacancyApplyTests(EmployeePersonaFixture fixture) : 
         await page.OpenCardAsync(vacancy.Title);
         await page.ClickApplyAsync();
 
-        await page.SelectCvAsync("cv.txt", "text/plain", "plain text CV"u8.ToArray());
-        await page.WaitForCvErrorAsync("The CV must be a PDF file.");
+        await page.SelectRejectedCvAsync("cv.txt", "text/plain", "plain text CV"u8.ToArray(), "The CV must be a PDF file.");
         Assert.False(await page.IsCvSelectedVisibleAsync(), "A rejected .txt file must not be shown as selected.");
-
-        await page.SelectCvAsync("empty.pdf", PdfMime, []);
-        await page.WaitForCvErrorAsync("The selected CV file is empty.");
+        await page.SelectRejectedCvAsync("empty.pdf", PdfMime, [], "The selected CV file is empty.");
         Assert.False(await page.IsCvSelectedVisibleAsync(), "A rejected empty file must not be shown as selected.");
 
         var oversized = new byte[MaxCvBytes + 1];
         CandidateCvApi.BuildTestPdf().AsSpan(0, 5).CopyTo(oversized);
-        await page.SelectCvAsync("huge.pdf", PdfMime, oversized);
-        await page.WaitForCvErrorAsync("The CV file is larger than the 20 MB limit.");
+        await page.SelectRejectedCvAsync("huge.pdf", PdfMime, oversized, "The CV file is larger than the 20 MB limit.");
         Assert.False(await page.IsCvSelectedVisibleAsync(), "A rejected oversized file must not be shown as selected.");
 
         Assert.True(await page.IsApplyFormVisibleAsync(), "Expected to remain on the apply form after rejected files.");

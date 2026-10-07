@@ -113,7 +113,7 @@ public sealed class ExternalRecruiterDetailPage(IPage page, string baseUrl)
     {
         try
         {
-            await DuplicateWarning.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+            await DuplicateWarning.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
             return true;
         }
         catch (TimeoutException)

@@ -428,6 +428,12 @@ public sealed class HrSettingsPage(IPage page, string baseUrl)
         return (await WorkEmailExample.TextContentAsync())?.Trim();
     }
 
+    public async Task ExpectWorkEmailExampleAsync(string expected)
+    {
+        await OpenWorkEmailTabAsync();
+        await Assertions.Expect(WorkEmailExample).ToHaveTextAsync(expected, new() { Timeout = 10_000 });
+    }
+
     public async Task SaveWorkEmailSettingsAsync()
     {
         await OpenWorkEmailTabAsync();

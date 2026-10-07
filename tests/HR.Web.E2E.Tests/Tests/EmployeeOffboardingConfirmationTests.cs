@@ -67,7 +67,7 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
     }
 
     [Fact]
-    public async Task StartOffboardingDialog_ShowsConsequencesExplanation_OnConfirmStep()
+    public async Task StartOffboardingDialog_ShowsDetailsSummary_OnConfirmStep()
     {
         var login = new LoginPage(_page, _fixture.WebBaseUrl);
         var empList = new EmployeeListPage(_page, _fixture.WebBaseUrl);
@@ -96,12 +96,13 @@ public sealed class EmployeeOffboardingConfirmationTests(HrAdminPersonaFixture f
         Assert.Equal("5. Confirm", await dialog.GetActiveStepLabelAsync());
 
         var confirmDialog = _page.GetByRole(Microsoft.Playwright.AriaRole.Dialog, new() { Name = "Start Leaving Process" });
+        foreach (var label in new[] { "Resignation Received Date", "Leaving Date", "Last Working Day", "Leaving Reason" })
+        {
+            await Microsoft.Playwright.Assertions.Expect(confirmDialog)
+                .ToContainTextAsync(label, new() { Timeout = 10_000 });
+        }
         await Microsoft.Playwright.Assertions.Expect(confirmDialog)
-            .ToContainTextAsync("This employee has resigned", new() { Timeout = 10_000 });
-        await Microsoft.Playwright.Assertions.Expect(confirmDialog)
-            .ToContainTextAsync("no separate \"start offboarding\" step", new() { Timeout = 5_000 });
-        await Microsoft.Playwright.Assertions.Expect(confirmDialog)
-            .ToContainTextAsync("offboarding checklist", new() { Timeout = 5_000 });
+            .Not.ToContainTextAsync("This employee has resigned");
     }
 
     [Fact]

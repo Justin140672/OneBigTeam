@@ -4,6 +4,7 @@ using Microsoft.Playwright;
 
 namespace HR.Web.E2E.Tests.Tests;
 
+[Collection("AcmeCompanyProfileEdits")]
 public sealed class CompanyAddressValidationTests(PriyaShahPersonaFixture fixture)
     : RoleE2ETestBase<PriyaShahPersonaFixture>(fixture)
 {

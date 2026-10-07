@@ -479,13 +479,13 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
         {
             await hrSettings.SetWorkEmailSuggestionsEnabledAsync(true);
             await hrSettings.SetWorkEmailPrimaryDomainAsync("@E2E-Beta.Example.com");
-            Assert.Equal("jane.smith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+            await hrSettings.ExpectWorkEmailExampleAsync("jane.smith@e2e-beta.example.com");
 
             await hrSettings.SelectWorkEmailConventionAsync("firstinitial.lastname");
-            Assert.Equal("j.smith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+            await hrSettings.ExpectWorkEmailExampleAsync("j.smith@e2e-beta.example.com");
 
             await hrSettings.SelectWorkEmailConventionAsync("firstnamelastname");
-            Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+            await hrSettings.ExpectWorkEmailExampleAsync("janesmith@e2e-beta.example.com");
 
             await hrSettings.SaveWorkEmailSettingsAsync();
 
@@ -498,7 +498,7 @@ public sealed class HrSettingsPageTests(HrSettingsSerialFixture fixture) : HrSet
             Assert.True(await hrSettings.IsWorkEmailSuggestionsEnabledAsync());
             Assert.Equal("e2e-beta.example.com", await hrSettings.GetWorkEmailPrimaryDomainAsync());
             Assert.Equal("firstnamelastname", await hrSettings.GetWorkEmailConventionAsync());
-            Assert.Equal("janesmith@e2e-beta.example.com", await hrSettings.GetWorkEmailExampleAsync());
+            await hrSettings.ExpectWorkEmailExampleAsync("janesmith@e2e-beta.example.com");
         }
         finally
         {

@@ -96,15 +96,13 @@ public sealed class RecruitmentDashboardRedesignTests(RecruiterPersonaFixture fi
 
         var kanban = new VacancyKanbanBoardPage(_page, _fixture.WebBaseUrl);
         await kanban.WaitForLoadedAsync();
-        Assert.True(await kanban.HasCardForNameAsync(candidateLast));
+        await kanban.WaitForCardPresentAsync(candidateLast);
 
         await dashboard.FillBoardSearchAsync("NoSuchCandidateXyz");
-        Assert.False(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the candidate's card to be hidden once the toolbar search term no longer matches");
+        await kanban.WaitForCardAbsentAsync(candidateLast);
 
         await dashboard.FillBoardSearchAsync(candidateLast);
-        Assert.True(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the candidate's card to reappear once the toolbar search term matches again");
+        await kanban.WaitForCardPresentAsync(candidateLast);
     }
 
     [Fact]

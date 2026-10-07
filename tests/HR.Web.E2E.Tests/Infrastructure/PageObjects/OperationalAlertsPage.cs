@@ -7,10 +7,29 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     private const string SettledSelector =
         ".e-grid .e-row, .e-grid .e-emptyrow, .activity-empty, .dashboard-error";
 
+    private string _companyFilter = "";
+    private string _categoryFilter = "";
+    private string _statusFilter = "open";
+    private int _pageNumber = 1;
+
+    private ILocator Results => page.Locator("[data-loaded-filter]");
+
+    private async Task WaitForFilterAppliedAsync()
+    {
+        var key = $"{_companyFilter}|{_categoryFilter}|{_statusFilter}|{_pageNumber}";
+        await Assertions.Expect(Results).ToHaveAttributeAsync("data-loaded-filter", key, new() { Timeout = 20_000 });
+        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
+    }
+
     public async Task GotoAsync()
     {
+        _companyFilter = "";
+        _categoryFilter = "";
+        _statusFilter = "open";
+        _pageNumber = 1;
         await page.GotoAsync($"{baseUrl}/operational-alerts");
         await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 30_000 });
+        await WaitForFilterAppliedAsync();
     }
 
     public Task<bool> IsErrorBannerVisibleAsync() =>
@@ -45,23 +64,25 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     {
         await CompanyIdInput.FillAsync(companyId.ToString());
         await CompanyIdInput.PressAsync("Tab");
-        await page.WaitForTimeoutAsync(600);
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(200);
+        _companyFilter = companyId.ToString();
+        _pageNumber = 1;
+        await WaitForFilterAppliedAsync();
     }
 
     public async Task SetCategoryFilterAsync(string value)
     {
         await CategorySelect.SelectOptionAsync(new SelectOptionValue { Value = value });
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(200);
+        _categoryFilter = value;
+        _pageNumber = 1;
+        await WaitForFilterAppliedAsync();
     }
 
     public async Task SetStatusFilterAsync(string value)
     {
         await StatusSelect.SelectOptionAsync(new SelectOptionValue { Value = value });
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(200);
+        _statusFilter = value;
+        _pageNumber = 1;
+        await WaitForFilterAppliedAsync();
     }
 
     public async Task<int> RowCountAsync()
@@ -121,15 +142,15 @@ public sealed class OperationalAlertsPage(IPage page, string baseUrl)
     public async Task NextPageAsync()
     {
         await PagerButton("Next").ClickAsync();
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(200);
+        _pageNumber++;
+        await WaitForFilterAppliedAsync();
     }
 
     public async Task PreviousPageAsync()
     {
         await PagerButton("Previous").ClickAsync();
-        await page.WaitForSelectorAsync(SettledSelector, new() { Timeout = 15_000 });
-        await page.WaitForTimeoutAsync(200);
+        _pageNumber--;
+        await WaitForFilterAppliedAsync();
     }
 
     public Task<bool> IsNextEnabledAsync() => PagerButton("Next").IsEnabledAsync();

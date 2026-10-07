@@ -373,7 +373,10 @@ public sealed class EmployeeProfileViewEditModeTests(HrAdminPersonaFixture fixtu
         await _page.Keyboard.PressAsync("ArrowRight");
 
         var employmentTab = EmployeeEditPage.SectionTab(_page, "Employment");
-        await Assertions.Expect(employmentTab).ToBeFocusedAsync(new() { Timeout = 5_000 });
+        var focusedTab = _page.Locator(".employee-profile-sections > .e-tab-header [role='tab']:focus-within");
+        await Assertions.Expect(focusedTab).ToHaveCountAsync(1, new() { Timeout = 5_000 });
+        await Assertions.Expect(focusedTab).ToHaveAttributeAsync("aria-selected", "false", new() { Timeout = 5_000 });
+        await Assertions.Expect(focusedTab).ToHaveTextAsync("Employment", new() { Timeout = 5_000 });
 
         await _page.Keyboard.PressAsync("Enter");
         await Assertions.Expect(employmentTab).ToHaveAttributeAsync("aria-selected", "true", new() { Timeout = 10_000 });

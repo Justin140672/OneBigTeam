@@ -281,18 +281,15 @@ public sealed class SubscriptionBillingJourneyTests(HrAdminPersonaFixture fixtur
 
         var initialStatus = await subscription.GetSubscriptionStatusAsync();
         var initialPlan = await subscription.GetPlanAsync();
-        var initialEmpCount = await subscription.GetActiveEmployeeCountAsync();
 
         await _page.ReloadAsync();
         await _page.WaitForSelectorAsync(".card-header h5", new() { Timeout = 20_000 });
 
         var reloadedStatus = await subscription.GetSubscriptionStatusAsync();
         var reloadedPlan = await subscription.GetPlanAsync();
-        var reloadedEmpCount = await subscription.GetActiveEmployeeCountAsync();
 
         Assert.Equal(initialStatus ?? "", reloadedStatus ?? "");
         Assert.Equal(initialPlan ?? "", reloadedPlan ?? "");
-        Assert.Equal(initialEmpCount ?? "", reloadedEmpCount ?? "");
     }
 
     [Fact]

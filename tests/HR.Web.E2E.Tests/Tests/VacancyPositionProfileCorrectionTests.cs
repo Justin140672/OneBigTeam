@@ -50,8 +50,7 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
         Assert.True(await vacancyDetail.IsCorrectionCheckboxCheckedAsync());
         Assert.True(await vacancyDetail.IsCorrectionReasonFieldVisibleAsync(),
             "Expected the Correction Reason field to appear once the checkbox is checked");
-        Assert.False(await vacancyDetail.IsPositionProfileDisabledAsync(),
-            "Expected the Position Profile dropdown to be re-enabled while requesting a correction");
+        await vacancyDetail.ExpectPositionProfileDisabledAsync(false);
     }
 
     [Fact]
@@ -61,15 +60,14 @@ public sealed class VacancyPositionProfileCorrectionTests(RecruiterPersonaFixtur
 
         await vacancyDetail.SetAuthorisedCorrectionCheckedAsync(true);
         Assert.True(await vacancyDetail.IsCorrectionReasonFieldVisibleAsync());
-        Assert.False(await vacancyDetail.IsPositionProfileDisabledAsync());
+        await vacancyDetail.ExpectPositionProfileDisabledAsync(false);
 
         await vacancyDetail.SetAuthorisedCorrectionCheckedAsync(false);
 
         Assert.False(await vacancyDetail.IsCorrectionCheckboxCheckedAsync());
         Assert.False(await vacancyDetail.IsCorrectionReasonFieldVisibleAsync(),
             "Expected the Correction Reason field to be hidden again after unchecking the box");
-        Assert.True(await vacancyDetail.IsPositionProfileDisabledAsync(),
-            "Expected the Position Profile dropdown to be re-locked after unchecking the box");
+        await vacancyDetail.ExpectPositionProfileDisabledAsync(true);
     }
 
     [Fact]

@@ -340,7 +340,7 @@ public sealed class EmployeeLeavingProcessTests(HrAdminPersonaFixture fixture) :
 
         await amendDialog.SaveAsync();
         Assert.False(await amendDialog.IsVisibleAsync(),
-            "Expected the Amend Leaving Process dialog to close after a successful save");
+            $"Expected the Amend Leaving Process dialog to close after a successful save. Dialog error: {await amendDialog.GetErrorAsync()}");
 
         await _page.WaitForSelectorAsync("[role='tablist']", new() { Timeout = 20_000 });
 

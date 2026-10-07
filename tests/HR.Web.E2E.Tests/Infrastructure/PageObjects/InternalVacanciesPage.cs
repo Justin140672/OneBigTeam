@@ -193,6 +193,23 @@ public sealed class InternalVacanciesPage(IPage page, string baseUrl)
         await Assertions.Expect(CvFileName).ToHaveTextAsync(fileName, new() { Timeout = 15_000 });
     }
 
+    public async Task SelectRejectedCvAsync(string fileName, string mimeType, byte[] bytes, string expectedError)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(45);
+        while (true)
+        {
+            await SelectCvAsync(fileName, mimeType, bytes);
+            try
+            {
+                await Assertions.Expect(CvError).ToHaveTextAsync(expectedError, new() { Timeout = 4_000 });
+                return;
+            }
+            catch (PlaywrightException) when (DateTime.UtcNow < deadline)
+            {
+            }
+        }
+    }
+
     public Task<bool> IsCvSelectedVisibleAsync() => CvSelected.IsVisibleAsync();
 
     public Task WaitForCvErrorAsync(string expected) =>

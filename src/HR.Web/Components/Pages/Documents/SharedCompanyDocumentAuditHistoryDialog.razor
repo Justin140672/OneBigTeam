@@ -107,14 +107,15 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (IsOpen && !_wasOpen)
+        var opening = IsOpen && !_wasOpen;
+        _wasOpen = IsOpen;
+
+        if (opening)
         {
             _loading = true;
             _items = await DocumentService.GetSharedCompanyDocumentAuditHistoryAsync(CompanyId, DocumentId);
             _loading = false;
         }
-
-        _wasOpen = IsOpen;
     }
 
     private void HandleView(DocumentAuditHistoryItemModel item)

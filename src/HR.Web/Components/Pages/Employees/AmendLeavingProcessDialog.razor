@@ -128,10 +128,11 @@
 
     protected override async Task OnParametersSetAsync()
     {
-        if (IsOpen && !_wasOpen)
-            await LoadCurrentValuesAsync();
-
+        var opening = IsOpen && !_wasOpen;
         _wasOpen = IsOpen;
+
+        if (opening)
+            await LoadCurrentValuesAsync();
     }
 
     private async Task LoadCurrentValuesAsync()

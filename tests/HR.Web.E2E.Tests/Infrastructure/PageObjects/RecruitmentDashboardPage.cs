@@ -118,7 +118,19 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
     {
         await EnsureTabForWidgetAsync(widgetTitle);
         var widget = WidgetCard(widgetTitle);
-        await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+        try
+        {
+            await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 30_000 });
+        }
+        catch (TimeoutException)
+        {
+            var warnings = await widget.Locator(".widget-source-warning").AllInnerTextsAsync();
+            if (warnings.Count == 0)
+                throw;
+
+            var warning = string.Join(" | ", warnings);
+            throw new InvalidOperationException($"Widget '{widgetTitle}' failed to load its data source: {warning}");
+        }
     }
 
     private static readonly string[] InsightsWidgetTitles = ["Hiring Pipeline", "New Hires"];
@@ -197,7 +209,8 @@ public sealed class RecruitmentDashboardPage(IPage page, string baseUrl)
             await SwitchToTabAsync(Tab.Activity);
 
         var widget = page.Locator(".widget-card").Filter(new() { HasText = "Upcoming Interviews" }).First;
-        await widget.Locator(".task-widget-item, .widget-empty").First.WaitForAsync(new() { Timeout = 15_000 });
+        await widget.Locator(".task-widget-item, .widget-empty, .widget-source-warning").First.WaitForAsync(new() { Timeout = 30_000 });
+        await Assertions.Expect(widget.Locator(".widget-source-warning")).ToHaveCountAsync(0);
 
         var titles = await widget.Locator(".task-widget-title").AllAsync();
         var names  = new List<string>();

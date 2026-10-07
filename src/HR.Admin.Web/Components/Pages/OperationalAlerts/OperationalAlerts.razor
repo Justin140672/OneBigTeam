@@ -26,6 +26,7 @@
     </select>
 </div>
 
+<div class="operational-alerts-results" data-loaded-filter="@_loadedFilterKey">
 @if (_loading)
 {
     <p>Loading…</p>
@@ -68,6 +69,7 @@ else
         <SfButton Disabled="@(!HasNextPage)" OnClick="NextPageAsync">Next</SfButton>
     </div>
 }
+</div>
 
 @code {
     private SfGrid<OperationalAlertListItem>? _grid;
@@ -79,6 +81,7 @@ else
     private string _categoryFilter = "";
     private string _statusFilter = "open";
     private int _page = 1;
+    private string? _loadedFilterKey;
     private CancellationTokenSource? _filterDebounceCts;
 
     private bool HasNextPage =>
@@ -95,14 +98,17 @@ else
         StateHasChanged();
 
         Guid? companyId = Guid.TryParse(_companyIdText, out var parsed) ? parsed : null;
+        var category = _categoryFilter;
+        var status = _statusFilter;
+        var page = _page;
 
         try
         {
             _response = await OperationalAlertsService.GetAlertsAsync(new OperationalAlertFilter(
                 companyId,
-                string.IsNullOrEmpty(_categoryFilter) ? null : _categoryFilter,
-                _statusFilter,
-                _page,
+                string.IsNullOrEmpty(category) ? null : category,
+                status,
+                page,
                 PageSize));
         }
         catch (Exception)
@@ -110,6 +116,7 @@ else
             _response = null;
         }
 
+        _loadedFilterKey = $"{companyId}|{category}|{status}|{page}";
         _loading = false;
     }
 

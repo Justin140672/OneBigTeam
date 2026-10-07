@@ -60,7 +60,7 @@ public sealed class SharedDocumentReviewOwnerTests(HrAdminPersonaFixture fixture
 
             await detail.SetReviewOwnerAsync(MarcusDiallo);
 
-            Assert.Equal(MarcusDiallo, await detail.GetReviewOwnerTextAsync());
+            await detail.WaitForReviewOwnerTextAsync(MarcusDiallo);
         }
         finally
         {
@@ -120,7 +120,7 @@ public sealed class SharedDocumentReviewOwnerTests(HrAdminPersonaFixture fixture
 
             await detail.ClearReviewOwnerAsync();
 
-            Assert.Null(await detail.GetReviewOwnerTextAsync());
+            await detail.WaitForReviewOwnerRowHiddenAsync();
         }
         finally
         {

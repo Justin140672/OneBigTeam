@@ -127,15 +127,16 @@ public sealed class WorkloadActionsReportTests(HrAdminPersonaFixture fixture) : 
         await report.GoToAsync(AcmeId);
 
         await report.SelectGroupByAsync("Action Type");
-        await report.WaitForLoadedAsync();
+
+        var headings = await report.GetGroupHeadingsAsync();
 
         Assert.False(await report.HasLoadErrorAsync(),
             "Expected the grid to reload without an error banner after applying Group By");
 
-        if (!await report.IsEmptyStateVisibleAsync())
+        if (headings.Count == 0)
         {
-            var headings = await report.GetGroupHeadingsAsync();
-            Assert.NotEmpty(headings);
+            Assert.True(await report.IsEmptyStateVisibleAsync(),
+                "Expected either grouped sections or the empty state after applying Group By");
         }
     }
 
