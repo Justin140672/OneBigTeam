@@ -7,6 +7,7 @@ internal sealed record TeamMemberItem(
     string? PhoneNumber,
     string WorkEmail,
     string? ProfilePhotoUrl,
-    string Status);
+    string Status,
+    bool IsLeaving = false);
 
 internal sealed record GetMyTeamResponse(IReadOnlyList<TeamMemberItem> Items);

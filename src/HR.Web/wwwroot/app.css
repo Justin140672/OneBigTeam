@@ -319,6 +319,13 @@ a:focus-visible {
     color: #fff;
 }
 
+/* A filled primary button that also carries e-warning (WaiveOffboardingTaskDialog) paints the teal
+   primary background but keeps the warning variant's dark text. */
+html:not([data-theme="dark"]) .e-btn.e-primary.e-warning:not(:disabled):not(.e-disabled),
+html:not([data-theme="dark"]) .e-css.e-btn.e-primary.e-warning:not(:disabled):not(.e-disabled) {
+    color: #fff;
+}
+
 /* Tab text (both Syncfusion SfTab and plain Bootstrap nav-pills/nav-tabs used across edit dialogs
    and report pages) defaults to a Bootstrap/Syncfusion blue accent that doesn't belong to this
    app's theme — re-point the active/selected state to the brand teal token instead. */

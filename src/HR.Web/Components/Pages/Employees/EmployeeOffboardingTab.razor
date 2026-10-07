@@ -38,7 +38,6 @@ else
                         <p class="text-muted small mb-0 mt-1">@Overview.Notes</p>
                     }
                 </div>
-                <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(EffectivePlanStatus)">@StatusLabel(EffectivePlanStatus)</span>
             </div>
 
             <div class="mb-1 small text-muted">@Overview.RequiredObligationsResolved of @Overview.RequiredObligationsTotal required obligations resolved</div>
@@ -166,7 +165,6 @@ else
     private bool _waiveDialogOpen;
     private Guid _waiveTaskId;
 
-    private string EffectivePlanStatus => Overview?.IsOverdueAfterDeparture == true ? "OverdueAfterDeparture" : Overview?.PlanStatus ?? "NotStarted";
 
     private int ProgressPercent => Overview?.ProgressPercent ?? 0;
 
@@ -215,26 +213,6 @@ else
         _waiveDialogOpen = false;
         await OnRefreshRequested.InvokeAsync();
     }
-
-    private static string StatusLabel(string? status) => status switch
-    {
-        "NotStarted" => "Not Started",
-        "InProgress" => "In Progress",
-        "Completed" => "Completed",
-        "Cancelled" => "Cancelled",
-        "OverdueAfterDeparture" => "Overdue After Departure",
-        _ => status ?? "Unknown"
-    };
-
-    private static string StatusBadgeClass(string? status) => status switch
-    {
-        "NotStarted" => "bg-secondary",
-        "InProgress" => "bg-primary",
-        "Completed" => "bg-success",
-        "Cancelled" => "bg-danger",
-        "OverdueAfterDeparture" => "bg-danger",
-        _ => "bg-secondary"
-    };
 
     private static string ProgressBarClass(string? status) => status switch
     {

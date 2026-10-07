@@ -83,7 +83,7 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
 
     [Fact]
-    public async Task TeamSize_Excludes_NonActive_NotYetStarted_And_Already_Left_But_Keeps_Inclusive_Boundaries()
+    public async Task TeamSize_Includes_Active_And_Leaving_And_Excludes_Suspended_Former_NotYetStarted_And_Already_Left_With_Inclusive_Boundaries()
     {
         await using var context = BuildContext();
         var companyId = Guid.NewGuid();
@@ -107,10 +107,10 @@ public class GetManagerTeamStatusSummaryHandlerTests
 
         var result = await handler.HandleAsync(companyId, Guid.NewGuid(), CancellationToken.None);
 
-        Assert.Equal(3, result.TeamSize);
-        Assert.Equal(3, result.Members.Count);
+        Assert.Equal(4, result.TeamSize);
+        Assert.Equal(4, result.Members.Count);
         Assert.Equal(
-            new[] { active.Id, leavesToday.Id, startsToday.Id }.OrderBy(x => x),
+            new[] { active.Id, leavesToday.Id, startsToday.Id, leaving.Id }.OrderBy(x => x),
             result.Members.Select(m => m.EmployeeId).OrderBy(x => x));
     }
 

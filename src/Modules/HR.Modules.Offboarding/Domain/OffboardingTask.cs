@@ -89,6 +89,16 @@ internal sealed class OffboardingTask
         UpdatedAt = now;
     }
 
+    public bool ReassignTo(Guid employeeId, DateTimeOffset now)
+    {
+        if (AssignedEmployeeId == employeeId)
+            return false;
+
+        AssignedEmployeeId = employeeId;
+        UpdatedAt = now;
+        return true;
+    }
+
     public void Complete(DateTimeOffset now)
     {
         Status = OffboardingTaskStatus.Completed;

@@ -35,7 +35,7 @@ internal sealed class GetManagerTeamStatusSummaryHandler(
             .AsNoTracking()
             .Where(e => e.CompanyId == companyId
                      && subtreeSet.Contains(e.Id)
-                     && e.Status == EmploymentStatus.Active
+                     && (e.Status == EmploymentStatus.Active || e.Status == EmploymentStatus.Leaving)
                      && e.StartDate <= today
                      && (e.LeavingDate == null || e.LeavingDate >= today))
             .Select(e => new

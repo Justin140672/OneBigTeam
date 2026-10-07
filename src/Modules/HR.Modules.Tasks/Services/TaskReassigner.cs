@@ -51,4 +51,50 @@ internal sealed class TaskReassigner(
 
         return tasks.Count;
     }
+
+    public async Task<int> ReassignBySourceEntitiesAsync(
+        Guid companyId,
+        IReadOnlyCollection<Guid> sourceEntityIds,
+        TaskSource source,
+        TaskActionType actionType,
+        Guid toEmployeeId,
+        CancellationToken cancellationToken)
+    {
+        if (sourceEntityIds.Count == 0)
+            return 0;
+
+        var tasks = await dbContext.TaskItems
+            .Where(t => t.CompanyId == companyId
+                     && t.SourceEntityId != null
+                     && sourceEntityIds.Contains(t.SourceEntityId.Value)
+                     && t.Source == source
+                     && t.ActionType == actionType
+                     && t.Status != TaskItemStatus.Completed
+                     && t.Status != TaskItemStatus.Cancelled
+                     && (t.AssignedEmployeeId != toEmployeeId || t.AssignedUserId != toEmployeeId))
+            .ToListAsync(cancellationToken);
+
+        if (tasks.Count == 0)
+            return 0;
+
+        var now = clock.UtcNowOffset();
+        foreach (var task in tasks)
+            task.Reassign(toEmployeeId, toEmployeeId, now);
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+
+        await notificationWriter.WriteAsync(
+            Guid.NewGuid(),
+            companyId,
+            toEmployeeId,
+            "Tasks assigned to you",
+            $"{tasks.Count} task(s) have been assigned to you.",
+            toEmployeeId,
+            NotificationType.TaskAssigned,
+            NotificationPriority.Normal,
+            now,
+            cancellationToken);
+
+        return tasks.Count;
+    }
 }

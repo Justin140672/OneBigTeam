@@ -57,6 +57,12 @@ public sealed class MyTeamRosterPage(IPage page, string baseUrl)
     public async Task ClickViewProfileAsync(Guid employeeId) =>
         await page.Locator($"[data-testid='roster-view-profile-{employeeId}']").ClickAsync();
 
+    public async Task<string> GetStatusBadgeTextAsync(Guid employeeId)
+    {
+        var row = Rows.Filter(new() { Has = page.Locator($"[data-testid='roster-view-profile-{employeeId}']") });
+        return (await row.Locator("span.badge").First.TextContentAsync())?.Trim() ?? "";
+    }
+
     public async Task<bool> RowExistsAsync(Guid employeeId) =>
         await page.Locator($"[data-testid='roster-view-profile-{employeeId}']").IsVisibleAsync();
 }

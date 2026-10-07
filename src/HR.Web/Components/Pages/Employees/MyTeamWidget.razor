@@ -68,7 +68,13 @@
                                     {
                                         <span></span>
                                     }
-                                    <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
+                                    <span class="team-card-status-group">
+                                        @if (m.IsLeaving)
+                                        {
+                                            <span class="team-card-leaving-badge" data-testid="@($"team-card-leaving-badge-{m.EmployeeId}")">Leaving</span>
+                                        }
+                                        <span class="team-card-status team-card-status--@StatusCss(m.Status)">@StatusLabel(m.Status)</span>
+                                    </span>
                                 </div>
                                 <a href="@($"/companies/{Session.CompanyId}/employees/{m.EmployeeId}/team-view")" class="team-card-profile-link">
                                     <ProfilePhotoAvatar PhotoUrl="@m.ProfilePhotoUrl" Initials="@Initials(m.FullName)" SizePx="48" />

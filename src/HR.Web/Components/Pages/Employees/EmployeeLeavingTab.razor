@@ -51,9 +51,7 @@ else
                         <SfButton CssClass="e-outline e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => OnAmendRequested.InvokeAsync())">Amend</SfButton>
                         <SfButton CssClass="e-outline e-danger e-small" Disabled="@Session.IsReadOnly" OnClick="@(() => OnCancelRequested.InvokeAsync())">Cancel Leaving Process</SfButton>
                     }
-                    <span class="badge fs-6 px-3 py-2 @StatusBadgeClass(EmploymentStatus)">@EmploymentStatusLabel(EmploymentStatus)</span>
                     <span class="badge fs-6 px-3 py-2 @LeavingStatusBadgeClass(process.Status)">@LeavingStatusLabel(process.Status)</span>
-                    <span class="badge fs-6 px-3 py-2 @OffboardingStatusBadgeClass()">@OffboardingStatusLabel()</span>
                 </div>
             </div>
             <div class="card-body">
@@ -255,46 +253,6 @@ else
             _hasFocusedChecklist = true;
             await JsRuntime.InvokeVoidAsync("hrScrollIntoView", "leaving-checklist-section");
         }
-    }
-
-    private static string EmploymentStatusLabel(string? status) => status is null ? "—" : EnumDisplay.Humanize(status);
-
-    private static string StatusBadgeClass(string? status) => status switch
-    {
-        "Leaving" => "bg-warning text-dark",
-        "FormerEmployee" => "bg-dark",
-        _ => "bg-secondary"
-    };
-
-    private string OffboardingStatusLabel()
-    {
-        var overview = _offboardingLookup?.Overview;
-        if (_offboardingLookup?.Failed == true) return "Unknown";
-        if (overview is null || !overview.HasPlan) return "Setup Incomplete";
-        if (overview.IsOverdueAfterDeparture) return "Overdue After Departure";
-        return overview.PlanStatus switch
-        {
-            "InProgress" => "In Progress",
-            "Completed" => "Completed",
-            "Cancelled" => "Cancelled",
-            "NotStarted" => "Setup Incomplete",
-            _ => overview.PlanStatus ?? "Setup Incomplete"
-        };
-    }
-
-    private string OffboardingStatusBadgeClass()
-    {
-        var overview = _offboardingLookup?.Overview;
-        if (_offboardingLookup?.Failed == true) return "bg-secondary";
-        if (overview is null || !overview.HasPlan) return "bg-secondary";
-        if (overview.IsOverdueAfterDeparture) return "bg-danger";
-        return overview.PlanStatus switch
-        {
-            "InProgress" => "bg-primary",
-            "Completed" => "bg-success",
-            "Cancelled" => "bg-danger",
-            _ => "bg-secondary"
-        };
     }
 
     private static string NoticePeriodSourceLabel(string source) => EnumDisplay.Humanize(source);

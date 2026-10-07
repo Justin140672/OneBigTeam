@@ -7,6 +7,7 @@ using HR.Modules.Offboarding.Features.CompleteOffboardingTaskFromTask;
 using HR.Modules.Offboarding.Features.GetOffboardingOverview;
 using HR.Modules.Offboarding.Features.GetOffboardingStatus;
 using HR.Modules.Offboarding.Features.MarkOffboardingIncompleteOnDepartureFinalised;
+using HR.Modules.Offboarding.Features.ReassignOffboardingTasksOnManagerChanged;
 using HR.Modules.Offboarding.Features.RescheduleOffboardingOnLeavingDateChanged;
 using HR.Modules.Offboarding.Features.StartOffboarding;
 using HR.Modules.Offboarding.Features.WaiveOffboardingTask;
@@ -54,6 +55,9 @@ public static class OffboardingModule
         services.AddScoped<IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>, RescheduleOffboardingOnLeavingDateChangedHandler>();
 
         services.AddScoped<IIntegrationEventHandler<EmployeeDepartureFinalisedIntegrationEvent>, MarkOffboardingIncompleteOnDepartureFinalisedHandler>();
+        services.AddScoped<OffboardingManagerTaskAssigneeReconciler>();
+        services.AddScoped<IIntegrationEventHandler<EmployeeManagerChangedIntegrationEvent>, ReassignOffboardingTasksOnManagerChangedHandler>();
+        services.AddScoped<OffboardingManagerTaskAssigneeReconciliationJob>();
         services.AddScoped<Jobs.IdempotencyMaintenanceJob>();
 
         return services;
@@ -74,6 +78,10 @@ public static class OffboardingModule
             "offboarding-plan-creation-reconciliation",
             job => job.ExecuteAsync(),
             Cron.Daily(10));
+        jobManager.AddOrUpdate<OffboardingManagerTaskAssigneeReconciliationJob>(
+            "offboarding-manager-task-assignee-reconciliation",
+            job => job.ExecuteAsync(),
+            Cron.Daily(11));
         // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
         jobManager.AddOrUpdate<Jobs.IdempotencyMaintenanceJob>(
             "offboarding-idempotency-maintenance",

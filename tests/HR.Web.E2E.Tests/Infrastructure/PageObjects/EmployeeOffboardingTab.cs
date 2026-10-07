@@ -20,12 +20,6 @@ public sealed class EmployeeOffboardingTab(IPage page)
     public Task<bool> HasChecklistCardAsync() =>
         Section.Locator(".card-header:has-text('Offboarding Checklist')").IsVisibleAsync();
 
-    public async Task<string?> GetStatusBadgeTextAsync()
-    {
-        var badge = Section.Locator(".card .badge").First;
-        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
-    }
-
     public async Task<int> GetProgressPercentAsync()
     {
         var bar = Section.Locator(".progress .progress-bar");

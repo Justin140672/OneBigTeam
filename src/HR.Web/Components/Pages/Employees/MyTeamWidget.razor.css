@@ -60,6 +60,28 @@
     border-radius: var(--hr-radius-sm);
 }
 
+.team-card-status-group {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.team-card-leaving-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 1px 7px;
+    border-radius: var(--hr-radius-sm);
+    background: #fef3c7;
+    color: #92400e;
+}
+
+html[data-theme="dark"] .team-card-leaving-badge {
+    background: rgba(202, 138, 4, 0.18);
+    color: #fbbf24;
+}
+
 .team-card-status--at-work {
     background: #dcfce7;
     color: var(--hr-color-success);

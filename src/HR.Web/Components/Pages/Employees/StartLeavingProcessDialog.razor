@@ -221,6 +221,8 @@
     {
         _model.LeavingDate = value;
         _leavingDateManuallyEdited = true;
+        _globalError = null;
+        _editContext.NotifyFieldChanged(_editContext.Field(nameof(StartLeavingProcessFormModel.LeavingDate)));
 
         if (!IsBackdated(_model.LeavingDate))
             _model.ConfirmBackdatedLeavingDate = false;
@@ -230,6 +232,8 @@
     {
         _model.LastWorkingDay = value;
         _lastWorkingDayManuallyEdited = true;
+        _globalError = null;
+        _editContext.NotifyFieldChanged(_editContext.Field(nameof(StartLeavingProcessFormModel.LastWorkingDay)));
     }
 
     private static DateOnly ComputeFallbackLastWorkingDay(DateOnly leavingDate) => leavingDate.DayOfWeek switch
@@ -251,24 +255,26 @@
         if (_step == 1 && _model.ResignationReceivedDate is { } received && !_leavingDateManuallyEdited)
             _model.LeavingDate = ComputeProposedLeavingDate(received);
 
-        _editContext.Validate();
-
         if (_stepFields.TryGetValue(_step, out var fields))
         {
+            foreach (var field in fields)
+                _editContext.NotifyFieldChanged(_editContext.Field(field));
+
             var customMessages = _model.Validate(new ValidationContext(_model))
                 .Where(r => r.MemberNames.Any(fields.Contains))
                 .Select(r => r.ErrorMessage);
 
-            var firstMessage = fields
+            var hasInlineError = fields
                 .SelectMany(f => _editContext.GetValidationMessages(_editContext.Field(f)))
-                .Concat(customMessages)
-                .FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+                .Any(m => !string.IsNullOrWhiteSpace(m));
 
-            if (firstMessage is not null)
-            {
-                _globalError = firstMessage;
+            var customMessage = customMessages.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m));
+
+            if (customMessage is not null)
+                _globalError = customMessage;
+
+            if (hasInlineError || customMessage is not null)
                 return;
-            }
         }
 
         if (_step == 2 && _model.LeavingDate is { } leaving && !_lastWorkingDayManuallyEdited)

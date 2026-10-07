@@ -199,6 +199,84 @@ public class GetMyTeamEndpointTests
         Assert.DoesNotContain(team1.Items, i => i.EmployeeId == report2);
     }
 
+    private async Task StartLeavingProcessAsync(HttpClient admin, Guid companyId, Guid employeeId)
+    {
+        var leavingDate = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(30);
+        var response = await admin.PostAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/leaving-process",
+            new
+            {
+                companyId,
+                employeeId,
+                resignationReceivedDate = leavingDate.AddDays(-30).ToString("yyyy-MM-dd"),
+                leavingDate = leavingDate.ToString("yyyy-MM-dd"),
+                lastWorkingDay = leavingDate.AddDays(-1).ToString("yyyy-MM-dd"),
+                leavingReason = "Resignation"
+            });
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Get_MyTeam_Includes_A_Leaving_Direct_Report_Flagged_As_Leaving()
+    {
+        var (admin, companyId, refData) = await ContextAsync();
+        var managerId = await CreateEmployeeAsync(admin, companyId, refData, "Mandy", "Manager");
+        var activeReportId = await CreateEmployeeAsync(admin, companyId, refData, "Aaron", "Active");
+        var leavingReportId = await CreateEmployeeAsync(admin, companyId, refData, "Lena", "Leaving");
+        await AssignManagerAsync(admin, companyId, activeReportId, managerId);
+        await AssignManagerAsync(admin, companyId, leavingReportId, managerId);
+        await StartLeavingProcessAsync(admin, companyId, leavingReportId);
+
+        using var client = AsEmployee(managerId, companyId);
+        var payload = await client.GetFromJsonAsync<TeamPayload>(
+            $"/api/companies/{companyId}/employees/me/team");
+
+        Assert.Equal(2, payload!.Items.Count);
+        Assert.False(payload.Items.Single(i => i.EmployeeId == activeReportId).IsLeaving);
+        Assert.True(payload.Items.Single(i => i.EmployeeId == leavingReportId).IsLeaving);
+    }
+
+    [Fact]
+    public async Task Get_MyTeam_Keeps_Indirect_Reports_Reachable_Through_A_Leaving_Middle_Manager()
+    {
+        var (admin, companyId, refData) = await ContextAsync();
+        var managerId = await CreateEmployeeAsync(admin, companyId, refData, "Mandy", "Manager");
+        var middleId = await CreateEmployeeAsync(admin, companyId, refData, "Mike", "Middle");
+        var leafId = await CreateEmployeeAsync(admin, companyId, refData, "Lia", "Leaf");
+        await AssignManagerAsync(admin, companyId, middleId, managerId);
+        await AssignManagerAsync(admin, companyId, leafId, middleId);
+        await StartLeavingProcessAsync(admin, companyId, middleId);
+
+        using var client = AsEmployee(managerId, companyId);
+        var payload = await client.GetFromJsonAsync<TeamPayload>(
+            $"/api/companies/{companyId}/employees/me/team?includeIndirect=true");
+
+        Assert.Contains(payload!.Items, i => i.EmployeeId == middleId && i.IsLeaving);
+        Assert.Contains(payload.Items, i => i.EmployeeId == leafId);
+    }
+
+    [Fact]
+    public async Task Get_MyTeamRoster_Lists_A_Leaving_Direct_Report_With_Leaving_Status()
+    {
+        var (admin, companyId, refData) = await ContextAsync();
+        var managerId = await CreateEmployeeAsync(admin, companyId, refData, "Mandy", "Manager");
+        var leavingReportId = await CreateEmployeeAsync(admin, companyId, refData, "Lena", "Leaving");
+        await AssignManagerAsync(admin, companyId, leavingReportId, managerId);
+        await StartLeavingProcessAsync(admin, companyId, leavingReportId);
+
+        using var client = AsEmployee(managerId, companyId);
+        var payload = await client.GetFromJsonAsync<RosterPayload>(
+            $"/api/companies/{companyId}/employees/me/team/roster");
+
+        var member = Assert.Single(payload!.Items);
+        Assert.Equal(leavingReportId, member.EmployeeId);
+        Assert.Equal("Leaving", member.Status);
+    }
+
+    private sealed record RosterMemberPayload(Guid EmployeeId, string Status);
+
+    private sealed record RosterPayload(List<RosterMemberPayload> Items);
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record TeamMemberPayload(
@@ -208,7 +286,8 @@ public class GetMyTeamEndpointTests
         string? PhoneNumber,
         string WorkEmail,
         string? ProfilePhotoUrl,
-        string Status);
+        string Status,
+        bool IsLeaving = false);
 
     private sealed record TeamPayload(List<TeamMemberPayload> Items);
 }

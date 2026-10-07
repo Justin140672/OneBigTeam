@@ -711,7 +711,8 @@ public sealed record TeamMemberItem(
     string? PhoneNumber,
     string WorkEmail,
     string? ProfilePhotoUrl,
-    string Status);
+    string Status,
+    bool IsLeaving = false);
 
 
 public sealed record GetMyTeamRosterResponse(IReadOnlyList<TeamRosterItem> Items);

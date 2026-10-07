@@ -90,11 +90,6 @@ public sealed class EmployeeOffboardingTabTests(HrAdminPersonaFixture fixture) :
         Assert.True(await offboarding.HasChecklistCardAsync(),
             "Expected the Offboarding Checklist card to be visible after the leaving process triggered a plan");
 
-        var status = await offboarding.GetStatusBadgeTextAsync();
-        Assert.True(
-            status is "Not Started" or "In Progress",
-            $"Expected a sensible newly-started offboarding plan status, got '{status}'");
-
         await empEdit.GoToAsync(AcmeId, employeeId, "tab=offboarding");
         Assert.Equal("Leaving & Offboarding", await employee.GetActiveTabNameAsync());
     }

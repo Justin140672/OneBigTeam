@@ -166,7 +166,7 @@ public sealed class StartLeavingProcessDialog(IPage page)
         }
         catch (PlaywrightException)
         {
-            await Dialog.Locator(".alert-danger")
+            await Dialog.Locator(".alert-danger, .validation-message").First
                 .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 8_000 });
         }
     }
@@ -197,7 +197,7 @@ public sealed class StartLeavingProcessDialog(IPage page)
 
     public async Task<string?> GetStepErrorAsync()
     {
-        var error = Dialog.Locator(".alert-danger").First;
+        var error = Dialog.Locator(".alert-danger, .validation-message").First;
         return await error.IsVisibleAsync() ? (await error.TextContentAsync())?.Trim() : null;
     }
 

@@ -66,13 +66,7 @@ public sealed class EmployeeLeavingTab(IPage page)
 
     public async Task<string?> GetStatusBadgeTextAsync()
     {
-        var badge = DetailsSection.Locator(".card-header .badge").Nth(1);
-        return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
-    }
-
-    public async Task<string?> GetOffboardingStatusBadgeTextAsync()
-    {
-        var badge = DetailsSection.Locator(".card-header .badge").Nth(2);
+        var badge = DetailsSection.Locator(".card-header .badge").First;
         return await badge.IsVisibleAsync() ? (await badge.TextContentAsync())?.Trim() : null;
     }
 
