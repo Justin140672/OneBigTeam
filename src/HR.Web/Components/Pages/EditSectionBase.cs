@@ -49,11 +49,27 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
 
     public async Task ReloadLatestValuesAsync(bool rebaseline = false)
     {
+        if (!_hasLoaded || _disposed) return;
+
         var preservedEdits = rebaseline
             ? null
             : System.Text.Json.JsonSerializer.Serialize(Model);
 
-        await LoadAsync();
+        var key = LoadKey;
+        var generation = BeginGeneration(out var token);
+        Action apply;
+        try
+        {
+            apply = await LoadAsync(token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        if (!IsCurrent(generation, key)) return;
+        apply();
+        _loadedKey = key;
 
         if (preservedEdits is not null)
             RestoreModelState(preservedEdits);
@@ -101,10 +117,38 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
         base.OnInitialized();
     }
 
-    public void Dispose() => EditContext.OnValidationStateChanged -= OnValidationStateChanged;
+    public void Dispose()
+    {
+        _disposed = true;
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = null;
+        EditContext.OnValidationStateChanged -= OnValidationStateChanged;
+    }
 
     private object? _loadingKey;
     private bool _loadInFlight;
+    private int _generation;
+    private bool _disposed;
+    private CancellationTokenSource? _loadCts;
+
+    protected virtual void RequestRender() => StateHasChanged();
+
+    protected object? LoadedKey => _loadedKey;
+
+    protected bool CanSave => _hasLoaded && !IsLoading && Equals(_loadedKey, LoadKey);
+
+    private int BeginGeneration(out CancellationToken token)
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+        _loadCts = new CancellationTokenSource();
+        token = _loadCts.Token;
+        return ++_generation;
+    }
+
+    private bool IsCurrent(int generation, object? key) =>
+        !_disposed && generation == _generation && Equals(LoadKey, key);
 
     protected override async Task OnParametersSetAsync()
     {
@@ -116,29 +160,42 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
         if (_loadInFlight && Equals(_loadingKey, key))
             return;
 
+        var generation = BeginGeneration(out var token);
         _loadInFlight = true;
         _loadingKey = key;
+        _hasLoaded = false;
+        _loadedKey = null;
         IsLoading = true;
         GlobalError = null;
         SuccessMsg = null;
 
         try
         {
-            await LoadAsync();
+            var apply = await LoadAsync(token);
+
+            if (!IsCurrent(generation, key)) return;
+
+            apply();
             CaptureBaseline();
 
             _loadedKey = key;
             _hasLoaded = true;
             IsLoading = false;
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+        }
         finally
         {
-            if (Equals(_loadingKey, key))
+            if (generation == _generation)
                 _loadInFlight = false;
         }
     }
 
-    protected abstract Task LoadAsync();
+    // Must capture every route/resource id into locals before its first await and return an
+    // action that applies the fetched data to Model/fields; the base only invokes that action if
+    // this load is still the current generation for the current LoadKey.
+    protected abstract Task<Action> LoadAsync(CancellationToken cancellationToken);
 
     private void CaptureBaseline() =>
         _baselineSnapshot = System.Text.Json.JsonSerializer.Serialize(Model);
@@ -150,7 +207,14 @@ public abstract class EditSectionBase<TModel> : ComponentBase, IDisposable where
         GlobalError = null;
         SuccessMsg = null;
         SaveConflict = false;
-        StateHasChanged();
+
+        if (!CanSave)
+        {
+            GlobalError = "The form is still loading or is out of date. Please wait and try again.";
+            return GlobalError;
+        }
+
+        RequestRender();
 
         if (!EditContext.Validate())
         {

@@ -101,26 +101,36 @@ else
     private int _managerFilterRequestId;
     private bool _reloading;
 
-    protected override async Task LoadAsync()
+    protected override async Task<System.Action> LoadAsync(CancellationToken cancellationToken)
     {
-        LoadedVersion = Record.Version;
-        Model.ManagerEmployeeId = Record.ManagerEmployeeId;
-        Model.ExpectedEndDate = Record.ExpectedEndDate;
-        Model.Notes = Record.Notes ?? string.Empty;
+        var companyId = CompanyId;
+        var record = Record;
 
-        var employees = await EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
-        _managerOptions = (employees?.Items ?? [])
-            .Where(e => e.Id != Record.EmployeeId && e.Status != "FormerEmployee")
+        var employees = await EmployeeService.ListSelectableEmployeesAsync(companyId, pageSize: 50);
+        var managerOptions = (employees?.Items ?? [])
+            .Where(e => e.Id != record.EmployeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .OrderBy(m => m.Name)
             .ToList();
 
-        if (_managerOptions.All(m => m.Id != Record.ManagerEmployeeId))
+        if (managerOptions.All(m => m.Id != record.ManagerEmployeeId))
         {
-            var current = await EmployeeService.GetEmployeeAsync(CompanyId, Record.ManagerEmployeeId);
+            cancellationToken.ThrowIfCancellationRequested();
+            var current = await EmployeeService.GetEmployeeAsync(companyId, record.ManagerEmployeeId);
             if (current is not null)
-                _managerOptions.Add(new ManagerOption(current.Id, current.FullName));
+                managerOptions.Add(new ManagerOption(current.Id, current.FullName));
         }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return () =>
+        {
+            LoadedVersion = record.Version;
+            Model.ManagerEmployeeId = record.ManagerEmployeeId;
+            Model.ExpectedEndDate = record.ExpectedEndDate;
+            Model.Notes = record.Notes ?? string.Empty;
+            _managerOptions = managerOptions;
+        };
     }
 
     private async Task OnManagerFilteringAsync(Syncfusion.Blazor.DropDowns.FilteringEventArgs args)

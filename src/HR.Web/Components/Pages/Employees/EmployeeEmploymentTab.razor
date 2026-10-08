@@ -444,59 +444,77 @@ else
         _statusOptions = options;
     }
 
-    protected override async Task LoadAsync()
+    protected override async Task<System.Action> LoadAsync(CancellationToken cancellationToken)
     {
-        var deptTask       = DepartmentService.ListDepartmentsAsync(CompanyId);
-        var locationTask   = LocationService.ListLocationsAsync(CompanyId);
-        var profileTask    = PositionProfileService.ListPositionProfilesAsync(CompanyId, pageSize: 100);
-        var empListTask    = EmployeeService.ListSelectableEmployeesAsync(CompanyId, pageSize: 50);
-        var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(CompanyId, EmployeeId);
-        var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(CompanyId);
-        var compensationTask = CompensationService.GetCurrentCompensationAsync(CompanyId, EmployeeId);
+        var companyId = CompanyId;
+        var employeeId = EmployeeId;
+
+        var deptTask       = DepartmentService.ListDepartmentsAsync(companyId);
+        var locationTask   = LocationService.ListLocationsAsync(companyId);
+        var profileTask    = PositionProfileService.ListPositionProfilesAsync(companyId, pageSize: 100);
+        var empListTask    = EmployeeService.ListSelectableEmployeesAsync(companyId, pageSize: 50);
+        var probationTask  = ProbationService.GetProbationRecordByEmployeeAsync(companyId, employeeId);
+        var empTypesTask   = EmploymentTypeService.ListEmploymentTypesAsync(companyId);
+        var compensationTask = CompensationService.GetCurrentCompensationAsync(companyId, employeeId);
 
         await Task.WhenAll(deptTask, locationTask, profileTask, empListTask, probationTask, empTypesTask, compensationTask);
+        cancellationToken.ThrowIfCancellationRequested();
 
-        _departments      = (await deptTask)?.Items ?? [];
-        _locations        = (await locationTask)?.Items ?? [];
-        _positionProfiles = (await profileTask)?.Items.ToList() ?? [];
-        _employmentTypes  = (await empTypesTask)?.Items ?? [];
+        var departments      = (await deptTask)?.Items ?? [];
+        var locations        = (await locationTask)?.Items ?? [];
+        var positionProfiles = (await profileTask)?.Items.ToList() ?? [];
+        var employmentTypes  = (await empTypesTask)?.Items ?? [];
 
-        _probationRecord = await probationTask;
-        _currentCompensation = await compensationTask;
+        var probationRecord = await probationTask;
+        var currentCompensation = await compensationTask;
 
-        var employee = await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
-        _employee = employee;
-        LoadedVersion = employee?.Version;
-        if (employee is not null)
-            PopulateModel(employee);
-        RebuildStatusOptions();
+        var employee = await EmployeeService.GetEmployeeAsync(companyId, employeeId);
+        cancellationToken.ThrowIfCancellationRequested();
 
         if (employee?.PositionProfileId is { } currentProfileId &&
-            _positionProfiles.All(p => p.Id != currentProfileId))
+            positionProfiles.All(p => p.Id != currentProfileId))
         {
-            var currentProfile = await PositionProfileService.GetPositionProfileAsync(CompanyId, currentProfileId);
+            var currentProfile = await PositionProfileService.GetPositionProfileAsync(companyId, currentProfileId);
             if (currentProfile is not null)
             {
-                _positionProfiles.Add(new PositionProfileListItemModel(
-                    currentProfile.Id, _departments.FirstOrDefault(d => d.Id == currentProfile.DepartmentId)?.Name, currentProfile.Title,
+                positionProfiles.Add(new PositionProfileListItemModel(
+                    currentProfile.Id, departments.FirstOrDefault(d => d.Id == currentProfile.DepartmentId)?.Name, currentProfile.Title,
                     currentProfile.IsActive, currentProfile.SalaryMin, currentProfile.SalaryMax,
                     currentProfile.SalaryType, currentProfile.NoticePeriodUnitOverride,
                     currentProfile.NoticePeriodLengthOverride,
-                    _locations.FirstOrDefault(l => l.Id == currentProfile.LocationId)?.Name));
+                    locations.FirstOrDefault(l => l.Id == currentProfile.LocationId)?.Name));
             }
         }
 
-        _managerOptions = ((await empListTask)?.Items ?? [])
-            .Where(e => e.Id != EmployeeId && e.Status != "FormerEmployee")
+        var managerOptions = ((await empListTask)?.Items ?? [])
+            .Where(e => e.Id != employeeId && e.Status != "FormerEmployee")
             .Select(e => new ManagerOption(e.Id, e.FullName))
             .ToList();
 
-        if (employee?.ManagerId is { } managerId && _managerOptions.All(m => m.Id != managerId))
-            _managerOptions.Add(new ManagerOption(managerId, employee.ManagerFullName ?? ""));
+        if (employee?.ManagerId is { } managerId && managerOptions.All(m => m.Id != managerId))
+            managerOptions.Add(new ManagerOption(managerId, employee.ManagerFullName ?? ""));
 
-        _managerOptions = _managerOptions.OrderBy(m => m.Name)
+        managerOptions = managerOptions.OrderBy(m => m.Name)
             .Prepend(new ManagerOption(Guid.Empty, "No Manager"))
             .ToList();
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return () =>
+        {
+            _departments = departments;
+            _locations = locations;
+            _positionProfiles = positionProfiles;
+            _employmentTypes = employmentTypes;
+            _probationRecord = probationRecord;
+            _currentCompensation = currentCompensation;
+            _employee = employee;
+            LoadedVersion = employee?.Version;
+            if (employee is not null)
+                PopulateModel(employee);
+            RebuildStatusOptions();
+            _managerOptions = managerOptions;
+        };
     }
 
     private int _managerFilterRequestId;

@@ -198,18 +198,30 @@ else
         await JS.InvokeVoidAsync("hrFocusById", "cd-save-button");
     }
 
-    protected override async Task LoadAsync()
+    protected override object? LoadKey => (CompanyId, EmployeeId);
+
+    protected override async Task<System.Action> LoadAsync(CancellationToken cancellationToken)
     {
-        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != EmployeeId)
-            return;
+        var companyId = CompanyId;
+        var employeeId = EmployeeId;
 
-        Model.PostcodeRegexPattern = Session.PostcodeRegex;
-        Model.TelephoneRegexPattern = Session.TelephoneRegex;
-        Model.MobileRegexPattern = Session.MobileRegex;
+        if (!Session.EmployeeId.HasValue || Session.EmployeeId.Value != employeeId)
+            return static () => { };
 
-        var details = await EmployeeService.GetMyContactDetailsAsync(CompanyId);
-        if (details is not null)
+        var postcodeRegex = Session.PostcodeRegex;
+        var telephoneRegex = Session.TelephoneRegex;
+        var mobileRegex = Session.MobileRegex;
+
+        var details = await EmployeeService.GetMyContactDetailsAsync(companyId);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        return () =>
         {
+            Model.PostcodeRegexPattern = postcodeRegex;
+            Model.TelephoneRegexPattern = telephoneRegex;
+            Model.MobileRegexPattern = mobileRegex;
+
+            if (details is null) return;
             _workEmail = details.WorkEmail;
             LoadedVersion = details.Version;
             Model.PersonalEmail = details.PersonalEmail;
@@ -221,7 +233,7 @@ else
             Model.County = details.County;
             Model.PostCode = details.PostCode ?? string.Empty;
             Model.Country = string.IsNullOrWhiteSpace(details.Country) ? "United Kingdom" : details.Country;
-        }
+        };
     }
 
     private async Task SaveClickedAsync()
