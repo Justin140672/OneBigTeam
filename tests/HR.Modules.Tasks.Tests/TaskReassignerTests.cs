@@ -344,6 +344,39 @@ public class TaskReassignerTests
     }
 
     [Fact]
+    public async Task ReassignBySourceEntitiesAsync_Unassigns_Only_The_Requested_Tasks_When_Destination_Is_Null()
+    {
+        await using var dbContext = BuildContext();
+        var companyId = Guid.NewGuid();
+        var sourceEntityId = Guid.NewGuid();
+        var previousManagerId = Guid.NewGuid();
+        var targeted = MakeSourceTask(companyId, sourceEntityId, previousManagerId);
+        var unrelatedSameAssignee = MakeSourceTask(companyId, Guid.NewGuid(), previousManagerId);
+        var unrelatedOtherSource = MakeSourceTask(companyId, sourceEntityId, previousManagerId, source: TaskSource.Leave);
+        var completed = MakeSourceTask(companyId, sourceEntityId, previousManagerId, status: TaskItemStatus.Completed);
+        dbContext.TaskItems.AddRange(targeted, unrelatedSameAssignee, unrelatedOtherSource, completed);
+        await dbContext.SaveChangesAsync();
+        var notificationWriter = new FakeNotificationWriter();
+
+        var count = await BuildReassigner(dbContext, notificationWriter).ReassignBySourceEntitiesAsync(
+            companyId, [sourceEntityId], TaskSource.Offboarding, TaskActionType.Complete, null,
+            CancellationToken.None);
+
+        Assert.Equal(1, count);
+        Assert.Empty(notificationWriter.Written);
+        var savedTargeted = await dbContext.TaskItems.SingleAsync(t => t.Id == targeted.Id);
+        Assert.Null(savedTargeted.AssignedEmployeeId);
+        Assert.Null(savedTargeted.AssignedUserId);
+        foreach (var other in new[] { unrelatedSameAssignee, unrelatedOtherSource, completed })
+            Assert.Equal(previousManagerId, (await dbContext.TaskItems.SingleAsync(t => t.Id == other.Id)).AssignedEmployeeId);
+
+        var again = await BuildReassigner(dbContext).ReassignBySourceEntitiesAsync(
+            companyId, [sourceEntityId], TaskSource.Offboarding, TaskActionType.Complete, null,
+            CancellationToken.None);
+        Assert.Equal(0, again);
+    }
+
+    [Fact]
     public async Task ReassignBySourceEntitiesAsync_Returns_Zero_For_An_Empty_Source_List()
     {
         await using var dbContext = BuildContext();

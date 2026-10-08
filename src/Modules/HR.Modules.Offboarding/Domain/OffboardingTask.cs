@@ -89,7 +89,7 @@ internal sealed class OffboardingTask
         UpdatedAt = now;
     }
 
-    public bool ReassignTo(Guid employeeId, DateTimeOffset now)
+    public bool ReassignTo(Guid? employeeId, DateTimeOffset now)
     {
         if (AssignedEmployeeId == employeeId)
             return false;

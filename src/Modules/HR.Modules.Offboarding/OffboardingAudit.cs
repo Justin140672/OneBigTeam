@@ -170,6 +170,27 @@ internal sealed record OffboardingPlanRescheduledAuditEvent(
     object? IAuditEvent.Metadata        => null;
 }
 
+internal sealed record OffboardingManagerTasksUnassignedAuditEvent(
+    Guid CompanyId,
+    Guid OffboardingPlanId,
+    Guid EmployeeId,
+    Guid? FallbackAssigneeEmployeeId,
+    int TasksReassigned,
+    DateTimeOffset OccurredAt) : IAuditEvent
+{
+    string IAuditEvent.EventType        => "offboarding-plan.manager-tasks-unassigned";
+    string IAuditEvent.EntityType       => "OffboardingPlan";
+    Guid   IAuditEvent.EntityId         => OffboardingPlanId;
+    Guid?  IAuditEvent.EmployeeId       => EmployeeId;
+    Guid?  IAuditEvent.ActorUserId      => null;
+    Guid?  IAuditEvent.ActorEmployeeId  => OffboardingSystemActor.Id;
+    Guid?  IAuditEvent.CorrelationId    => null;
+    string? IAuditEvent.Summary         => $"Employee has no manager; {TasksReassigned} manager-assigned offboarding task(s) moved to {(FallbackAssigneeEmployeeId is null ? "the unassigned HR queue" : "an HR administrator")}";
+    object? IAuditEvent.Before          => null;
+    object? IAuditEvent.After           => new { FallbackAssigneeEmployeeId, TasksReassigned, RequiresHrReconciliation = true };
+    object? IAuditEvent.Metadata        => null;
+}
+
 internal sealed record OffboardingIncompleteAtDepartureAuditEvent(
     Guid CompanyId,
     Guid OffboardingPlanId,

@@ -57,7 +57,7 @@ internal sealed class TaskReassigner(
         IReadOnlyCollection<Guid> sourceEntityIds,
         TaskSource source,
         TaskActionType actionType,
-        Guid toEmployeeId,
+        Guid? toEmployeeId,
         CancellationToken cancellationToken)
     {
         if (sourceEntityIds.Count == 0)
@@ -83,17 +83,20 @@ internal sealed class TaskReassigner(
 
         await dbContext.SaveChangesAsync(cancellationToken);
 
-        await notificationWriter.WriteAsync(
-            Guid.NewGuid(),
-            companyId,
-            toEmployeeId,
-            "Tasks assigned to you",
-            $"{tasks.Count} task(s) have been assigned to you.",
-            toEmployeeId,
-            NotificationType.TaskAssigned,
-            NotificationPriority.Normal,
-            now,
-            cancellationToken);
+        if (toEmployeeId is { } recipientId)
+        {
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(),
+                companyId,
+                recipientId,
+                "Tasks assigned to you",
+                $"{tasks.Count} task(s) have been assigned to you.",
+                recipientId,
+                NotificationType.TaskAssigned,
+                NotificationPriority.Normal,
+                now,
+                cancellationToken);
+        }
 
         return tasks.Count;
     }

@@ -22,19 +22,37 @@ internal sealed class FakeTaskReassigner : ITaskReassigner
 
     public record SourceReassignCall(
         Guid CompanyId, IReadOnlyCollection<Guid> SourceEntityIds, TaskSource Source, TaskActionType ActionType,
-        Guid ToEmployeeId);
+        Guid? ToEmployeeId);
 
     public List<SourceReassignCall> SourceCalls { get; } = [];
+
+    public bool ThrowOnSourceReassign { get; set; }
+
+    private readonly Dictionary<Guid, Guid?> _lastTarget = [];
 
     public Task<int> ReassignBySourceEntitiesAsync(
         Guid companyId,
         IReadOnlyCollection<Guid> sourceEntityIds,
         TaskSource source,
         TaskActionType actionType,
-        Guid toEmployeeId,
+        Guid? toEmployeeId,
         CancellationToken cancellationToken)
     {
+        if (ThrowOnSourceReassign)
+            throw new InvalidOperationException("Tasks module unavailable.");
+
         SourceCalls.Add(new SourceReassignCall(companyId, sourceEntityIds, source, actionType, toEmployeeId));
-        return Task.FromResult(sourceEntityIds.Count);
+
+        var changed = 0;
+        foreach (var id in sourceEntityIds)
+        {
+            if (_lastTarget.TryGetValue(id, out var previous) && previous == toEmployeeId)
+                continue;
+
+            _lastTarget[id] = toEmployeeId;
+            changed++;
+        }
+
+        return Task.FromResult(changed);
     }
 }

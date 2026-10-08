@@ -13,6 +13,6 @@ public interface ITaskReassigner
         IReadOnlyCollection<Guid> sourceEntityIds,
         TaskSource source,
         TaskActionType actionType,
-        Guid toEmployeeId,
+        Guid? toEmployeeId,
         CancellationToken cancellationToken);
 }

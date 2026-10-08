@@ -199,6 +199,65 @@ public class OffboardingManagerTasksVisibilityEndpointTests
         Assert.Equal(4, (await OffboardingTasksOfAsync(companyId, managerId)).Count);
     }
 
+    private static async Task ClearManagerAsync(HttpClient client, Guid companyId, Guid employeeId)
+    {
+        var response = await client.PutAsJsonAsync(
+            $"/api/companies/{companyId}/employees/{employeeId}/manager",
+            new { companyId, id = employeeId, managerId = (Guid?)null });
+        response.EnsureSuccessStatusCode();
+    }
+
+    [Fact]
+    public async Task Clearing_The_Leavers_Manager_Removes_The_Exit_Checklist_Tasks_From_The_Previous_Manager()
+    {
+        var companyId = Guid.NewGuid();
+        using var hr = await HrClientAsync(companyId);
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hr, companyId);
+
+        var managerId = await CreateEmployeeAsync(hr, companyId, refData, "OldMgr", managerId: null);
+        var reportId = await CreateEmployeeAsync(hr, companyId, refData, "Rep", managerId);
+        await StartLeavingProcessAsync(hr, companyId, reportId, 30);
+
+        var before = await OffboardingTasksOfAsync(companyId, managerId);
+        Assert.Equal(4, before.Count);
+
+        await ClearManagerAsync(hr, companyId, reportId);
+
+        Assert.Empty(await OffboardingTasksOfAsync(companyId, managerId));
+
+        using var previousManager = await ManagerClientAsync(companyId, managerId);
+        var complete = await previousManager.PostAsync(
+            $"/api/companies/{companyId}/tasks/{before[0].Id}/complete",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(System.Net.HttpStatusCode.Forbidden, complete.StatusCode);
+
+        var hrComplete = await hr.PostAsync(
+            $"/api/companies/{companyId}/tasks/{before[0].Id}/complete",
+            new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        Assert.Equal(System.Net.HttpStatusCode.OK, hrComplete.StatusCode);
+    }
+
+    [Fact]
+    public async Task Manager_Set_Cleared_And_Reassigned_Moves_The_Exit_Checklist_Tasks_Accordingly()
+    {
+        var companyId = Guid.NewGuid();
+        using var hr = await HrClientAsync(companyId);
+        var refData = await EmployeeReferenceDataSeeder.SeedViaApiAsync(hr, companyId);
+
+        var firstManagerId = await CreateEmployeeAsync(hr, companyId, refData, "FirstMgr", managerId: null);
+        var secondManagerId = await CreateEmployeeAsync(hr, companyId, refData, "SecondMgr", managerId: null);
+        var reportId = await CreateEmployeeAsync(hr, companyId, refData, "Rep", firstManagerId);
+        await StartLeavingProcessAsync(hr, companyId, reportId, 30);
+
+        await ClearManagerAsync(hr, companyId, reportId);
+        Assert.Empty(await OffboardingTasksOfAsync(companyId, firstManagerId));
+
+        await AssignManagerAsync(hr, companyId, reportId, secondManagerId);
+
+        Assert.Empty(await OffboardingTasksOfAsync(companyId, firstManagerId));
+        Assert.Equal(4, (await OffboardingTasksOfAsync(companyId, secondManagerId)).Count);
+    }
+
     private sealed record IdPayload(Guid Id);
 
     private sealed record MyTasksPayload(IReadOnlyList<MyTaskItemPayload> Items);

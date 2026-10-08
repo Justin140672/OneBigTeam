@@ -37,7 +37,9 @@ public class ReassignOffboardingTasksOnManagerChangedHandlerTests
 
         var reassigner = new FakeTaskReassigner();
         var reconciler = new OffboardingManagerTaskAssigneeReconciler(
-            dbContext, new FakeManagerReader(newManagerId), reassigner, new FakeClock(FixedUtcNow),
+            dbContext, new FakeManagerReader(newManagerId), reassigner,
+            new FakeHrAdministratorDirectory(), new FakeEmployeeNameReader(), new FakeNotificationWriter(),
+            new FakeAuditPublisher(), new FakeClock(FixedUtcNow),
             NullLogger<OffboardingManagerTaskAssigneeReconciler>.Instance);
         var handler = new ReassignOffboardingTasksOnManagerChangedHandler(reconciler);
 

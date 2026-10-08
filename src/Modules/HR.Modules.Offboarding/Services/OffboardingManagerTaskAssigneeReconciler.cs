@@ -13,6 +13,10 @@ internal sealed class OffboardingManagerTaskAssigneeReconciler(
     OffboardingDbContext dbContext,
     IManagerReader managerReader,
     ITaskReassigner taskReassigner,
+    IHrAdministratorDirectory hrAdministratorDirectory,
+    IEmployeeNameReader employeeNameReader,
+    INotificationWriter notificationWriter,
+    IAuditEventPublisher auditEventPublisher,
     IClock clock,
     ILogger<OffboardingManagerTaskAssigneeReconciler> logger)
 {
@@ -68,8 +72,14 @@ internal sealed class OffboardingManagerTaskAssigneeReconciler(
         Guid companyId, Guid planId, Guid employeeId, CancellationToken cancellationToken)
     {
         var managerId = await managerReader.GetManagerIdAsync(companyId, employeeId, cancellationToken);
-        if (managerId is not { } resolvedManagerId)
-            return 0;
+
+        Guid? targetAssigneeId = managerId;
+        if (managerId is null)
+        {
+            var hrAdministratorIds = await hrAdministratorDirectory.GetHrAdministratorEmployeeIdsAsync(
+                companyId, cancellationToken);
+            targetAssigneeId = hrAdministratorIds.Count == 0 ? null : hrAdministratorIds.OrderBy(id => id).First();
+        }
 
         var managerTasks = await dbContext.OffboardingTasks
             .Where(t => t.CompanyId == companyId
@@ -82,7 +92,7 @@ internal sealed class OffboardingManagerTaskAssigneeReconciler(
             return 0;
 
         var now = clock.UtcNowOffset();
-        var changedLocally = managerTasks.Count(t => t.ReassignTo(resolvedManagerId, now));
+        var changedLocally = managerTasks.Count(t => t.ReassignTo(targetAssigneeId, now));
 
         if (changedLocally > 0)
             await dbContext.SaveChangesAsync(cancellationToken);
@@ -93,18 +103,73 @@ internal sealed class OffboardingManagerTaskAssigneeReconciler(
             .ToList();
 
         var reassignedInTasksModule = await taskReassigner.ReassignBySourceEntitiesAsync(
-            companyId, syncedTaskIds, TaskSource.Offboarding, TaskActionType.Complete, resolvedManagerId,
+            companyId, syncedTaskIds, TaskSource.Offboarding, TaskActionType.Complete, targetAssigneeId,
             cancellationToken);
 
         if (changedLocally > 0 || reassignedInTasksModule > 0)
         {
             logger.LogInformation(
                 "Re-pointed manager-assigned offboarding tasks for plan {OffboardingPlanId} " +
-                "(employee {EmployeeId}, company {CompanyId}) to current manager {ManagerId}: " +
+                "(employee {EmployeeId}, company {CompanyId}) to {AssigneeId} (manager: {HasManager}): " +
                 "{LocalCount} local, {TasksModuleCount} in Tasks module.",
-                planId, employeeId, companyId, resolvedManagerId, changedLocally, reassignedInTasksModule);
+                planId, employeeId, companyId, targetAssigneeId, managerId is not null, changedLocally,
+                reassignedInTasksModule);
+
+            if (managerId is null)
+            {
+                await FlagHrReconciliationAsync(
+                    companyId, planId, employeeId, targetAssigneeId, Math.Max(changedLocally, reassignedInTasksModule),
+                    now, cancellationToken);
+            }
         }
 
         return Math.Max(changedLocally, reassignedInTasksModule);
+    }
+
+    private async Task FlagHrReconciliationAsync(
+        Guid companyId, Guid planId, Guid employeeId, Guid? fallbackAssigneeId, int tasksReassigned,
+        DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var plan = await dbContext.OffboardingPlans
+            .SingleAsync(p => p.Id == planId && p.CompanyId == companyId, cancellationToken);
+
+        if (!plan.RequiresHrReconciliation)
+        {
+            plan.MarkHrReconciliationRequired(now);
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+
+        var names = await employeeNameReader.GetNamesAsync(companyId, [employeeId], cancellationToken);
+        var employeeName = names.TryGetValue(employeeId, out var name) && !string.IsNullOrEmpty(name)
+            ? name
+            : "the employee";
+
+        var hrAdministratorIds = await hrAdministratorDirectory.GetHrAdministratorEmployeeIdsAsync(
+            companyId, cancellationToken);
+
+        foreach (var hrAdministratorId in hrAdministratorIds)
+        {
+            var alreadySent = await notificationWriter.ExistsAsync(
+                hrAdministratorId, planId, NotificationType.OffboardingRequiresHrReconciliation, cancellationToken);
+
+            if (alreadySent)
+                continue;
+
+            await notificationWriter.WriteAsync(
+                Guid.NewGuid(), companyId, hrAdministratorId,
+                $"Offboarding needs HR reconciliation — {employeeName}",
+                $"{employeeName} no longer has a manager. Their manager-assigned offboarding tasks were " +
+                    "removed from the previous manager and need HR attention.",
+                planId,
+                NotificationType.OffboardingRequiresHrReconciliation,
+                NotificationPriority.High,
+                now,
+                cancellationToken);
+        }
+
+        await auditEventPublisher.PublishAsync(
+            new OffboardingManagerTasksUnassignedAuditEvent(
+                companyId, planId, employeeId, fallbackAssigneeId, tasksReassigned, now),
+            cancellationToken);
     }
 }
