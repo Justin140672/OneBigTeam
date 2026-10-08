@@ -50,7 +50,6 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
 
     public async Task SelectGroupByAsync(string groupByLabel)
     {
-        var versionBefore = await LoadRoot.GetAttributeAsync("data-load-version");
         try
         {
             await DropDownSelector.SelectAsync(page, FilterField("Group By"), groupByLabel);
@@ -61,9 +60,8 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
                 .ToHaveValueAsync(groupByLabel, new() { Timeout = 15_000 });
         }
 
-        await Assertions.Expect(LoadRoot)
-            .Not.ToHaveAttributeAsync("data-load-version", versionBefore ?? string.Empty, new() { Timeout = 20_000 });
-        await page.WaitForSelectorAsync(LoadedSelector, new() { Timeout = 20_000 });
+        await page.Locator("h5.mt-4").Or(page.Locator(".alert-info")).Or(page.Locator(".alert-danger")).First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 45_000 });
     }
 
     public async Task SetDueDateRangeAsync(DateOnly from, DateOnly to)

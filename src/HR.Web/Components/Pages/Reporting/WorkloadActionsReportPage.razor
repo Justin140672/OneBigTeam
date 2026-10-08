@@ -267,6 +267,7 @@
     private bool _isLoading = true;
     private bool _hasLoaded;
     private int _loadVersion;
+    private int _loadGeneration;
     private string? _error;
 
     private string? _actionType;
@@ -605,11 +606,15 @@
 
     private async Task LoadAsync()
     {
+        var generation = ++_loadGeneration;
         _isLoading = true;
         _error = null;
         StateHasChanged();
 
         var response = await ReportingService.GetWorkloadActionsReportAsync(CompanyId, BuildFilter());
+        if (generation != _loadGeneration)
+            return;
+
         if (response is null)
         {
             _error = "Failed to load the workload & HR actions report.";
