@@ -17,7 +17,7 @@ internal sealed class StartLeavingProcessHandler(
     ICompanyTimeZoneReader companyTimeZoneReader,
     IEffectiveNoticePeriodResolver noticePeriodResolver,
     IAuditEventPublisher auditEventPublisher,
-    IIntegrationEventPublisher integrationEventPublisher,
+    LeavingProcessPropagationService propagationService,
     INotificationWriter notificationWriter,
     IOffboardingPlanCoordinator offboardingPlanCoordinator,
     IEmployeeDepartureFinalizer departureFinalizer)
@@ -40,6 +40,8 @@ internal sealed class StartLeavingProcessHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await propagationService.TryDispatchForEmployeeAsync(
+                        request.CompanyId, request.EmployeeId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<StartLeavingProcessResponse>(
@@ -125,6 +127,8 @@ internal sealed class StartLeavingProcessHandler(
 
         employee.SetLeaving(now);
 
+        propagationService.Stage(leavingProcess, LeavingProcessPropagation.OperationStarted, now);
+
         StartLeavingProcessResponse BuildResponse() => new(
             leavingProcess.Id,
             leavingProcess.CompanyId,
@@ -148,7 +152,11 @@ internal sealed class StartLeavingProcessHandler(
                 scope, key, fingerprint!, StatusCodes.Status201Created, response, now, cancellationToken);
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                await propagationService.TryDispatchForEmployeeAsync(
+                    request.CompanyId, request.EmployeeId, cancellationToken);
                 return Result.Success(outcome.Response!);
+            }
         }
         else
         {
@@ -179,11 +187,8 @@ internal sealed class StartLeavingProcessHandler(
 
         await NotifyLeavingProcessStartedAsync(employee, leavingProcess, now, cancellationToken);
 
-        await integrationEventPublisher.PublishAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(
-                leavingProcess.CompanyId, leavingProcess.EmployeeId,
-                leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
-            cancellationToken);
+        await propagationService.TryDispatchForEmployeeAsync(
+            leavingProcess.CompanyId, leavingProcess.EmployeeId, cancellationToken);
 
         if (isBackdated)
             await departureFinalizer.FinalizeAsync(employee, leavingProcess, now, cancellationToken);

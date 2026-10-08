@@ -2,6 +2,7 @@ using HR.Infrastructure.Abstractions;
 using HR.Modules.Employees.Contracts;
 using HR.Modules.Employees.Domain;
 using HR.Modules.Employees.Persistence;
+using HR.Modules.Employees.Services;
 using HR.SharedKernel;
 using HR.SharedKernel.Idempotency;
 using Microsoft.AspNetCore.Http;
@@ -13,7 +14,7 @@ internal sealed class CancelLeavingProcessHandler(
     EmployeesDbContext dbContext,
     IClock clock,
     IAuditEventPublisher auditEventPublisher,
-    IIntegrationEventPublisher integrationEventPublisher,
+    LeavingProcessPropagationService propagationService,
     IOffboardingStatusReader offboardingStatusReader,
     IOffboardingPlanCoordinator offboardingPlanCoordinator)
 {
@@ -35,6 +36,8 @@ internal sealed class CancelLeavingProcessHandler(
             switch (replay?.Kind)
             {
                 case IdempotencyOutcomeKind.Replayed:
+                    await propagationService.TryDispatchForEmployeeAsync(
+                        request.CompanyId, request.EmployeeId, cancellationToken);
                     return Result.Success(replay.Response!);
                 case IdempotencyOutcomeKind.KeyReused:
                     return Result.Failure<CancelLeavingProcessResponse>(
@@ -71,6 +74,8 @@ internal sealed class CancelLeavingProcessHandler(
         leavingProcess.Cancel(request.CancellationReason, now);
         employee.Activate(now);
 
+        propagationService.Stage(leavingProcess, LeavingProcessPropagation.OperationCancelled, now);
+
         var response = new CancelLeavingProcessResponse(
             leavingProcess.Id,
             leavingProcess.CompanyId,
@@ -84,7 +89,11 @@ internal sealed class CancelLeavingProcessHandler(
                 scope, key, fingerprint!, StatusCodes.Status200OK, response, now, cancellationToken);
 
             if (outcome.Kind == IdempotencyOutcomeKind.Replayed)
+            {
+                await propagationService.TryDispatchForEmployeeAsync(
+                    request.CompanyId, request.EmployeeId, cancellationToken);
                 return Result.Success(outcome.Response!);
+            }
         }
         else
         {
@@ -108,10 +117,8 @@ internal sealed class CancelLeavingProcessHandler(
                 offboardingAlreadyStarted),
             cancellationToken);
 
-        await integrationEventPublisher.PublishAsync(
-            new EmployeeLeavingProcessCancelledIntegrationEvent(
-                leavingProcess.CompanyId, leavingProcess.EmployeeId, now),
-            cancellationToken);
+        await propagationService.TryDispatchForEmployeeAsync(
+            leavingProcess.CompanyId, leavingProcess.EmployeeId, cancellationToken);
 
         return Result.Success(response);
     }

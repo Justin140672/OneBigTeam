@@ -14,7 +14,7 @@ internal sealed class AmendLeavingProcessHandler(
     IClock clock,
     ICompanyTimeZoneReader companyTimeZoneReader,
     IAuditEventPublisher auditEventPublisher,
-    IIntegrationEventPublisher integrationEventPublisher,
+    LeavingProcessPropagationService propagationService,
     IOffboardingStatusReader offboardingStatusReader,
     IEmployeeDepartureFinalizer departureFinalizer)
 {
@@ -61,6 +61,8 @@ internal sealed class AmendLeavingProcessHandler(
 
         leavingProcess.Amend(request.LeavingDate, request.LastWorkingDay, request.LeavingReason, now, request.Notes);
 
+        propagationService.Stage(leavingProcess, LeavingProcessPropagation.OperationAmended, now);
+
         // Ticket 2: optimistic concurrency (base-code helper). Nothing commits on conflict, so the
         // audit/integration events and departure finalisation below only run on a successful save.
         var saveResult = await dbContext.SaveChangesWithConcurrencyAsync(
@@ -94,11 +96,8 @@ internal sealed class AmendLeavingProcessHandler(
                 offboardingAlreadyStarted),
             cancellationToken);
 
-        await integrationEventPublisher.PublishAsync(
-            new EmployeeLeavingDateSetIntegrationEvent(
-                leavingProcess.CompanyId, leavingProcess.EmployeeId,
-                leavingProcess.LeavingDate, leavingProcess.LastWorkingDay, now),
-            cancellationToken);
+        await propagationService.TryDispatchForEmployeeAsync(
+            leavingProcess.CompanyId, leavingProcess.EmployeeId, cancellationToken);
 
         if (isBackdated)
         {

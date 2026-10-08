@@ -5,6 +5,7 @@ using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -69,7 +70,7 @@ public class StartLeavingProcessHandlerTests
             companyTimeZoneReader ?? new FakeCompanyTimeZoneReader(),
             new FakeEffectiveNoticePeriodResolver(effectiveNoticePeriod),
             auditPublisher,
-            new NoOpIntegrationEventPublisher(),
+            new LeavingProcessPropagationService(context, new NoOpIntegrationEventPublisher(), new FakeClock(fixedUtcNow ?? FixedUtcNow), NullLogger<LeavingProcessPropagationService>.Instance),
             notificationWriter,
             offboardingPlanCoordinator ?? new FakeOffboardingPlanCoordinator(),
             departureFinalizer);

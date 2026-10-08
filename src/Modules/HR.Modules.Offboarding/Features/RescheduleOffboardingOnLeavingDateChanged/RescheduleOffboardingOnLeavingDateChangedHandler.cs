@@ -6,7 +6,7 @@ namespace HR.Modules.Offboarding.Features.RescheduleOffboardingOnLeavingDateChan
 
 internal sealed class RescheduleOffboardingOnLeavingDateChangedHandler(
     IOffboardingPlanCoordinator offboardingPlanCoordinator)
-    : IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>
+    : IRequiredIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>
 {
     public Task HandleAsync(
         EmployeeLeavingDateSetIntegrationEvent integrationEvent, CancellationToken cancellationToken)

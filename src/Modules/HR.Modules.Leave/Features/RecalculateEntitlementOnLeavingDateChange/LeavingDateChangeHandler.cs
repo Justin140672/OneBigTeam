@@ -12,8 +12,8 @@ internal sealed class LeavingDateChangeHandler(
     IClock clock,
     ICompanyLeaveSettingsReader leaveSettingsReader,
     IEmployeeStartDateReader startDateReader)
-    : IIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>,
-      IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>
+    : IRequiredIntegrationEventHandler<EmployeeLeavingDateSetIntegrationEvent>,
+      IRequiredIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>
 {
     public Task HandleAsync(EmployeeLeavingDateSetIntegrationEvent integrationEvent, CancellationToken cancellationToken) =>
         RecalculateAsync(

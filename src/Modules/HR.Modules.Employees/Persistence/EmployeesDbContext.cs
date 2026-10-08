@@ -42,6 +42,7 @@ internal sealed class EmployeesDbContext : DbContext
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
     public DbSet<AuditOutboxEntry> AuditOutboxEntries => Set<AuditOutboxEntry>();
     public DbSet<PendingManagerChangedEvent> PendingManagerChangedEvents => Set<PendingManagerChangedEvent>();
+    public DbSet<LeavingProcessPropagation> LeavingProcessPropagations => Set<LeavingProcessPropagation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -6,7 +6,7 @@ namespace HR.Modules.Offboarding.Features.CancelOffboardingOnLeavingProcessCance
 
 internal sealed class CancelOffboardingOnLeavingProcessCancelledHandler(
     IOffboardingPlanCoordinator offboardingPlanCoordinator)
-    : IIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>
+    : IRequiredIntegrationEventHandler<EmployeeLeavingProcessCancelledIntegrationEvent>
 {
     public Task HandleAsync(
         EmployeeLeavingProcessCancelledIntegrationEvent integrationEvent, CancellationToken cancellationToken)

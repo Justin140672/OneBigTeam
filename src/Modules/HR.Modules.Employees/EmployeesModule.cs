@@ -95,6 +95,7 @@ using HR.Modules.Employees.Features.GetEmployeeTimeline;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeeCreated;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnEmployeePromoted;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnManagerChanged;
+using HR.Modules.Employees.Features.ListLeavingProcessPropagations;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnLocationChanged;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnPositionChanged;
 using HR.Modules.Employees.Features.CreateTimelineEntryOnCompensationChanged;
@@ -160,6 +161,14 @@ public static class EmployeesModule
             "reconcile-pending-manager-changed-events",
             job => job.ExecuteAsync(),
             Cron.Daily(1));
+        jobManager.AddOrUpdate<DispatchLeavingProcessPropagationsJob>(
+            "dispatch-leaving-process-propagations",
+            job => job.ExecuteAsync(),
+            Cron.Minutely());
+        jobManager.AddOrUpdate<ReconcileLeavingProcessPropagationsJob>(
+            "reconcile-leaving-process-propagations",
+            job => job.ExecuteAsync(),
+            Cron.Hourly());
         // Ticket 3 (P1) follow-up item 4: clean up expired idempotency records.
         jobManager.AddOrUpdate<IdempotencyMaintenanceJob>(
             "employees-idempotency-maintenance",
@@ -409,6 +418,11 @@ public static class EmployeesModule
         services.AddScoped<ProcessPromotionsJob>();
         services.AddScoped<ReconcileFormerEmployeeAccessJob>();
         services.AddScoped<ReconcilePendingManagerChangedEventsJob>();
+        services.AddScoped<LeavingProcessPropagationService>();
+        services.AddScoped<DispatchLeavingProcessPropagationsJob>();
+        services.AddScoped<ReconcileLeavingProcessPropagationsJob>();
+        services.AddScoped<ListLeavingProcessPropagationsHandler>();
+        services.AddScoped<IValidator<ListLeavingProcessPropagationsRequest>, ListLeavingProcessPropagationsValidator>();
         services.AddScoped<IdempotencyMaintenanceJob>();
 
         services.AddScoped<GetEmployeeTimelineHandler>();

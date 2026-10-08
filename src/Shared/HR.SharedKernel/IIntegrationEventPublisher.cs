@@ -1,3 +1,5 @@
+using HR.SharedKernel.ExecutionContext;
+
 namespace HR.SharedKernel;
 public interface IIntegrationEventPublisher
 {
@@ -6,6 +8,11 @@ public interface IIntegrationEventPublisher
 
     Task<bool> PublishAndConfirmAsync<TEvent>(TEvent integrationEvent, CancellationToken cancellationToken)
         where TEvent : IIntegrationEvent;
+
+    Task<bool> PublishAndConfirmAsync<TEvent>(
+        TEvent integrationEvent, IExecutionContext restoredContext, CancellationToken cancellationToken)
+        where TEvent : IIntegrationEvent =>
+        PublishAndConfirmAsync(integrationEvent, cancellationToken);
 }
 
 // Opt-in marker for an integration event handler whose successful completion a publisher-side

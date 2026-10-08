@@ -4,6 +4,7 @@ using HR.Modules.Employees.Persistence;
 using HR.Modules.Employees.Services;
 using HR.Modules.Employees.Tests.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace HR.Modules.Employees.Tests;
 
@@ -48,7 +49,7 @@ public class AmendLeavingProcessConcurrencyHandlerTests
             new FakeClock(FixedUtcNow),
             new FakeCompanyTimeZoneReader(),
             audit,
-            integration,
+            new LeavingProcessPropagationService(context, integration, new FakeClock(FixedUtcNow), NullLogger<LeavingProcessPropagationService>.Instance),
             offboardingStatusReader,
             departureFinalizer);
     }
