@@ -206,8 +206,9 @@ public sealed class VacancyKanbanBoardTests(RecruiterPersonaFixture fixture) : R
         await _page.Locator("[data-testid='recruitment-view-board-btn']").ClickAsync();
         await kanban.WaitForLoadedAsync();
 
-        Assert.True(await kanban.HasCardForNameAsync(candidateLast),
-            "Expected the Kanban board's search filter to still be applied after switching away to the List view and back");
+        await Assertions.Expect(_page.Locator("input[aria-label='Search pipeline candidates']").First)
+            .ToHaveValueAsync(candidateLast, new() { Timeout = 15_000 });
+        await kanban.WaitForCardPresentAsync(candidateLast);
     }
 
     private string? _vacancyTitle;

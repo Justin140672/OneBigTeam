@@ -62,7 +62,7 @@ public sealed class LeaveApprovalTests(CrossUserFixture fixture) : RoleE2ETestBa
         Assert.Contains(notifTitles, t => t.Contains("Tom Williams", StringComparison.OrdinalIgnoreCase)
                                        || t.Contains("leave", StringComparison.OrdinalIgnoreCase));
 
-        await notif.ClickNotificationAsync("Tom Williams");
+        await notif.ClickNotificationAsync("6 Jul 2026 to 10 Jul 2026");
         await task.WaitForLoadedAsync();
 
         var taskTitle = await task.GetTitleAsync();

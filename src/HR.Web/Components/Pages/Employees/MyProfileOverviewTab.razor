@@ -400,7 +400,7 @@ else
 
         static T? Result<T>(Task<T?> t) => t.IsCompletedSuccessfully ? t.Result : default;
 
-        _employee = Result(employeeTask);
+        _employee = Result(employeeTask) ?? await EmployeeService.GetEmployeeAsync(CompanyId, EmployeeId);
         _probationStatus = Result(probationTask);
         _onboardingStatus = Result(onboardingTask);
         _currentCompensation = Result(compensationTask);

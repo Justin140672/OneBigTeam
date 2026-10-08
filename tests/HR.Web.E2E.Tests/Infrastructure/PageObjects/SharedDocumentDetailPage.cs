@@ -52,40 +52,31 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
     private async Task ClickMoreActionsItemAsync(string itemName)
     {
         var menuItem = page.Locator($"#{MoreActionsItemId(itemName)}");
+        const int maxAttempts = 5;
 
-        for (var attempt = 1; attempt <= 3; attempt++)
+        for (var attempt = 1; ; attempt++)
         {
-            await MoreActionsButton.ClickAsync();
             try
             {
+                await MoreActionsButton.ClickAsync(new() { Timeout = 5_000 });
                 await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 5_000 });
+                await menuItem.ClickAsync(new() { Timeout = 3_000 });
+                return;
             }
-            catch (TimeoutException)
+            catch (Exception ex) when (ex is TimeoutException or PlaywrightException && attempt < maxAttempts)
             {
                 await page.Keyboard.PressAsync("Escape");
-                continue;
             }
-
-            await menuItem.ClickAsync();
-            return;
+            catch (TimeoutException ex)
+            {
+                var popupText = await page.Locator(".e-dropdown-popup").IsVisibleAsync()
+                    ? await page.Locator(".e-dropdown-popup").InnerTextAsync()
+                    : "(popup not visible)";
+                throw new TimeoutException(
+                    $"'More actions' item '{itemName}' (#{MoreActionsItemId(itemName)}) could not be clicked after {maxAttempts} attempts. " +
+                    $"Popup contents at final failure: {popupText}", ex);
+            }
         }
-
-        await MoreActionsButton.ClickAsync();
-        try
-        {
-            await menuItem.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
-        }
-        catch (TimeoutException)
-        {
-            var popupText = await page.Locator(".e-dropdown-popup").IsVisibleAsync()
-                ? await page.Locator(".e-dropdown-popup").InnerTextAsync()
-                : "(popup not visible)";
-            throw new TimeoutException(
-                $"'More actions' item '{itemName}' (#{MoreActionsItemId(itemName)}) never appeared after 3 retries. " +
-                $"Popup contents at final failure: {popupText}");
-        }
-
-        await menuItem.ClickAsync();
     }
 
     private async Task<bool> HasMoreActionsItemAsync(string itemName)
@@ -212,16 +203,18 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
         await input.ClickAsync();
         await page.Keyboard.PressAsync("Control+A");
         await page.Keyboard.PressAsync("Delete");
-        await page.WaitForTimeoutAsync(150);
+        await Assertions.Expect(input).ToHaveValueAsync("", new() { Timeout = 5_000 });
         if (value.Length > 0)
+        {
             await input.PressSequentiallyAsync(value, new() { Delay = 30 });
+            await Assertions.Expect(input).ToHaveValueAsync(value, new() { Timeout = 5_000 });
+        }
         await page.Keyboard.PressAsync("Tab");
     }
 
     public async Task EditTitleDescriptionCategoryAsync(string title, string description, string categoryLabel)
     {
-        await EditMetadataHeaderButton.ClickAsync();
-        await EditMetadataDialog.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 10_000 });
+        await OpenMetadataDialogAsync();
 
         await ClearAndTypeAsync(EditMetadataDialog.GetByPlaceholder("Document title"), title);
         await ClearAndTypeAsync(EditMetadataDialog.GetByPlaceholder("Optional description"), description);
@@ -466,23 +459,8 @@ public sealed class SharedDocumentDetailPage(IPage page, string baseUrl)
 
     public async Task WaitForOverlayToClearAsync()
     {
-        try
-        {
-            await page.Locator(".e-dlg-overlay").WaitForAsync(
-                new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
-        }
-        catch (TimeoutException)
-        {
-        }
-
-        try
-        {
-            await page.Locator(".e-dlg-container").WaitForAsync(
-                new() { State = WaitForSelectorState.Detached, Timeout = 5_000 });
-        }
-        catch (TimeoutException)
-        {
-        }
+        await Assertions.Expect(page.Locator(".e-dlg-overlay:visible")).ToHaveCountAsync(0, new() { Timeout = 15_000 });
+        await Assertions.Expect(page.Locator(".e-dlg-container:visible")).ToHaveCountAsync(0, new() { Timeout = 15_000 });
     }
 
     public Task<bool> IsEditAcknowledgementDialogOpenAsync() => EditAcknowledgementDialog.IsVisibleAsync();

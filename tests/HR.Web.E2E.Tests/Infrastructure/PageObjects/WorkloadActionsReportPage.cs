@@ -116,8 +116,11 @@ public sealed class WorkloadActionsReportPage(IPage page, string baseUrl)
     public async Task<IReadOnlyList<string>> GetGroupHeadingsAsync()
     {
         var emptyState = page.Locator(".alert-info", new() { HasText = "No outstanding actions. Everything is up to date." });
-        await page.Locator("h5.mt-4").Or(emptyState).First
-            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 15_000 });
+        var error = page.Locator(".alert-danger");
+        await page.Locator("h5.mt-4").Or(emptyState).Or(error).First
+            .WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = 30_000 });
+        if (await error.First.IsVisibleAsync())
+            throw new InvalidOperationException($"Workload report showed an error banner: {(await error.First.TextContentAsync())?.Trim()}");
         var headings = await page.Locator("h5.mt-4").AllTextContentsAsync();
         return headings.Select(h => h.Trim()).ToList();
     }

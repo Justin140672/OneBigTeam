@@ -73,6 +73,15 @@ public sealed class NotificationPanel(IPage page)
             {
                 if (!await item.IsVisibleAsync())
                 {
+                    if (!await dialog.First.IsVisibleAsync() && attempt < maxAttempts)
+                    {
+                        await page.WaitForTimeoutAsync(1_000);
+                        if (await page.Locator(".notif-dropdown").IsVisibleAsync())
+                            await CloseAsync();
+                        await OpenAsync();
+                        continue;
+                    }
+
                     await dialog.First.WaitForAsync(new() { State = WaitForSelectorState.Visible, Timeout = attempt < maxAttempts ? 8_000 : 30_000 });
                     return;
                 }

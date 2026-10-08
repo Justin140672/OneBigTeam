@@ -101,22 +101,28 @@ public sealed class TaskViewPage(IPage page, string baseUrl)
     public async Task WaitForCompletedAsync() =>
         await Dialog.WaitForAsync(new() { State = WaitForSelectorState.Hidden, Timeout = 15_000 });
 
-    public async Task<string> GetListTaskStatusAsync(Guid taskId)
-    {
-        var badge = page.Locator($".e-row:has([data-testid='task-view-btn-{taskId}']) .task-status-badge").First;
-        await badge.WaitForAsync(new() { Timeout = 15_000 });
-        var cssClass = await badge.GetAttributeAsync("class") ?? "";
-        return cssClass.Contains("task-status-badge--completed") ? "Completed" : "Not Started";
-    }
+    public Task<string> GetListTaskStatusAsync(Guid taskId) =>
+        WaitForCompletedBadgeAsync(
+            page.Locator($".e-row:has([data-testid='task-view-btn-{taskId}']) .task-status-badge").First);
 
-    public async Task<string> GetListTaskStatusByTitleAsync(string taskTitle)
-    {
-        var badge = page.Locator(".e-row")
+    public Task<string> GetListTaskStatusByTitleAsync(string taskTitle) =>
+        WaitForCompletedBadgeAsync(page.Locator(".e-row")
             .Filter(new() { Has = page.GetByRole(AriaRole.Button, new() { Name = taskTitle, Exact = true }) })
-            .First.Locator(".task-status-badge").First;
+            .First.Locator(".task-status-badge").First);
+
+    private static async Task<string> WaitForCompletedBadgeAsync(ILocator badge)
+    {
         await badge.WaitForAsync(new() { Timeout = 15_000 });
-        var cssClass = await badge.GetAttributeAsync("class") ?? "";
-        return cssClass.Contains("task-status-badge--completed") ? "Completed" : "Not Started";
+        try
+        {
+            await Assertions.Expect(badge).ToHaveClassAsync(
+                new System.Text.RegularExpressions.Regex("task-status-badge--completed"), new() { Timeout = 15_000 });
+            return "Completed";
+        }
+        catch (PlaywrightException)
+        {
+            return "Not Started";
+        }
     }
 
     public async Task CloseAsync()

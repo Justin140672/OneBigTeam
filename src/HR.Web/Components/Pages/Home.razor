@@ -38,6 +38,8 @@
                 targetUrl = AppSession.DashboardUrl(lastDashboard) ?? targetUrl;
         }
 
+        if (new Uri(Navigation.Uri).AbsolutePath != "/") return;
+
         Navigation.NavigateTo(targetUrl, replace: true);
     }
 }
