@@ -17,9 +17,9 @@
       },
       "coverlet.collector": {
         "type": "Direct",
-        "requested": "[10.0.1, )",
-        "resolved": "10.0.1",
-        "contentHash": "27jXSV/0DbVqF5jDrAxuQFZ9oaz6gmG03p8ttxAFk+X0M4woFYj7MoWDLCna5EGLb0CE6OE7X6ZH3Wt5smTtaA=="
+        "requested": "[10.1.0, )",
+        "resolved": "10.1.0",
+        "contentHash": "SlYCIHnBYxINSUpR75SiM5JEmnx11pqT+Ac/C/fUqTTA0dLPl9eYzmFXKKuxmQhL3ZdTQl4PBD3YdAxAauaKLQ=="
       },
       "Microsoft.EntityFrameworkCore.InMemory": {
         "type": "Direct",
@@ -737,7 +737,6 @@
         "dependencies": {
           "ClosedXML": "[0.105.1, )",
           "HR.Infrastructure.Abstractions": "[0.1.0-dev, )",
-          "HR.Modules.Companies.Contracts": "[0.1.0-dev, )",
           "HR.ServiceDefaults": "[0.1.0-dev, )",
           "HR.SharedKernel": "[0.1.0-dev, )",
           "Hangfire.AspNetCore": "[1.8.25, )",
